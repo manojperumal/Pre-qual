@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Build outputs
+client/dist/
+server/dist/
+
+# Environment files
+.env
+.env.local
+client/.env
+client/.env.local
+server/.env
+server/.env.local
+
+# Misc
+.DS_Store
+*.log
