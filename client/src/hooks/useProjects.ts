@@ -54,6 +54,40 @@ export function useCreateProject() {
   })
 }
 
+export function useUpdateProject() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      id,
+      name,
+      description,
+      startDate,
+      endDate,
+    }: {
+      id: string
+      name: string
+      description?: string
+      startDate?: string
+      endDate?: string
+    }) => {
+      const { data, error } = await supabase
+        .from('projects')
+        .update({
+          name,
+          description: description || null,
+          start_date: startDate || null,
+          end_date: endDate || null,
+        })
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      return data as Project
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
+  })
+}
+
 export function useProjectMembers(projectId: string | undefined) {
   return useQuery({
     queryKey: ['project_members', projectId],
@@ -82,7 +116,6 @@ export interface OwnerContractorRow {
   contractorEmail: string | null
   companyName: string | null
   submissionStatus: string | null
-  // trades only
   gcName: string | null
   gcCompany: string | null
 }
@@ -92,7 +125,6 @@ export function useOwnerGCs(ownerId: string | undefined) {
     queryKey: ['owner_gcs', ownerId],
     enabled: !!ownerId,
     queryFn: async (): Promise<OwnerContractorRow[]> => {
-      // Get all projects owned by this user
       const { data: projects, error: pErr } = await supabase
         .from('projects')
         .select('id, name, start_date, end_date')
@@ -102,7 +134,6 @@ export function useOwnerGCs(ownerId: string | undefined) {
 
       const projectIds = projects.map((p) => p.id)
 
-      // Get all GC members across those projects
       const { data: members, error: mErr } = await supabase
         .from('project_members')
         .select('id, project_id, user_id, joined_at, profile:profiles!inner(id, full_name, email, company_name, role)')
@@ -112,7 +143,6 @@ export function useOwnerGCs(ownerId: string | undefined) {
       const gcMembers = (members ?? []).filter((m: any) => m.profile?.role === 'gc')
       if (!gcMembers.length) return []
 
-      // Get submissions for those project+contractor combos
       const { data: submissions } = await supabase
         .from('project_submissions')
         .select('project_id, contractor_id, status')
@@ -180,7 +210,6 @@ export function useOwnerTrades(ownerId: string | undefined) {
         subMap.set(`${s.project_id}:${s.contractor_id}`, s.status)
       }
 
-      // Get accepted invitations to find which GC invited each trade
       const tradeEmails = [...new Set(tradeMembers.map((m: any) => m.profile?.email).filter(Boolean))]
       const { data: invitations } = await supabase
         .from('invitations')
@@ -190,7 +219,6 @@ export function useOwnerTrades(ownerId: string | undefined) {
         .eq('status', 'accepted')
         .in('recipient_email', tradeEmails)
 
-      // Map projectId+email → GC info
       const gcMap = new Map<string, { gcName: string | null; gcCompany: string | null }>()
       for (const inv of invitations ?? []) {
         const sender = inv.sender as any
