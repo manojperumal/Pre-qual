@@ -13,6 +13,8 @@ import InvitePage from '@/pages/InvitePage'
 import CreateProjectPage from '@/pages/CreateProjectPage'
 import ProjectDetailPage from '@/pages/ProjectDetailPage'
 import ProjectsListPage from '@/pages/ProjectsListPage'
+import GeneralContractorsPage from '@/pages/GeneralContractorsPage'
+import TradesPage from '@/pages/TradesPage'
 import InviteAcceptPage from '@/pages/InviteAcceptPage'
 import ContractorProfilePage from '@/pages/ContractorProfilePage'
 import ProjectSubmissionPage from '@/pages/ProjectSubmissionPage'
@@ -63,6 +65,8 @@ export default function App() {
         <Route path="projects/:projectId" element={<ProjectDetailPage />} />
         <Route path="projects/:projectId/invite" element={<InvitePage />} />
         <Route path="projects/:projectId/submissions/:submissionId" element={<SubmissionReviewPage />} />
+        <Route path="general-contractors" element={<GeneralContractorsPage />} />
+        <Route path="trades" element={<TradesPage />} />
         <Route path="prequal/:id" element={<PrequalDetail />} />
       </Route>
 
