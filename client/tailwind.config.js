@@ -5,16 +5,20 @@ export default {
     extend: {
       colors: {
         brand: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
+          50: '#eef1fb',
+          100: '#d5dcf7',
+          200: '#abb9ef',
+          300: '#8196e7',
+          400: '#6070e0', // card header
+          500: '#4B6BF5', // primary
+          600: '#3D5BE0', // hover
+          700: '#3050cc', // dark
+          800: '#2440b8', // darker
+          900: '#1a2e8a', // darkest
+        },
+        mojo: {
+          bg: '#EEF1F8',
+          dark: '#1A1A2E',
         },
       },
     },
