@@ -9,8 +9,6 @@ import {
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
-// ─── Fetch prequalifications ───────────────────────────────────────────────
-
 export function useMyPrequals(userId: string | undefined) {
   return useQuery({
     queryKey: ['preqals', 'mine', userId],
@@ -44,8 +42,6 @@ export function usePrequal(id: string | undefined) {
     enabled: !!id,
   })
 }
-
-// ─── Create/Update prequalification ───────────────────────────────────────
 
 export function useCreatePrequal() {
   const qc = useQueryClient()
@@ -104,8 +100,6 @@ export function useUpdatePrequalStatus() {
   })
 }
 
-// ─── Documents ─────────────────────────────────────────────────────────────
-
 export function usePrequalDocs(prequalId: string | undefined) {
   return useQuery({
     queryKey: ['prequal-docs', prequalId],
@@ -140,8 +134,6 @@ export function useDeleteDoc() {
   })
 }
 
-// ─── Invitations ───────────────────────────────────────────────────────────
-
 export function useSentInvitations(senderId: string | undefined) {
   return useQuery({
     queryKey: ['invitations', 'sent', senderId],
@@ -159,6 +151,11 @@ export function useSentInvitations(senderId: string | undefined) {
   })
 }
 
+export interface ReceivedInvitation extends Invitation {
+  sender: { full_name: string | null; company_name: string | null; role: string } | null
+  project: { id: string; name: string } | null
+}
+
 export function useReceivedInvitations(email: string | undefined) {
   return useQuery({
     queryKey: ['invitations', 'received', email],
@@ -166,11 +163,11 @@ export function useReceivedInvitations(email: string | undefined) {
       if (!email) return []
       const { data, error } = await supabase
         .from('invitations')
-        .select('*')
+        .select('*, sender:profiles!sender_id(full_name, company_name, role), project:projects(id, name)')
         .eq('recipient_email', email)
         .order('created_at', { ascending: false })
       if (error) throw error
-      return data as Invitation[]
+      return data as ReceivedInvitation[]
     },
     enabled: !!email,
   })
@@ -205,6 +202,22 @@ export function useSendInvitation() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['invitations'] })
+    },
+  })
+}
+
+export function useMyProjectSubmissions(contractorId: string | undefined) {
+  return useQuery({
+    queryKey: ['my_project_submissions', contractorId],
+    enabled: !!contractorId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('project_submissions')
+        .select('*')
+        .eq('contractor_id', contractorId!)
+        .order('updated_at', { ascending: false })
+      if (error) throw error
+      return data
     },
   })
 }
