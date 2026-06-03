@@ -3,12 +3,8 @@ import { useAuth } from '@/hooks/useAuth'
 import clsx from 'clsx'
 import {
   LayoutDashboard,
-  FileText,
-  Send,
   LogOut,
-  HardHat,
-  Building2,
-  Wrench,
+  User,
 } from 'lucide-react'
 
 interface NavItem {
@@ -20,36 +16,38 @@ interface NavItem {
 const ROLE_NAV: Record<string, NavItem[]> = {
   owner: [
     { label: 'Dashboard', to: '/owner', icon: <LayoutDashboard size={18} /> },
-    { label: 'Send Invite', to: '/owner/invite', icon: <Send size={18} /> },
   ],
   gc: [
     { label: 'Dashboard', to: '/gc', icon: <LayoutDashboard size={18} /> },
-    { label: 'New Pre-Qual', to: '/gc/prequal/new', icon: <FileText size={18} /> },
-    { label: 'Send Invite', to: '/gc/invite', icon: <Send size={18} /> },
+    { label: 'My Profile', to: '/gc/profile', icon: <User size={18} /> },
   ],
   trade: [
     { label: 'Dashboard', to: '/trade', icon: <LayoutDashboard size={18} /> },
-    { label: 'New Pre-Qual', to: '/trade/prequal/new', icon: <FileText size={18} /> },
+    { label: 'My Profile', to: '/trade/profile', icon: <User size={18} /> },
   ],
 }
 
-const ROLE_ICON: Record<string, React.ReactNode> = {
-  owner: <Building2 size={22} className="text-brand-400" />,
-  gc: <HardHat size={22} className="text-brand-400" />,
-  trade: <Wrench size={22} className="text-brand-400" />,
-}
-
-const ROLE_LABEL: Record<string, string> = {
+const ROLE_LABELS: Record<string, string> = {
   owner: 'Owner',
   gc: 'General Contractor',
   trade: 'Trade',
 }
 
+function getInitials(name?: string | null): string {
+  if (!name) return '?'
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((n) => n[0].toUpperCase())
+    .join('')
+}
+
 export function Sidebar() {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
-  const role = profile?.role ?? 'trade'
-  const navItems = ROLE_NAV[role] ?? []
+  const role = profile?.role ?? 'owner'
+  const navItems = ROLE_NAV[role] ?? ROLE_NAV.owner
 
   async function handleSignOut() {
     await signOut()
@@ -57,42 +55,26 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="w-64 flex-shrink-0 bg-gray-900 flex flex-col min-h-screen">
+    <aside className="w-60 flex-shrink-0 bg-brand-800 flex flex-col min-h-screen">
       {/* Logo */}
-      <div className="px-6 py-5 border-b border-gray-700">
-        <div className="flex items-center gap-2">
-          <HardHat size={24} className="text-brand-400" />
-          <span className="text-white font-bold text-lg">PreQual Pro</span>
-        </div>
+      <div className="px-5 py-5 border-b border-white/10">
+        <span className="text-white font-black text-xl">mojo</span>
+        <span className="text-brand-500 font-medium text-xl"> pre-qual</span>
       </div>
 
-      {/* Role indicator */}
-      <div className="px-6 py-4 border-b border-gray-700">
-        <div className="flex items-center gap-2 text-gray-300">
-          {ROLE_ICON[role]}
-          <div>
-            <p className="text-xs text-gray-500 uppercase tracking-wider">Role</p>
-            <p className="text-sm font-medium">{ROLE_LABEL[role]}</p>
-          </div>
-        </div>
-        {profile?.company_name && (
-          <p className="mt-1 text-xs text-gray-400 truncate">{profile.company_name}</p>
-        )}
-      </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 px-4 py-4 space-y-1">
+      {/* Nav */}
+      <nav className="flex-1 px-3 py-4 space-y-1">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
-            end={item.to === '/owner' || item.to === '/gc' || item.to === '/trade'}
+            end={item.to.split('/').length === 2}
             className={({ isActive }) =>
               clsx(
                 'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-brand-700 text-white'
-                  : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                  ? 'bg-white/10 text-white'
+                  : 'text-white/70 hover:bg-white/10 hover:text-white'
               )
             }
           >
@@ -102,17 +84,31 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* User + Sign out */}
-      <div className="px-4 py-4 border-t border-gray-700">
-        <div className="mb-3 px-3">
-          <p className="text-sm font-medium text-white truncate">
-            {profile?.full_name || 'User'}
-          </p>
-          <p className="text-xs text-gray-400 truncate">{profile?.email}</p>
+      {/* Bottom user section */}
+      <div className="px-3 py-4 border-t border-white/10">
+        <div className="flex items-center gap-3 px-2 py-2 rounded-md mb-2">
+          {/* Avatar */}
+          <div className="w-8 h-8 rounded-full bg-brand-500 flex items-center justify-center flex-shrink-0">
+            <span className="text-white text-xs font-bold">
+              {getInitials(profile?.full_name)}
+            </span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-white text-sm font-medium truncate">
+              {profile?.full_name || 'User'}
+            </p>
+            <p className="text-white/50 text-xs truncate">{profile?.email}</p>
+          </div>
+        </div>
+        {/* Role badge */}
+        <div className="px-2 mb-2">
+          <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-brand-500/10 text-brand-400 border border-brand-500/20">
+            {ROLE_LABELS[role] ?? role}
+          </span>
         </div>
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+          className="flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm font-medium text-white/70 hover:bg-white/10 hover:text-white transition-colors"
         >
           <LogOut size={18} />
           Sign Out

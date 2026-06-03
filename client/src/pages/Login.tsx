@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { supabase } from '@/lib/supabase'
-import { HardHat, Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -40,13 +40,13 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-brand-900 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-[#1a0a0e] flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <HardHat size={32} className="text-brand-400" />
-            <span className="text-white font-bold text-2xl">PreQual Pro</span>
+          <div className="flex items-center justify-center gap-0 mb-3">
+            <span className="text-white font-black text-2xl">mojo</span>
+            <span className="text-brand-500 font-medium text-2xl"> pre-qual</span>
           </div>
           <p className="text-gray-400 text-sm">Construction Pre-Qualification Platform</p>
         </div>

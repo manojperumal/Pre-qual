@@ -15,6 +15,16 @@ const SUBMISSION_STATUS_COLORS: Record<string, string> = {
   needs_more_info: 'bg-orange-100 text-orange-700',
 }
 
+function getInitials(name?: string | null): string {
+  if (!name) return '?'
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((n) => n[0].toUpperCase())
+    .join('')
+}
+
 export default function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const { profile } = useAuth()
@@ -93,13 +103,24 @@ export default function ProjectDetailPage() {
               <tbody className="divide-y divide-gray-200">
                 {members.map((member: any) => {
                   const p = member.profile
+                  const displayName = p?.full_name || p?.email || '—'
+                  const initials = getInitials(p?.full_name || p?.email)
                   return (
                     <tr key={member.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {p?.full_name || '—'}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center flex-shrink-0">
+                            <span className="text-brand-700 text-xs font-bold">{initials}</span>
+                          </div>
+                          <span className="text-sm text-gray-900">{displayName}</span>
+                        </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {p?.company_name || '—'}
+                      <td className="px-6 py-4 text-sm">
+                        {p?.company_name ? (
+                          <span className="text-gray-600">{p.company_name}</span>
+                        ) : (
+                          <span className="text-gray-400 italic">Profile incomplete</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600 capitalize">
                         {member.role}
@@ -149,10 +170,14 @@ export default function ProjectDetailPage() {
                   {submissions.map((sub) => (
                     <tr key={sub.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 text-sm text-gray-900">
-                        {sub.contractor?.full_name || '—'}
+                        {sub.contractor?.full_name || sub.contractor?.email || '—'}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {sub.contractor?.company_name || '—'}
+                      <td className="px-6 py-4 text-sm">
+                        {sub.contractor?.company_name ? (
+                          <span className="text-gray-600">{sub.contractor.company_name}</span>
+                        ) : (
+                          <span className="text-gray-400 italic">Profile incomplete</span>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SUBMISSION_STATUS_COLORS[sub.status] ?? 'bg-gray-100 text-gray-600'}`}>

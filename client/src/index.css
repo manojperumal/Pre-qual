@@ -25,7 +25,10 @@
     @apply block text-sm font-medium text-[#0A0A0A] mb-1;
   }
   .card {
-    @apply bg-white rounded-lg border border-gray-200 shadow-sm;
+    @apply bg-white rounded-lg border border-gray-200 shadow-sm transition-shadow;
+  }
+  .card-hover {
+    @apply bg-white rounded-lg border border-gray-200 shadow-sm transition-all hover:shadow-md hover:border-brand-200 cursor-pointer;
   }
   .form-error {
     @apply mt-1 text-xs text-red-600;

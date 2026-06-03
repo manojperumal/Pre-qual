@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { supabase } from '@/lib/supabase'
-import { HardHat, Eye, EyeOff, Building2, Wrench } from 'lucide-react'
+import { Eye, EyeOff, Building2, Wrench, HardHat } from 'lucide-react'
 import { UserRole } from '@/types'
 import clsx from 'clsx'
 
@@ -119,20 +119,20 @@ export default function SignUp() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-brand-900 flex items-center justify-center px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-[#1a0a0e] flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-lg">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <HardHat size={32} className="text-brand-400" />
-            <span className="text-white font-bold text-2xl">PreQual Pro</span>
+          <div className="flex items-center justify-center gap-0 mb-3">
+            <span className="text-white font-black text-2xl">mojo</span>
+            <span className="text-brand-500 font-medium text-2xl"> pre-qual</span>
           </div>
           <p className="text-gray-400 text-sm">Create your account</p>
         </div>
 
         {/* Card */}
         <div className="card p-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Join PreQual Pro</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">Join mojo pre-qual</h2>
 
           {authError && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
