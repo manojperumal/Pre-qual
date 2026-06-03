@@ -40,19 +40,22 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-[#1a0a0e] flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[#111827] flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-0 mb-3">
-            <span className="text-white font-black text-2xl">mojo</span>
-            <span className="text-brand-500 font-medium text-2xl"> pre-qual</span>
+          <div className="flex items-center justify-center gap-1 mb-3">
+            <span className="text-white font-light text-3xl">safety</span>
+            <div className="relative">
+              <span className="text-white font-bold text-3xl">Mojo</span>
+              <span className="absolute top-0 left-[1.45rem] -translate-y-1 w-2 h-2 rounded-full bg-[#E8336D]" />
+            </div>
           </div>
           <p className="text-gray-400 text-sm">Construction Pre-Qualification Platform</p>
         </div>
 
         {/* Card */}
-        <div className="card p-8">
+        <div className="card p-8 rounded-xl shadow-xl">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">Sign in to your account</h2>
 
           {authError && (
