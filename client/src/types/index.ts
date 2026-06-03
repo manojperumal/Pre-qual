@@ -25,6 +25,8 @@ export interface Project {
   name: string
   description?: string
   owner_id: string
+  start_date?: string | null
+  end_date?: string | null
   created_at: string
   updated_at: string
 }
@@ -43,14 +45,12 @@ export interface Prequalification {
   applicant_id: string
   requester_id: string
   status: PrequalStatus
-  // company info
   company_name: string | null
   address: string | null
   years_in_business: number | null
   trade_type: string | null
   license_numbers: string | null
   state: string | null
-  // insurance
   gl_carrier: string | null
   gl_policy: string | null
   gl_limits: string | null
@@ -63,19 +63,16 @@ export interface Prequalification {
   umbrella_policy: string | null
   umbrella_limits: string | null
   umbrella_expiry: string | null
-  // safety
   emr_value: number | null
   osha_year1: number | null
   osha_year2: number | null
   osha_year3: number | null
   trir: number | null
   safety_program: string | null
-  // financial
   annual_revenue: number | null
   bonding_single: number | null
   bonding_aggregate: number | null
   bonding_company: string | null
-  // meta
   created_at: string
   updated_at: string
 }
@@ -111,7 +108,6 @@ export interface InvitationWithSender extends Invitation {
   sender?: Profile
 }
 
-// Form data types
 export interface CompanyInfoFormData {
   company_name: string
   address: string
@@ -157,12 +153,9 @@ export type PrequalFormData = CompanyInfoFormData &
   SafetyFormData &
   FinancialFormData
 
-// Phase 1B types
-
 export interface ContractorProfile {
   id: string
   user_id: string
-  // Company
   company_name?: string
   address?: string
   city?: string
@@ -172,7 +165,6 @@ export interface ContractorProfile {
   years_in_business?: number
   license_numbers?: string
   employee_count?: number
-  // Insurance
   gl_carrier?: string
   gl_policy?: string
   gl_limits?: string
@@ -185,7 +177,6 @@ export interface ContractorProfile {
   umbrella_policy?: string
   umbrella_limits?: string
   umbrella_expiry?: string
-  // Safety
   emr_value?: number
   osha_incidents_y1?: number
   osha_incidents_y2?: number
@@ -197,10 +188,8 @@ export interface ContractorProfile {
   total_hours_y3?: number
   trir?: number
   dart_rate?: number
-  // PTP
   has_ptp_program?: boolean
   ptp_description?: string
-  // Bonding
   bonding_company?: string
   bonding_single?: number
   bonding_aggregate?: number
