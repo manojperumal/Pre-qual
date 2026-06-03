@@ -4,10 +4,13 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAuth } from '@/hooks/useAuth'
 import { useCreateProject } from '@/hooks/useProjects'
+import { ChevronRight } from 'lucide-react'
 
 const schema = z.object({
   name: z.string().min(1, 'Project name is required'),
   description: z.string().optional(),
+  start_date: z.string().optional(),
+  end_date: z.string().optional(),
 })
 
 type FormData = z.infer<typeof schema>
@@ -31,9 +34,11 @@ export default function CreateProjectPage() {
       await createProject.mutateAsync({
         name: data.name,
         description: data.description,
+        startDate: data.start_date || undefined,
+        endDate: data.end_date || undefined,
         ownerId: profile.id,
       })
-      navigate('/owner')
+      navigate('/owner/projects')
     } catch (err) {
       console.error('Failed to create project', err)
     }
@@ -41,10 +46,14 @@ export default function CreateProjectPage() {
 
   return (
     <div className="max-w-lg space-y-6">
+      {/* Breadcrumbs */}
+      <nav className="flex items-center gap-1.5 text-sm text-gray-500">
+        <Link to="/owner/projects" className="hover:text-brand-600 transition-colors">Projects</Link>
+        <ChevronRight size={14} className="text-gray-400 flex-shrink-0" />
+        <span className="text-gray-900 font-medium">New Project</span>
+      </nav>
+
       <div>
-        <Link to="/owner" className="text-sm text-brand-600 hover:text-brand-700 mb-2 inline-block">
-          ← Back to Dashboard
-        </Link>
         <h1 className="text-2xl font-bold text-gray-900">Create New Project</h1>
         <p className="mt-1 text-sm text-gray-500">Set up a project to manage pre-qualifications</p>
       </div>
@@ -58,9 +67,7 @@ export default function CreateProjectPage() {
       <div className="card p-6">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           <div>
-            <label className="label" htmlFor="name">
-              Project Name *
-            </label>
+            <label className="label" htmlFor="name">Project Name *</label>
             <input
               id="name"
               type="text"
@@ -72,23 +79,39 @@ export default function CreateProjectPage() {
           </div>
 
           <div>
-            <label className="label" htmlFor="description">
-              Description
-            </label>
+            <label className="label" htmlFor="description">Description</label>
             <textarea
               id="description"
-              rows={4}
+              rows={3}
               className="input-field resize-none"
               placeholder="Brief description of the project..."
               {...register('description')}
             />
-            {errors.description && <p className="form-error">{errors.description.message}</p>}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="label" htmlFor="start_date">Start Date</label>
+              <input
+                id="start_date"
+                type="date"
+                className="input-field"
+                {...register('start_date')}
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="end_date">End Date</label>
+              <input
+                id="end_date"
+                type="date"
+                className="input-field"
+                {...register('end_date')}
+              />
+            </div>
           </div>
 
           <div className="flex items-center justify-between pt-2">
-            <Link to="/owner" className="btn-secondary">
-              Cancel
-            </Link>
+            <Link to="/owner/projects" className="btn-secondary">Cancel</Link>
             <button
               type="submit"
               disabled={isSubmitting || createProject.isPending}
