@@ -8,6 +8,8 @@ import { HardHat, Eye, EyeOff, Building2, Wrench } from 'lucide-react'
 import { UserRole } from '@/types'
 import clsx from 'clsx'
 
+const API_URL = import.meta.env.VITE_API_URL || ''
+
 const schema = z.object({
   full_name: z.string().min(2, 'Full name is required'),
   company_name: z.string().min(2, 'Company name is required'),
@@ -77,17 +79,43 @@ export default function SignUp() {
 
     if (error) {
       setAuthError(error.message)
-    } else {
-      // Update the profile with company_name (the trigger sets full_name and role)
-      const { data: sessionData } = await supabase.auth.getSession()
-      if (sessionData.session) {
-        await supabase
-          .from('profiles')
-          .update({ company_name: data.company_name })
-          .eq('id', sessionData.session.user.id)
-      }
-      navigate('/')
+      return
     }
+
+    // Update the profile with company_name
+    const { data: sessionData } = await supabase.auth.getSession()
+    if (sessionData.session) {
+      await supabase
+        .from('profiles')
+        .update({ company_name: data.company_name })
+        .eq('id', sessionData.session.user.id)
+
+      // Check for a pending invite token
+      const pendingToken = sessionStorage.getItem('pending_invite_token')
+      if (pendingToken) {
+        try {
+          const res = await fetch(`${API_URL}/api/invitations/accept`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${sessionData.session.access_token}`,
+            },
+            body: JSON.stringify({ token: pendingToken }),
+          })
+          sessionStorage.removeItem('pending_invite_token')
+          if (res.ok) {
+            // Navigate based on role
+            const role = data.role
+            navigate(role === 'owner' ? '/owner' : role === 'gc' ? '/gc' : '/trade')
+            return
+          }
+        } catch {
+          // Best-effort; fall through to default navigation
+        }
+      }
+    }
+
+    navigate('/')
   }
 
   return (

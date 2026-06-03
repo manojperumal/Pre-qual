@@ -20,6 +20,24 @@ export interface Profile {
   created_at: string
 }
 
+export interface Project {
+  id: string
+  name: string
+  description?: string
+  owner_id: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ProjectMember {
+  id: string
+  project_id: string
+  user_id: string
+  role: UserRole
+  joined_at: string
+  profile?: Profile
+}
+
 export interface Prequalification {
   id: string
   applicant_id: string
@@ -83,6 +101,9 @@ export interface Invitation {
   recipient_role: 'gc' | 'trade'
   status: InvitationStatus
   prequalification_id: string | null
+  project_id?: string
+  token?: string
+  expires_at?: string
   created_at: string
 }
 

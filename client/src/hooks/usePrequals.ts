@@ -7,6 +7,8 @@ import {
   PrequalStatus,
 } from '@/types'
 
+const API_URL = import.meta.env.VITE_API_URL || ''
+
 // ─── Fetch prequalifications ───────────────────────────────────────────────
 
 export function useMyPrequals(userId: string | undefined) {
@@ -178,31 +180,28 @@ export function useSendInvitation() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (invitation: {
-      sender_id: string
       recipient_email: string
       recipient_role: 'gc' | 'trade'
+      project_id?: string
     }) => {
-      // Create the invitation in the DB
-      const { data, error } = await supabase
-        .from('invitations')
-        .insert(invitation)
-        .select()
-        .single()
-      if (error) throw error
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
 
-      // Notify the server to send the email
-      try {
-        await fetch('/api/invitations/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ invitationId: (data as Invitation).id }),
-        })
-      } catch {
-        // Email sending is best-effort; don't fail the invitation creation
-        console.warn('Failed to send invitation email (server may be offline)')
+      const res = await fetch(`${API_URL}/api/invitations/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(invitation),
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to send invitation')
       }
 
-      return data as Invitation
+      return res.json() as Promise<Invitation>
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['invitations'] })

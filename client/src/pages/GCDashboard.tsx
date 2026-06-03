@@ -1,15 +1,17 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useMyPrequals, useSentInvitations } from '@/hooks/usePrequals'
+import { useProjects } from '@/hooks/useProjects'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Prequalification } from '@/types'
-import { Plus, Send, Eye, FileText } from 'lucide-react'
+import { Plus, Send, Eye, FileText, FolderOpen } from 'lucide-react'
 import { format } from 'date-fns'
 
 export default function GCDashboard() {
   const { profile } = useAuth()
   const { data: preqals = [], isLoading } = useMyPrequals(profile?.id)
   const { data: invitations = [] } = useSentInvitations(profile?.id)
+  const { data: projects = [], isLoading: projectsLoading } = useProjects(profile?.id)
 
   // GC as applicant: submitted to owners
   const asApplicant = preqals.filter((p) => p.applicant_id === profile?.id)
@@ -36,6 +38,47 @@ export default function GCDashboard() {
             Invite Trade
           </Link>
         </div>
+      </div>
+
+      {/* My Projects */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">My Projects</h2>
+        {projectsLoading ? (
+          <div className="flex justify-center items-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" />
+          </div>
+        ) : projects.length === 0 ? (
+          <div className="card p-6 text-center text-gray-500">
+            <FolderOpen size={28} className="mx-auto mb-2 text-gray-300" />
+            <p className="text-sm">No projects yet</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {projects.map((project) => {
+              const memberCount = project.project_members?.[0]?.count ?? 0
+              return (
+                <Link
+                  key={project.id}
+                  to={`/gc/projects/${project.id}`}
+                  className="card p-5 hover:shadow-md transition-shadow block"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900 truncate">{project.name}</h3>
+                      {project.description && (
+                        <p className="text-sm text-gray-500 mt-1 line-clamp-2">{project.description}</p>
+                      )}
+                    </div>
+                    <FolderOpen size={18} className="text-brand-400 flex-shrink-0 ml-2" />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-3">
+                    {memberCount} member{memberCount !== 1 ? 's' : ''}
+                  </p>
+                </Link>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* Stats */}

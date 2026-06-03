@@ -1,15 +1,19 @@
 import { Router, Request, Response } from 'express'
 import nodemailer from 'nodemailer'
+import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
 import { requireAuth } from '../middleware/auth.js'
 import { supabaseAdmin } from '../lib/supabase.js'
 
 const router = Router()
 
-// Create nodemailer transporter
+// Create nodemailer transporter (returns null if SMTP not configured)
 function createTransporter() {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    return null
+  }
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.ethereal.email',
+    host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT) || 587,
     secure: false,
     auth: {
@@ -20,57 +24,86 @@ function createTransporter() {
 }
 
 const sendSchema = z.object({
-  invitationId: z.string().uuid(),
+  recipient_email: z.string().email(),
+  recipient_role: z.enum(['gc', 'trade']),
+  project_id: z.string().uuid().optional(),
 })
 
 /**
  * POST /api/invitations/send
- * Sends invitation email for an already-created invitation record.
- * Requires auth so we can verify the sender owns the invitation.
+ * Creates an invitation record with a token and sends an email.
+ * Requires auth.
  */
 router.post('/send', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const parsed = sendSchema.safeParse(req.body)
   if (!parsed.success) {
-    res.status(400).json({ error: 'invitationId is required (UUID)' })
+    res.status(400).json({ error: 'Invalid request body', details: parsed.error.flatten() })
     return
   }
 
-  const { invitationId } = parsed.data
+  const { recipient_email, recipient_role, project_id } = parsed.data
+  const senderId = req.userId!
 
-  // Fetch invitation + sender profile
-  const { data: invitation, error: invErr } = await supabaseAdmin
-    .from('invitations')
-    .select('*, sender:profiles!sender_id(full_name, company_name, email)')
-    .eq('id', invitationId)
+  // Generate a secure token
+  const token = randomBytes(32).toString('hex')
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+
+  // Fetch sender profile
+  const { data: sender } = await supabaseAdmin
+    .from('profiles')
+    .select('full_name, company_name, email')
+    .eq('id', senderId)
     .single()
 
-  if (invErr || !invitation) {
-    res.status(404).json({ error: 'Invitation not found' })
+  // Fetch project name if project_id provided
+  let projectName: string | undefined
+  if (project_id) {
+    const { data: project } = await supabaseAdmin
+      .from('projects')
+      .select('name')
+      .eq('id', project_id)
+      .single()
+    projectName = project?.name
+  }
+
+  // Insert invitation record
+  const { data: invitation, error: insertErr } = await supabaseAdmin
+    .from('invitations')
+    .insert({
+      sender_id: senderId,
+      recipient_email,
+      recipient_role,
+      project_id: project_id ?? null,
+      token,
+      expires_at: expiresAt,
+      status: 'pending',
+    })
+    .select()
+    .single()
+
+  if (insertErr || !invitation) {
+    console.error('[invitations] Insert error:', insertErr)
+    res.status(500).json({ error: 'Failed to create invitation' })
     return
   }
 
-  // Security check: only the sender can trigger sending
-  if (invitation.sender_id !== req.userId) {
-    res.status(403).json({ error: 'Forbidden' })
+  const senderName = (sender as any)?.company_name || (sender as any)?.full_name || 'A construction company'
+  const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173'
+  const inviteLink = `${clientUrl}/invite/${token}`
+  const recipientRoleLabel = recipient_role === 'gc' ? 'General Contractor' : 'Trade Subcontractor'
+
+  // Send email or log to console
+  const transporter = createTransporter()
+  if (!transporter) {
+    console.log(`[invitations] SMTP not configured. Invite link: ${inviteLink}`)
+    res.json({ success: true, message: 'Invitation created (email not sent — SMTP not configured)', invitation })
     return
   }
-
-  const sender = invitation.sender as {
-    full_name?: string
-    company_name?: string
-    email?: string
-  } | null
-
-  const senderName = sender?.company_name || sender?.full_name || 'A construction company'
-  const recipientRole = invitation.recipient_role === 'gc' ? 'General Contractor' : 'Trade Subcontractor'
-  const appUrl = process.env.APP_URL || 'http://localhost:5173'
 
   try {
-    const transporter = createTransporter()
-
     await transporter.sendMail({
       from: `"PreQual Pro" <${process.env.FROM_EMAIL || 'noreply@prequalpro.com'}>`,
-      to: invitation.recipient_email,
+      to: recipient_email,
       subject: `Pre-Qualification Invitation from ${senderName}`,
       html: `
         <!DOCTYPE html>
@@ -90,19 +123,18 @@ router.post('/send', requireAuth, async (req: Request, res: Response): Promise<v
         <body>
           <div class="container">
             <div class="header">
-              <h1>🏗 PreQual Pro — Pre-Qualification Invitation</h1>
+              <h1>PreQual Pro — Pre-Qualification Invitation</h1>
             </div>
             <div class="body">
               <p>Hello,</p>
-              <p><strong>${senderName}</strong> has invited you to complete a pre-qualification as a <strong>${recipientRole}</strong>.</p>
-              <p>Pre-qualification helps construction owners and general contractors evaluate vendors before awarding contracts. Please complete your application at your earliest convenience.</p>
-              <a href="${appUrl}/signup" class="btn">Complete Pre-Qualification →</a>
-              <p style="margin-top: 24px; color: #6b7280; font-size: 13px;">
-                If you already have an account, <a href="${appUrl}/login" style="color: #2563eb;">sign in here</a>.
-              </p>
+              <p><strong>${senderName}</strong> has invited you to complete a pre-qualification as a <strong>${recipientRoleLabel}</strong>${projectName ? ` for the project <strong>${projectName}</strong>` : ''}.</p>
+              <p>Please click the button below to accept your invitation:</p>
+              <a href="${inviteLink}" class="btn">Accept Invitation →</a>
+              <p style="margin-top: 24px; color: #6b7280; font-size: 13px;">Or copy this link: ${inviteLink}</p>
             </div>
             <div class="footer">
               <p>You received this email because ${senderName} invited you to PreQual Pro. If you believe this was sent in error, please ignore it.</p>
+              <p>This invitation expires in 7 days.</p>
             </div>
           </div>
         </body>
@@ -110,37 +142,83 @@ router.post('/send', requireAuth, async (req: Request, res: Response): Promise<v
       `,
     })
 
-    // Mark invitation as still pending (email sent)
-    res.json({ success: true, message: 'Invitation email sent' })
+    res.json({ success: true, message: 'Invitation email sent', invitation })
   } catch (err: unknown) {
     console.error('[invitations] Email send error:', err)
-    res.status(500).json({ error: 'Failed to send email. Invitation was already created in DB.' })
+    console.log(`[invitations] Invite link (email failed): ${inviteLink}`)
+    // Don't fail — invitation is created, just email didn't send
+    res.json({ success: true, message: 'Invitation created (email delivery failed)', invitation })
   }
 })
 
 /**
- * POST /api/invitations/accept
- * Mark an invitation as accepted when the recipient signs up.
+ * GET /api/invitations/token/:token
+ * Public — look up an invitation by token.
  */
-router.post('/accept', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const schema = z.object({ invitationId: z.string().uuid() })
-  const parsed = schema.safeParse(req.body)
-  if (!parsed.success) {
-    res.status(400).json({ error: 'invitationId is required' })
-    return
-  }
+router.get('/token/:token', async (req: Request, res: Response): Promise<void> => {
+  const { token } = req.params
 
-  const { invitationId } = parsed.data
-
-  // Verify this invitation belongs to the current user's email
   const { data: invitation, error } = await supabaseAdmin
     .from('invitations')
-    .select('*')
-    .eq('id', invitationId)
+    .select('*, sender:profiles!sender_id(full_name, company_name), project:projects(name)')
+    .eq('token', token)
     .single()
 
   if (error || !invitation) {
     res.status(404).json({ error: 'Invitation not found' })
+    return
+  }
+
+  // Check expiry
+  if (invitation.expires_at && new Date(invitation.expires_at) < new Date()) {
+    res.status(404).json({ error: 'Invitation has expired' })
+    return
+  }
+
+  if (invitation.status === 'accepted') {
+    res.status(404).json({ error: 'Invitation has already been accepted' })
+    return
+  }
+
+  const sender = invitation.sender as { full_name?: string; company_name?: string } | null
+  const project = invitation.project as { name?: string } | null
+
+  res.json({
+    recipient_email: invitation.recipient_email,
+    recipient_role: invitation.recipient_role,
+    project_id: invitation.project_id,
+    project_name: project?.name,
+    sender_name: sender?.company_name || sender?.full_name,
+  })
+})
+
+/**
+ * POST /api/invitations/accept
+ * Requires auth. Accepts { token }, verifies email match, marks accepted, inserts project_member.
+ */
+router.post('/accept', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const schema = z.object({ token: z.string().min(1) })
+  const parsed = schema.safeParse(req.body)
+  if (!parsed.success) {
+    res.status(400).json({ error: 'token is required' })
+    return
+  }
+
+  const { token } = parsed.data
+
+  const { data: invitation, error } = await supabaseAdmin
+    .from('invitations')
+    .select('*')
+    .eq('token', token)
+    .single()
+
+  if (error || !invitation) {
+    res.status(404).json({ error: 'Invitation not found' })
+    return
+  }
+
+  if (invitation.expires_at && new Date(invitation.expires_at) < new Date()) {
+    res.status(400).json({ error: 'Invitation has expired' })
     return
   }
 
@@ -149,17 +227,31 @@ router.post('/accept', requireAuth, async (req: Request, res: Response): Promise
     return
   }
 
+  // Mark accepted
   const { error: updateErr } = await supabaseAdmin
     .from('invitations')
     .update({ status: 'accepted' })
-    .eq('id', invitationId)
+    .eq('id', invitation.id)
 
   if (updateErr) {
     res.status(500).json({ error: 'Failed to accept invitation' })
     return
   }
 
-  res.json({ success: true })
+  // Insert project_member if project_id is set
+  if (invitation.project_id) {
+    await supabaseAdmin
+      .from('project_members')
+      .insert({
+        project_id: invitation.project_id,
+        user_id: req.userId,
+        role: invitation.recipient_role,
+      })
+      .select()
+      .single()
+  }
+
+  res.json({ success: true, project_id: invitation.project_id ?? null })
 })
 
 export default router

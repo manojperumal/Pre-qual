@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -20,6 +20,7 @@ type FormData = z.infer<typeof schema>
 export default function InvitePage() {
   const { profile } = useAuth()
   const navigate = useNavigate()
+  const { projectId } = useParams<{ projectId?: string }>()
   const [sent, setSent] = useState(false)
   const [sentEmail, setSentEmail] = useState('')
 
@@ -46,9 +47,9 @@ export default function InvitePage() {
     if (!profile?.id) return
     try {
       await sendInvitation.mutateAsync({
-        sender_id: profile.id,
         recipient_email: data.recipient_email,
         recipient_role: data.recipient_role,
+        project_id: projectId,
       })
       setSentEmail(data.recipient_email)
       setSent(true)
@@ -59,14 +60,19 @@ export default function InvitePage() {
     }
   }
 
+  const backPath = profile?.role === 'owner' ? '/owner' : profile?.role === 'gc' ? '/gc' : '/trade'
+
   return (
     <div className="space-y-8 max-w-2xl">
       {/* Header */}
       <div>
+        <Link to={backPath} className="text-sm text-brand-600 hover:text-brand-700 mb-2 inline-block">
+          ← Back to Dashboard
+        </Link>
         <h1 className="text-2xl font-bold text-gray-900">Send Pre-Qual Invitation</h1>
         <p className="mt-1 text-sm text-gray-500">
           Invite a {isOwner ? 'General Contractor or Trade' : 'Trade subcontractor'} to complete
-          a pre-qualification form
+          a pre-qualification form{projectId ? ' for this project' : ''}
         </p>
       </div>
 

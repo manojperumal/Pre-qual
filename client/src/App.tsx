@@ -10,6 +10,9 @@ import TradeDashboard from '@/pages/TradeDashboard'
 import PrequalForm from '@/pages/PrequalForm'
 import PrequalDetail from '@/pages/PrequalDetail'
 import InvitePage from '@/pages/InvitePage'
+import CreateProjectPage from '@/pages/CreateProjectPage'
+import ProjectDetailPage from '@/pages/ProjectDetailPage'
+import InviteAcceptPage from '@/pages/InviteAcceptPage'
 
 function RoleRedirect() {
   const { profile, loading } = useAuth()
@@ -35,6 +38,7 @@ export default function App() {
       {/* Public routes */}
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<SignUp />} />
+      <Route path="/invite/:token" element={<InviteAcceptPage />} />
 
       {/* Role redirect from root */}
       <Route path="/" element={<RoleRedirect />} />
@@ -50,6 +54,9 @@ export default function App() {
       >
         <Route index element={<OwnerDashboard />} />
         <Route path="invite" element={<InvitePage />} />
+        <Route path="projects/new" element={<CreateProjectPage />} />
+        <Route path="projects/:projectId" element={<ProjectDetailPage />} />
+        <Route path="projects/:projectId/invite" element={<InvitePage />} />
         <Route path="prequal/:id" element={<PrequalDetail />} />
       </Route>
 
@@ -64,6 +71,7 @@ export default function App() {
       >
         <Route index element={<GCDashboard />} />
         <Route path="invite" element={<InvitePage />} />
+        <Route path="projects/:projectId" element={<ProjectDetailPage />} />
         <Route path="prequal/new" element={<PrequalForm />} />
         <Route path="prequal/:id" element={<PrequalDetail />} />
         <Route path="prequal/:id/edit" element={<PrequalForm />} />
@@ -79,6 +87,7 @@ export default function App() {
         }
       >
         <Route index element={<TradeDashboard />} />
+        <Route path="projects/:projectId" element={<ProjectDetailPage />} />
         <Route path="prequal/new" element={<PrequalForm />} />
         <Route path="prequal/:id" element={<PrequalDetail />} />
         <Route path="prequal/:id/edit" element={<PrequalForm />} />
