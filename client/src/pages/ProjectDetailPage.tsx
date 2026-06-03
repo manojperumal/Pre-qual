@@ -3,7 +3,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useProjectMembers } from '@/hooks/useProjects'
 import { useProjects } from '@/hooks/useProjects'
 import { useProjectSubmissions } from '@/hooks/useContractorProfile'
-import { Users, UserPlus } from 'lucide-react'
+import { Users, UserPlus, ChevronRight } from 'lucide-react'
 import { format } from 'date-fns'
 
 const SUBMISSION_STATUS_COLORS: Record<string, string> = {
@@ -35,16 +35,24 @@ export default function ProjectDetailPage() {
   const project = projects.find((p) => p.id === projectId)
 
   const role = profile?.role ?? 'owner'
-  const dashPath = role === 'owner' ? '/owner' : role === 'gc' ? '/gc' : '/trade'
+  const projectsListPath = role === 'owner' ? '/owner/projects' : role === 'gc' ? '/gc' : '/trade'
   const invitePath = `/${role}/projects/${projectId}/invite`
   const submissionBasePath = role === 'gc' ? `/gc/projects/${projectId}/submissions` : `/owner/projects/${projectId}/submissions`
 
   return (
     <div className="space-y-6">
-      <div>
-        <Link to={dashPath} className="text-sm text-brand-600 hover:text-brand-700 mb-2 inline-block">
-          ← Back to Dashboard
+      {/* Breadcrumbs */}
+      <nav className="flex items-center gap-1.5 text-sm text-gray-500">
+        <Link to={projectsListPath} className="hover:text-brand-600 transition-colors">
+          Projects
         </Link>
+        <ChevronRight size={14} className="text-gray-400 flex-shrink-0" />
+        <span className="text-gray-900 font-medium truncate">
+          {project?.name ?? 'Project'}
+        </span>
+      </nav>
+
+      <div>
         {project ? (
           <>
             <h1 className="text-2xl font-bold text-gray-900">{project.name}</h1>
