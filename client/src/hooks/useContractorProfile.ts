@@ -94,3 +94,33 @@ export function useProjectSubmissions(projectId: string | undefined) {
     },
   })
 }
+
+export function useOwnerPendingSubmissions(ownerId: string | undefined) {
+  return useQuery({
+    queryKey: ['owner_pending_submissions', ownerId],
+    enabled: !!ownerId,
+    queryFn: async () => {
+      const { data: projects } = await supabase
+        .from('projects')
+        .select('id, name')
+        .eq('owner_id', ownerId!)
+      if (!projects?.length) return []
+
+      const projectIds = projects.map((p) => p.id)
+      const projectMap = new Map(projects.map((p) => [p.id, p.name]))
+
+      const { data: submissions, error } = await supabase
+        .from('project_submissions')
+        .select('*, contractor:profiles!contractor_id(full_name, company_name, email)')
+        .in('project_id', projectIds)
+        .in('status', ['submitted', 'under_review'])
+        .order('updated_at', { ascending: false })
+      if (error) throw error
+
+      return (submissions ?? []).map((s) => ({
+        ...(s as ProjectSubmission & { contractor: { full_name: string; company_name: string; email: string } }),
+        project_name: projectMap.get(s.project_id) ?? 'Unknown',
+      }))
+    },
+  })
+}
