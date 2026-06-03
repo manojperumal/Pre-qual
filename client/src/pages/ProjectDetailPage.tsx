@@ -1,10 +1,12 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { useProjectMembers } from '@/hooks/useProjects'
+import { useProjectMembers, useUpdateProject } from '@/hooks/useProjects'
 import { useProjects } from '@/hooks/useProjects'
 import { useProjectSubmissions } from '@/hooks/useContractorProfile'
-import { Users, UserPlus, ChevronRight } from 'lucide-react'
+import { Users, UserPlus, ChevronRight, Pencil, X, Check, Calendar } from 'lucide-react'
 import { format } from 'date-fns'
+import { useForm } from 'react-hook-form'
 
 const SUBMISSION_STATUS_COLORS: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
@@ -17,12 +19,12 @@ const SUBMISSION_STATUS_COLORS: Record<string, string> = {
 
 function getInitials(name?: string | null): string {
   if (!name) return '?'
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((n) => n[0].toUpperCase())
-    .join('')
+  return name.split(' ').filter(Boolean).slice(0, 2).map((n) => n[0].toUpperCase()).join('')
+}
+
+function fmt(d: string | null | undefined) {
+  if (!d) return null
+  return format(new Date(d), 'MMM d, yyyy')
 }
 
 export default function ProjectDetailPage() {
@@ -31,6 +33,9 @@ export default function ProjectDetailPage() {
   const { data: projects = [] } = useProjects(profile?.id)
   const { data: members = [], isLoading } = useProjectMembers(projectId)
   const { data: submissions = [], isLoading: subsLoading } = useProjectSubmissions(projectId)
+  const updateProject = useUpdateProject()
+
+  const [editing, setEditing] = useState(false)
 
   const project = projects.find((p) => p.id === projectId)
 
@@ -39,32 +44,112 @@ export default function ProjectDetailPage() {
   const invitePath = `/${role}/projects/${projectId}/invite`
   const submissionBasePath = role === 'gc' ? `/gc/projects/${projectId}/submissions` : `/owner/projects/${projectId}/submissions`
 
+  const { register, handleSubmit, reset } = useForm({
+    defaultValues: {
+      name: project?.name ?? '',
+      description: project?.description ?? '',
+      start_date: project?.start_date ?? '',
+      end_date: project?.end_date ?? '',
+    },
+  })
+
+  // Sync form when project loads
+  const [synced, setSynced] = useState(false)
+  if (project && !synced) {
+    reset({
+      name: project.name,
+      description: project.description ?? '',
+      start_date: project.start_date ?? '',
+      end_date: project.end_date ?? '',
+    })
+    setSynced(true)
+  }
+
+  async function onSave(data: any) {
+    if (!projectId) return
+    await updateProject.mutateAsync({
+      id: projectId,
+      name: data.name,
+      description: data.description,
+      startDate: data.start_date,
+      endDate: data.end_date,
+    })
+    setEditing(false)
+  }
+
   return (
     <div className="space-y-6">
       {/* Breadcrumbs */}
       <nav className="flex items-center gap-1.5 text-sm text-gray-500">
-        <Link to={projectsListPath} className="hover:text-brand-600 transition-colors">
-          Projects
-        </Link>
+        <Link to={projectsListPath} className="hover:text-brand-600 transition-colors">Projects</Link>
         <ChevronRight size={14} className="text-gray-400 flex-shrink-0" />
-        <span className="text-gray-900 font-medium truncate">
-          {project?.name ?? 'Project'}
-        </span>
+        <span className="text-gray-900 font-medium truncate">{project?.name ?? 'Project'}</span>
       </nav>
 
-      <div>
-        {project ? (
-          <>
-            <h1 className="text-2xl font-bold text-gray-900">{project.name}</h1>
-            {project.description && (
-              <p className="mt-1 text-sm text-gray-500">{project.description}</p>
+      {/* Project header / edit form */}
+      {editing ? (
+        <form onSubmit={handleSubmit(onSave)} className="card p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-gray-900">Edit Project</h2>
+            <button type="button" onClick={() => setEditing(false)} className="text-gray-400 hover:text-gray-600">
+              <X size={18} />
+            </button>
+          </div>
+          <div>
+            <label className="label">Project Name *</label>
+            <input type="text" className="input-field" {...register('name', { required: true })} />
+          </div>
+          <div>
+            <label className="label">Description</label>
+            <textarea rows={2} className="input-field resize-none" {...register('description')} />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="label">Start Date</label>
+              <input type="date" className="input-field" {...register('start_date')} />
+            </div>
+            <div>
+              <label className="label">End Date</label>
+              <input type="date" className="input-field" {...register('end_date')} />
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={() => setEditing(false)} className="btn-secondary">Cancel</button>
+            <button type="submit" disabled={updateProject.isPending} className="btn-primary inline-flex items-center gap-1.5">
+              <Check size={14} />
+              {updateProject.isPending ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{project?.name ?? 'Project'}</h1>
+            {project?.description && <p className="mt-1 text-sm text-gray-500">{project.description}</p>}
+            {(project?.start_date || project?.end_date) && (
+              <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                <span className="inline-flex items-center gap-1.5">
+                  <Calendar size={13} className="text-gray-400" />
+                  {fmt(project.start_date) ?? '—'}
+                  {' → '}
+                  {fmt(project.end_date) ?? '—'}
+                </span>
+              </div>
             )}
-          </>
-        ) : (
-          <h1 className="text-2xl font-bold text-gray-900">Project</h1>
-        )}
-      </div>
+          </div>
+          {role === 'owner' && (
+            <button
+              onClick={() => setEditing(true)}
+              className="btn-secondary inline-flex items-center gap-1.5 text-sm flex-shrink-0"
+            >
+              <Pencil size={14} />
+              Edit
+            </button>
+          )}
+        </div>
+      )}
 
+      {/* Members */}
       <div className="card overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -88,9 +173,7 @@ export default function ProjectDetailPage() {
             <Users size={28} className="mx-auto mb-2 text-gray-300" />
             <p className="text-sm">No members yet</p>
             {role === 'owner' && (
-              <Link to={invitePath} className="btn-primary mt-3 inline-flex text-sm">
-                Invite someone
-              </Link>
+              <Link to={invitePath} className="btn-primary mt-3 inline-flex text-sm">Invite someone</Link>
             )}
           </div>
         ) : (
@@ -99,12 +182,7 @@ export default function ProjectDetailPage() {
               <thead className="bg-gray-50">
                 <tr>
                   {['Name', 'Company', 'Role', 'Joined'].map((h) => (
-                    <th
-                      key={h}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      {h}
-                    </th>
+                    <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -127,15 +205,11 @@ export default function ProjectDetailPage() {
                         {p?.company_name ? (
                           <span className="text-gray-600">{p.company_name}</span>
                         ) : (
-                          <span className="text-gray-400 italic">Profile incomplete</span>
+                          <span className="text-gray-400 italic">—</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 capitalize">
-                        {member.role}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
-                        {format(new Date(member.joined_at), 'MMM d, yyyy')}
-                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600 capitalize">{member.role}</td>
+                      <td className="px-6 py-4 text-sm text-gray-500">{format(new Date(member.joined_at), 'MMM d, yyyy')}</td>
                     </tr>
                   )
                 })}
@@ -145,7 +219,7 @@ export default function ProjectDetailPage() {
         )}
       </div>
 
-      {/* Submissions section — visible to owner and gc */}
+      {/* Submissions */}
       {(role === 'owner' || role === 'gc') && (
         <div className="card overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
@@ -164,42 +238,24 @@ export default function ProjectDetailPage() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    {['Contractor', 'Company', 'Status', 'Submitted', 'Actions'].map((h) => (
-                      <th
-                        key={h}
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        {h}
-                      </th>
+                    {['Contractor', 'Company', 'Status', 'Updated', 'Actions'].map((h) => (
+                      <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {submissions.map((sub) => (
                     <tr key={sub.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {sub.contractor?.full_name || sub.contractor?.email || '—'}
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        {sub.contractor?.company_name ? (
-                          <span className="text-gray-600">{sub.contractor.company_name}</span>
-                        ) : (
-                          <span className="text-gray-400 italic">Profile incomplete</span>
-                        )}
-                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900">{sub.contractor?.full_name || sub.contractor?.email || '—'}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{sub.contractor?.company_name || <span className="text-gray-400 italic">—</span>}</td>
                       <td className="px-6 py-4">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SUBMISSION_STATUS_COLORS[sub.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                          {sub.status.replace('_', ' ')}
+                          {sub.status.replace(/_/g, ' ')}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
-                        {format(new Date(sub.updated_at), 'MMM d, yyyy')}
-                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">{format(new Date(sub.updated_at), 'MMM d, yyyy')}</td>
                       <td className="px-6 py-4">
-                        <Link
-                          to={`${submissionBasePath}/${sub.id}`}
-                          className="text-sm text-brand-600 hover:text-brand-700 font-medium"
-                        >
+                        <Link to={`${submissionBasePath}/${sub.id}`} className="text-sm text-brand-600 hover:text-brand-700 font-medium">
                           Review
                         </Link>
                       </td>
