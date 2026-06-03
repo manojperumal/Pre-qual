@@ -1,11 +1,9 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { useMyPrequals, useReceivedInvitations } from '@/hooks/usePrequals'
 import { useProjects } from '@/hooks/useProjects'
 import { useContractorProfile, useProjectSubmission } from '@/hooks/useContractorProfile'
-import { StatusBadge } from '@/components/StatusBadge'
-import { Prequalification, ProjectSubmission } from '@/types'
-import { FileText, Mail, Eye, Clock, FolderOpen, User, Send } from 'lucide-react'
+import { useReceivedInvitations, useMyProjectSubmissions } from '@/hooks/usePrequals'
+import { FolderOpen, User, Send, Clock, CheckCircle, AlertCircle, Mail, ChevronRight } from 'lucide-react'
 import { format } from 'date-fns'
 
 const SUBMISSION_COLORS: Record<string, string> = {
@@ -17,38 +15,57 @@ const SUBMISSION_COLORS: Record<string, string> = {
   needs_more_info: 'bg-orange-100 text-orange-700',
 }
 
+function SubmissionStatusIcon({ status }: { status: string | undefined }) {
+  if (status === 'approved') return <CheckCircle size={13} className="text-green-500" />
+  if (status === 'under_review' || status === 'submitted') return <Clock size={13} className="text-yellow-500" />
+  if (status === 'rejected') return <AlertCircle size={13} className="text-red-500" />
+  if (status === 'needs_more_info') return <AlertCircle size={13} className="text-orange-500" />
+  return null
+}
+
 function ProjectCard({ project, userId }: { project: any; userId: string }) {
   const { data: submission } = useProjectSubmission(project.id, userId)
-  const memberCount = project.project_members?.[0]?.count ?? 0
 
   return (
-    <div className="card p-5 hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between">
+    <div className="card p-5">
+      <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-gray-900 truncate">{project.name}</h3>
+          <Link
+            to={`/trade/projects/${project.id}`}
+            className="font-semibold text-gray-900 hover:text-brand-600 truncate block"
+          >
+            {project.name}
+          </Link>
           {project.description && (
-            <p className="text-sm text-gray-500 mt-1 line-clamp-2">{project.description}</p>
+            <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{project.description}</p>
           )}
         </div>
-        <FolderOpen size={18} className="text-brand-400 flex-shrink-0 ml-2" />
+        <FolderOpen size={16} className="text-brand-400 flex-shrink-0 mt-0.5" />
       </div>
-      <p className="text-xs text-gray-400 mt-2">
-        {memberCount} member{memberCount !== 1 ? 's' : ''}
-      </p>
-      <div className="flex items-center justify-between mt-3">
+
+      {(project.start_date || project.end_date) && (
+        <p className="text-xs text-gray-400 mt-2">
+          {project.start_date ? format(new Date(project.start_date), 'MMM d, yyyy') : '—'}
+          {' → '}
+          {project.end_date ? format(new Date(project.end_date), 'MMM d, yyyy') : '—'}
+        </p>
+      )}
+
+      <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
         {submission ? (
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${SUBMISSION_COLORS[submission.status] ?? 'bg-gray-100 text-gray-600'}`}>
-            {submission.status.replace('_', ' ')}
+          <span className={`inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full font-medium ${SUBMISSION_COLORS[submission.status] ?? 'bg-gray-100 text-gray-600'}`}>
+            <SubmissionStatusIcon status={submission.status} />
+            {submission.status.replace(/_/g, ' ')}
           </span>
         ) : (
-          <span className="text-xs text-gray-400">No submission</span>
+          <span className="text-xs text-gray-400">No submission yet</span>
         )}
         <Link
           to={`/trade/projects/${project.id}/submit`}
-          className="text-xs btn-primary py-1 px-3 inline-flex items-center gap-1"
+          className="inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium"
         >
           <Send size={12} />
-          Submit Pre-Qual
+          {submission ? 'Update' : 'Submit Pre-Qual'}
         </Link>
       </div>
     </div>
@@ -57,49 +74,123 @@ function ProjectCard({ project, userId }: { project: any; userId: string }) {
 
 export default function TradeDashboard() {
   const { profile } = useAuth()
-  const { data: preqals = [], isLoading } = useMyPrequals(profile?.id)
-  const { data: invitations = [] } = useReceivedInvitations(profile?.email ?? undefined)
   const { data: projects = [], isLoading: projectsLoading } = useProjects(profile?.id)
+  const { data: invitations = [] } = useReceivedInvitations(profile?.email ?? undefined)
   const { data: contractorProfile } = useContractorProfile(profile?.id)
-
-  // Trade is always the applicant
-  const myPrequals = preqals.filter((p) => p.applicant_id === profile?.id)
-  const pendingInvites = invitations.filter((i) => i.status === 'pending')
+  const { data: allSubmissions = [] } = useMyProjectSubmissions(profile?.id)
 
   const profileComplete = !!(contractorProfile?.company_name && contractorProfile?.gl_carrier)
+  const myProjects = projects.filter((p) => p.owner_id !== profile?.id)
+  const pendingInvites = invitations.filter((i) => i.status === 'pending')
+
+  const approvedCount = allSubmissions.filter((s: any) => s.status === 'approved').length
+  const needsActionCount = allSubmissions.filter((s: any) => s.status === 'needs_more_info').length
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Trade Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Manage your pre-qualification submissions
-          </p>
-        </div>
-        <Link to="/trade/prequal/new" className="btn-primary">
-          <FileText size={16} className="mr-2" />
-          New Pre-Qual
-        </Link>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Welcome back, {profile?.full_name || profile?.company_name || 'Trade'}
+        </p>
       </div>
 
-      {/* My Profile card */}
-      <div className="card p-5 flex items-center justify-between">
+      {/* Profile completeness banner */}
+      <div className={`card p-5 flex items-center justify-between ${!profileComplete ? 'border-amber-200 bg-amber-50' : ''}`}>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center">
-            <User size={20} className="text-brand-600" />
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${profileComplete ? 'bg-green-100' : 'bg-amber-100'}`}>
+            <User size={20} className={profileComplete ? 'text-green-600' : 'text-amber-600'} />
           </div>
           <div>
             <p className="font-semibold text-gray-900">My Contractor Profile</p>
-            <p className={`text-xs mt-0.5 ${profileComplete ? 'text-green-600' : 'text-yellow-600'}`}>
-              {profileComplete ? 'Complete' : 'Incomplete — complete your profile to submit pre-quals'}
+            <p className={`text-xs mt-0.5 ${profileComplete ? 'text-green-600' : 'text-amber-600'}`}>
+              {profileComplete
+                ? 'Complete — ready to submit pre-quals'
+                : 'Incomplete — complete your profile before submitting'}
             </p>
           </div>
         </div>
-        <Link to="/trade/profile" className="btn-secondary text-sm">
-          {profileComplete ? 'Edit Profile' : 'Complete Profile'}
+        <Link to="/trade/profile" className="btn-secondary text-sm flex-shrink-0">
+          {profileComplete ? 'Edit Profile' : 'Complete Profile →'}
         </Link>
+      </div>
+
+      {/* Pending invites alert */}
+      {pendingInvites.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Mail size={16} className="text-blue-600" />
+            <h3 className="text-sm font-semibold text-blue-800">
+              You have {pendingInvites.length} pending invitation{pendingInvites.length > 1 ? 's' : ''}
+            </h3>
+          </div>
+          <div className="space-y-2">
+            {pendingInvites.map((inv) => {
+              const senderName = inv.sender?.company_name || inv.sender?.full_name || 'Someone'
+              return (
+                <div key={inv.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-blue-100">
+                  <div>
+                    <p className="text-sm text-gray-900 font-medium">{senderName} invited you</p>
+                    {inv.project && (
+                      <p className="text-xs text-gray-500">Project: {inv.project.name}</p>
+                    )}
+                    <p className="text-xs text-gray-400">{format(new Date(inv.created_at), 'MMM d, yyyy')}</p>
+                  </div>
+                  <Link
+                    to={inv.project ? `/trade/projects/${inv.project.id}/submit` : '/trade/profile'}
+                    className="btn-primary text-xs py-1.5 px-3 flex-shrink-0"
+                  >
+                    View Project
+                  </Link>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {[
+          {
+            label: 'Projects',
+            value: myProjects.length,
+            color: 'text-brand-600',
+            bg: 'bg-brand-50',
+            icon: <FolderOpen size={18} />,
+          },
+          {
+            label: 'Approved',
+            value: approvedCount,
+            color: approvedCount > 0 ? 'text-green-600' : 'text-gray-500',
+            bg: approvedCount > 0 ? 'bg-green-50' : 'bg-gray-50',
+            icon: <CheckCircle size={18} />,
+          },
+          {
+            label: 'Needs Action',
+            value: needsActionCount,
+            color: needsActionCount > 0 ? 'text-orange-600' : 'text-gray-500',
+            bg: needsActionCount > 0 ? 'bg-orange-50' : 'bg-gray-50',
+            icon: <AlertCircle size={18} />,
+          },
+          {
+            label: 'Pending Invites',
+            value: pendingInvites.length,
+            color: pendingInvites.length > 0 ? 'text-blue-600' : 'text-gray-500',
+            bg: pendingInvites.length > 0 ? 'bg-blue-50' : 'bg-gray-50',
+            icon: <Mail size={18} />,
+          },
+        ].map((s) => (
+          <div key={s.label} className="card px-5 py-4 flex items-center gap-3">
+            <div className={`w-9 h-9 rounded-lg ${s.bg} flex items-center justify-center flex-shrink-0`}>
+              <span className={s.color}>{s.icon}</span>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">{s.label}</p>
+              <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* My Projects */}
@@ -109,149 +200,19 @@ export default function TradeDashboard() {
           <div className="flex justify-center items-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" />
           </div>
-        ) : projects.length === 0 ? (
-          <div className="card p-6 text-center text-gray-500">
-            <FolderOpen size={28} className="mx-auto mb-2 text-gray-300" />
-            <p className="text-sm">No projects yet</p>
+        ) : myProjects.length === 0 ? (
+          <div className="card p-8 text-center text-gray-500">
+            <FolderOpen size={32} className="mx-auto mb-3 text-gray-300" />
+            <p className="font-medium">No projects yet</p>
+            <p className="text-sm mt-1">
+              Accept an invitation from an Owner or GC to join a project
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {projects.map((project) => (
+            {myProjects.map((project) => (
               <ProjectCard key={project.id} project={project} userId={profile?.id ?? ''} />
             ))}
-          </div>
-        )}
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { label: 'Submissions', value: myPrequals.length, color: 'text-gray-900' },
-          {
-            label: 'Approved',
-            value: myPrequals.filter((p) => p.status === 'approved').length,
-            color: 'text-green-600',
-          },
-          {
-            label: 'Under Review',
-            value: myPrequals.filter((p) => p.status === 'under_review').length,
-            color: 'text-yellow-600',
-          },
-          {
-            label: 'Pending Invites',
-            value: pendingInvites.length,
-            color: 'text-blue-600',
-          },
-        ].map((stat) => (
-          <div key={stat.label} className="card px-5 py-4">
-            <p className="text-sm text-gray-500">{stat.label}</p>
-            <p className={`text-2xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Pending invitations alert */}
-      {pendingInvites.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Mail size={18} className="text-blue-600" />
-            <h3 className="text-sm font-semibold text-blue-800">
-              You have {pendingInvites.length} pending pre-qualification request
-              {pendingInvites.length > 1 ? 's' : ''}
-            </h3>
-          </div>
-          <ul className="space-y-1">
-            {pendingInvites.map((inv) => (
-              <li key={inv.id} className="text-sm text-blue-700 flex items-center gap-2">
-                <Clock size={12} />
-                Invited by {inv.sender_id} — {format(new Date(inv.created_at), 'MMM d, yyyy')}
-                <Link to="/trade/prequal/new" className="ml-2 underline font-medium">
-                  Respond
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Pre-qualifications */}
-      <div className="card overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-900">My Pre-Qualifications</h2>
-          <Link to="/trade/prequal/new" className="text-sm text-brand-600 hover:text-brand-700 font-medium">
-            + New
-          </Link>
-        </div>
-
-        {isLoading ? (
-          <div className="flex justify-center items-center py-16">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" />
-          </div>
-        ) : myPrequals.length === 0 ? (
-          <div className="text-center py-16 text-gray-500">
-            <FileText size={32} className="mx-auto mb-3 text-gray-300" />
-            <p className="font-medium">No pre-qualifications yet</p>
-            <p className="text-sm mt-1">Start a new pre-qualification to get approved</p>
-            <Link to="/trade/prequal/new" className="btn-primary mt-4 inline-flex">
-              Start Pre-Qual
-            </Link>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  {['Requester', 'Trade Type', 'Last Updated', 'Status', 'Actions'].map((h) => (
-                    <th
-                      key={h}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {myPrequals.map((prequal: Prequalification & { requester: unknown }) => {
-                  const requester = prequal.requester as { company_name?: string; full_name?: string } | null
-                  return (
-                    <tr key={prequal.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                        {requester?.company_name || requester?.full_name || 'Self-initiated'}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {prequal.trade_type || '—'}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
-                        {format(new Date(prequal.updated_at), 'MMM d, yyyy')}
-                      </td>
-                      <td className="px-6 py-4">
-                        <StatusBadge status={prequal.status} />
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <Link
-                            to={`/trade/prequal/${prequal.id}`}
-                            className="p-1.5 text-gray-400 hover:text-brand-600 rounded hover:bg-brand-50 transition-colors"
-                            title="View"
-                          >
-                            <Eye size={16} />
-                          </Link>
-                          {prequal.status === 'draft' && (
-                            <Link
-                              to={`/trade/prequal/${prequal.id}/edit`}
-                              className="text-xs text-brand-600 hover:text-brand-700 font-medium"
-                            >
-                              Edit
-                            </Link>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
           </div>
         )}
       </div>
@@ -259,35 +220,58 @@ export default function TradeDashboard() {
       {/* Received invitations history */}
       {invitations.length > 0 && (
         <div className="card overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-base font-semibold text-gray-900">Received Invitations</h2>
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <h2 className="text-base font-semibold text-gray-900">Invitation History</h2>
+            <span className="text-xs text-gray-400">{invitations.length} total</span>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  {['From', 'Received', 'Status'].map((h) => (
-                    <th
-                      key={h}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
+                  {['From', 'Project', 'Received', 'Status'].map((h) => (
+                    <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {invitations.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-900">{inv.sender_id}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {format(new Date(inv.created_at), 'MMM d, yyyy')}
-                    </td>
-                    <td className="px-6 py-4">
-                      <StatusBadge status={inv.status} size="sm" />
-                    </td>
-                  </tr>
-                ))}
+                {invitations.map((inv) => {
+                  const senderName = inv.sender?.company_name || inv.sender?.full_name || '—'
+                  return (
+                    <tr key={inv.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4">
+                        <p className="text-sm text-gray-900">{senderName}</p>
+                        {inv.sender?.role && (
+                          <p className="text-xs text-gray-400 capitalize">{inv.sender.role}</p>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {inv.project ? (
+                          <Link
+                            to={`/trade/projects/${inv.project.id}`}
+                            className="text-brand-600 hover:text-brand-700 inline-flex items-center gap-1"
+                          >
+                            {inv.project.name}
+                            <ChevronRight size={12} />
+                          </Link>
+                        ) : '—'}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {format(new Date(inv.created_at), 'MMM d, yyyy')}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          inv.status === 'accepted' ? 'bg-green-100 text-green-700' :
+                          inv.status === 'expired' ? 'bg-gray-100 text-gray-500' :
+                          'bg-blue-100 text-blue-700'
+                        }`}>
+                          {inv.status}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
