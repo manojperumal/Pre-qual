@@ -4,16 +4,16 @@
 
 @layer base {
   body {
-    @apply bg-[#EEF1F8] text-[#1A1A2E] antialiased;
+    @apply bg-gray-50 text-[#0A0A0A] antialiased;
   }
 }
 
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-brand-500 border border-transparent rounded-md shadow-sm hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
+    @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white border border-transparent rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-gradient-to-r from-[#E8336D] to-[#D42B2B] hover:from-[#d42b5a] hover:to-[#b82020];
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-[#1A1A2E] bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
+    @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-[#0A0A0A] bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
   }
   .btn-danger {
     @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
@@ -22,7 +22,7 @@
     @apply block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 bg-white focus:outline-none focus:ring-brand-500 focus:border-brand-500 sm:text-sm;
   }
   .label {
-    @apply block text-sm font-medium text-[#1A1A2E] mb-1;
+    @apply block text-sm font-medium text-[#0A0A0A] mb-1;
   }
   .card {
     @apply bg-white rounded-lg border border-gray-200 shadow-sm;
