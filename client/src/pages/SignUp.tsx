@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { supabase } from '@/lib/supabase'
 import { Eye, EyeOff, Building2, Wrench, HardHat } from 'lucide-react'
 import { UserRole } from '@/types'
+import { MojoLogo } from '@/components/MojoLogo'
 import clsx from 'clsx'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
@@ -82,7 +83,6 @@ export default function SignUp() {
       return
     }
 
-    // Update the profile with company_name
     const { data: sessionData } = await supabase.auth.getSession()
     if (sessionData.session) {
       await supabase
@@ -90,7 +90,6 @@ export default function SignUp() {
         .update({ company_name: data.company_name })
         .eq('id', sessionData.session.user.id)
 
-      // Check for a pending invite token
       const pendingToken = sessionStorage.getItem('pending_invite_token')
       if (pendingToken) {
         try {
@@ -104,13 +103,12 @@ export default function SignUp() {
           })
           sessionStorage.removeItem('pending_invite_token')
           if (res.ok) {
-            // Navigate based on role
             const role = data.role
             navigate(role === 'owner' ? '/owner' : role === 'gc' ? '/gc' : '/trade')
             return
           }
         } catch {
-          // Best-effort; fall through to default navigation
+          // fall through
         }
       }
     }
@@ -121,21 +119,12 @@ export default function SignUp() {
   return (
     <div className="min-h-screen bg-[#111827] flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-lg">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-1 mb-3">
-            <span className="text-white font-light text-3xl">safety</span>
-            <div className="relative">
-              <span className="text-white font-bold text-3xl">Mojo</span>
-              <span className="absolute top-0 left-[1.45rem] -translate-y-1 w-2 h-2 rounded-full bg-[#E8336D]" />
-            </div>
-          </div>
-          <p className="text-gray-400 text-sm">Create your account</p>
+        <div className="flex justify-center mb-8">
+          <MojoLogo size="lg" subtitle="Pre-Qualification Platform" />
         </div>
 
-        {/* Card */}
         <div className="card p-8 rounded-xl shadow-xl">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Join Safety Mojo Pre-Qual</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">Create your account</h2>
 
           {authError && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
@@ -144,7 +133,6 @@ export default function SignUp() {
           )}
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {/* Role selection */}
             <div>
               <label className="label">I am a...</label>
               <div className="grid grid-cols-3 gap-2">
@@ -175,41 +163,19 @@ export default function SignUp() {
 
             <div>
               <label className="label" htmlFor="full_name">Full Name</label>
-              <input
-                id="full_name"
-                type="text"
-                autoComplete="name"
-                className="input-field"
-                placeholder="Jane Smith"
-                {...register('full_name')}
-              />
+              <input id="full_name" type="text" autoComplete="name" className="input-field" placeholder="Jane Smith" {...register('full_name')} />
               {errors.full_name && <p className="form-error">{errors.full_name.message}</p>}
             </div>
 
             <div>
               <label className="label" htmlFor="company_name">Company Name</label>
-              <input
-                id="company_name"
-                type="text"
-                className="input-field"
-                placeholder="Acme Construction LLC"
-                {...register('company_name')}
-              />
-              {errors.company_name && (
-                <p className="form-error">{errors.company_name.message}</p>
-              )}
+              <input id="company_name" type="text" className="input-field" placeholder="Acme Construction LLC" {...register('company_name')} />
+              {errors.company_name && <p className="form-error">{errors.company_name.message}</p>}
             </div>
 
             <div>
               <label className="label" htmlFor="email">Email Address</label>
-              <input
-                id="email"
-                type="email"
-                autoComplete="email"
-                className="input-field"
-                placeholder="you@company.com"
-                {...register('email')}
-              />
+              <input id="email" type="email" autoComplete="email" className="input-field" placeholder="you@company.com" {...register('email')} />
               {errors.email && <p className="form-error">{errors.email.message}</p>}
             </div>
 
@@ -235,20 +201,14 @@ export default function SignUp() {
               {errors.password && <p className="form-error">{errors.password.message}</p>}
             </div>
 
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="btn-primary w-full mt-2"
-            >
+            <button type="submit" disabled={isSubmitting} className="btn-primary w-full mt-2">
               {isSubmitting ? 'Creating account...' : 'Create Account'}
             </button>
           </form>
 
           <p className="mt-6 text-center text-sm text-gray-600">
             Already have an account?{' '}
-            <Link to="/login" className="font-medium text-brand-600 hover:text-brand-700">
-              Sign in
-            </Link>
+            <Link to="/login" className="font-medium text-brand-600 hover:text-brand-700">Sign in</Link>
           </p>
         </div>
       </div>

@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { supabase } from '@/lib/supabase'
 import { Eye, EyeOff } from 'lucide-react'
+import { MojoLogo } from '@/components/MojoLogo'
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -42,19 +43,10 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-[#111827] flex items-center justify-center px-4">
       <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-1 mb-3">
-            <span className="text-white font-light text-3xl">safety</span>
-            <div className="relative">
-              <span className="text-white font-bold text-3xl">Mojo</span>
-              <span className="absolute top-0 left-[1.45rem] -translate-y-1 w-2 h-2 rounded-full bg-[#E8336D]" />
-            </div>
-          </div>
-          <p className="text-gray-400 text-sm">Construction Pre-Qualification Platform</p>
+        <div className="flex justify-center mb-8">
+          <MojoLogo size="lg" subtitle="Pre-Qualification Platform" />
         </div>
 
-        {/* Card */}
         <div className="card p-8 rounded-xl shadow-xl">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">Sign in to your account</h2>
 
