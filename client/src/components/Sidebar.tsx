@@ -43,16 +43,15 @@ export function Sidebar() {
   return (
     <aside className="w-56 flex-shrink-0 bg-[#111827] flex flex-col min-h-screen">
       {/* Logo */}
-      <div className="px-5 py-4 border-b border-white/10">
-        <div className="flex items-center gap-1">
-          <span className="text-white font-light text-lg">safety</span>
+      <div className="px-5 py-5 border-b border-white/10">
+        <div className="flex items-center gap-1 mb-1">
+          <span className="text-white font-light text-xl">safety</span>
           <div className="relative">
-            <span className="text-white font-bold text-lg">Mojo</span>
-            {/* Pink dot above the j */}
+            <span className="text-white font-bold text-xl">Mojo</span>
             <span className="absolute top-0 left-[1.15rem] -translate-y-1 w-1.5 h-1.5 rounded-full bg-[#E8336D]" />
           </div>
         </div>
-        <p className="text-xs text-gray-400 mt-0.5">Pre-Qualification</p>
+        <p className="text-[11px] text-gray-400 uppercase tracking-widest font-medium">Pre-qualification</p>
       </div>
 
       {/* Nav */}
