@@ -156,3 +156,78 @@ export type PrequalFormData = CompanyInfoFormData &
   InsuranceFormData &
   SafetyFormData &
   FinancialFormData
+
+// Phase 1B types
+
+export interface ContractorProfile {
+  id: string
+  user_id: string
+  // Company
+  company_name?: string
+  address?: string
+  city?: string
+  state?: string
+  zip?: string
+  trade_type?: string
+  years_in_business?: number
+  license_numbers?: string
+  employee_count?: number
+  // Insurance
+  gl_carrier?: string
+  gl_policy?: string
+  gl_limits?: string
+  gl_expiry?: string
+  wc_carrier?: string
+  wc_policy?: string
+  wc_limits?: string
+  wc_expiry?: string
+  umbrella_carrier?: string
+  umbrella_policy?: string
+  umbrella_limits?: string
+  umbrella_expiry?: string
+  // Safety
+  emr_value?: number
+  osha_incidents_y1?: number
+  osha_incidents_y2?: number
+  osha_incidents_y3?: number
+  osha_incidents_y4?: number
+  osha_incidents_y5?: number
+  total_hours_y1?: number
+  total_hours_y2?: number
+  total_hours_y3?: number
+  trir?: number
+  dart_rate?: number
+  // PTP
+  has_ptp_program?: boolean
+  ptp_description?: string
+  // Bonding
+  bonding_company?: string
+  bonding_single?: number
+  bonding_aggregate?: number
+  last_updated?: string
+  created_at?: string
+}
+
+export interface ProjectSubmission {
+  id: string
+  project_id: string
+  contractor_id: string
+  status: 'draft' | 'submitted' | 'under_review' | 'approved' | 'rejected' | 'needs_more_info'
+  snapshot?: Record<string, unknown>
+  reviewer_notes?: string
+  reviewed_by?: string
+  reviewed_at?: string
+  flagged_no_ptp?: boolean
+  flagged_high_emr?: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface SubmissionDocument {
+  id: string
+  submission_id: string
+  doc_type: 'coi' | 'osha_300' | 'osha_301' | 'osha_citations' | 'loss_runs' | 'ptp_photos' | 'other'
+  file_name: string
+  storage_path: string
+  uploaded_at: string
+}

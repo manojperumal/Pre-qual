@@ -2,20 +2,32 @@ import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useProjectMembers } from '@/hooks/useProjects'
 import { useProjects } from '@/hooks/useProjects'
+import { useProjectSubmissions } from '@/hooks/useContractorProfile'
 import { Users, UserPlus } from 'lucide-react'
 import { format } from 'date-fns'
+
+const SUBMISSION_STATUS_COLORS: Record<string, string> = {
+  draft: 'bg-gray-100 text-gray-600',
+  submitted: 'bg-blue-100 text-blue-700',
+  under_review: 'bg-yellow-100 text-yellow-700',
+  approved: 'bg-green-100 text-green-700',
+  rejected: 'bg-red-100 text-red-700',
+  needs_more_info: 'bg-orange-100 text-orange-700',
+}
 
 export default function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const { profile } = useAuth()
   const { data: projects = [] } = useProjects(profile?.id)
   const { data: members = [], isLoading } = useProjectMembers(projectId)
+  const { data: submissions = [], isLoading: subsLoading } = useProjectSubmissions(projectId)
 
   const project = projects.find((p) => p.id === projectId)
 
   const role = profile?.role ?? 'owner'
   const dashPath = role === 'owner' ? '/owner' : role === 'gc' ? '/gc' : '/trade'
   const invitePath = `/${role}/projects/${projectId}/invite`
+  const submissionBasePath = role === 'gc' ? `/gc/projects/${projectId}/submissions` : `/owner/projects/${projectId}/submissions`
 
   return (
     <div className="space-y-6">
@@ -103,6 +115,69 @@ export default function ProjectDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Submissions section — visible to owner and gc */}
+      {(role === 'owner' || role === 'gc') && (
+        <div className="card overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-base font-semibold text-gray-900">Pre-Qual Submissions</h2>
+          </div>
+          {subsLoading ? (
+            <div className="flex justify-center items-center py-10">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" />
+            </div>
+          ) : submissions.length === 0 ? (
+            <div className="text-center py-10 text-gray-500">
+              <p className="text-sm">No submissions yet</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    {['Contractor', 'Company', 'Status', 'Submitted', 'Actions'].map((h) => (
+                      <th
+                        key={h}
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {submissions.map((sub) => (
+                    <tr key={sub.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        {sub.contractor?.full_name || '—'}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {sub.contractor?.company_name || '—'}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SUBMISSION_STATUS_COLORS[sub.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                          {sub.status.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {format(new Date(sub.updated_at), 'MMM d, yyyy')}
+                      </td>
+                      <td className="px-6 py-4">
+                        <Link
+                          to={`${submissionBasePath}/${sub.id}`}
+                          className="text-sm text-brand-600 hover:text-brand-700 font-medium"
+                        >
+                          Review
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

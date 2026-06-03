@@ -2,21 +2,72 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useMyPrequals, useSentInvitations } from '@/hooks/usePrequals'
 import { useProjects } from '@/hooks/useProjects'
+import { useContractorProfile, useProjectSubmission } from '@/hooks/useContractorProfile'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Prequalification } from '@/types'
-import { Plus, Send, Eye, FileText, FolderOpen } from 'lucide-react'
+import { Plus, Send, Eye, FileText, FolderOpen, User } from 'lucide-react'
 import { format } from 'date-fns'
+
+const SUBMISSION_COLORS: Record<string, string> = {
+  draft: 'bg-gray-100 text-gray-600',
+  submitted: 'bg-blue-100 text-blue-700',
+  under_review: 'bg-yellow-100 text-yellow-700',
+  approved: 'bg-green-100 text-green-700',
+  rejected: 'bg-red-100 text-red-700',
+  needs_more_info: 'bg-orange-100 text-orange-700',
+}
+
+function ProjectCard({ project, userId }: { project: any; userId: string }) {
+  const { data: submission } = useProjectSubmission(project.id, userId)
+  const memberCount = project.project_members?.[0]?.count ?? 0
+
+  return (
+    <div className="card p-5 hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-gray-900 truncate">{project.name}</h3>
+          {project.description && (
+            <p className="text-sm text-gray-500 mt-1 line-clamp-2">{project.description}</p>
+          )}
+        </div>
+        <FolderOpen size={18} className="text-brand-400 flex-shrink-0 ml-2" />
+      </div>
+      <p className="text-xs text-gray-400 mt-2">
+        {memberCount} member{memberCount !== 1 ? 's' : ''}
+      </p>
+      <div className="flex items-center justify-between mt-3">
+        {submission ? (
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${SUBMISSION_COLORS[submission.status] ?? 'bg-gray-100 text-gray-600'}`}>
+            {submission.status.replace('_', ' ')}
+          </span>
+        ) : (
+          <span className="text-xs text-gray-400">No submission</span>
+        )}
+        <Link
+          to={`/gc/projects/${project.id}/submit`}
+          className="text-xs btn-primary py-1 px-3 inline-flex items-center gap-1"
+        >
+          <Send size={12} />
+          Submit Pre-Qual
+        </Link>
+      </div>
+    </div>
+  )
+}
 
 export default function GCDashboard() {
   const { profile } = useAuth()
   const { data: preqals = [], isLoading } = useMyPrequals(profile?.id)
   const { data: invitations = [] } = useSentInvitations(profile?.id)
   const { data: projects = [], isLoading: projectsLoading } = useProjects(profile?.id)
+  const { data: contractorProfile } = useContractorProfile(profile?.id)
 
   // GC as applicant: submitted to owners
   const asApplicant = preqals.filter((p) => p.applicant_id === profile?.id)
   // GC as requester: trades they manage
   const asRequester = preqals.filter((p) => p.requester_id === profile?.id)
+
+  const profileComplete = !!(contractorProfile?.company_name && contractorProfile?.gl_carrier)
 
   return (
     <div className="space-y-8">
@@ -40,6 +91,24 @@ export default function GCDashboard() {
         </div>
       </div>
 
+      {/* My Profile card */}
+      <div className="card p-5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center">
+            <User size={20} className="text-brand-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900">My Contractor Profile</p>
+            <p className={`text-xs mt-0.5 ${profileComplete ? 'text-green-600' : 'text-yellow-600'}`}>
+              {profileComplete ? 'Complete' : 'Incomplete — complete your profile to submit pre-quals'}
+            </p>
+          </div>
+        </div>
+        <Link to="/gc/profile" className="btn-secondary text-sm">
+          {profileComplete ? 'Edit Profile' : 'Complete Profile'}
+        </Link>
+      </div>
+
       {/* My Projects */}
       <div>
         <h2 className="text-lg font-semibold text-gray-900 mb-4">My Projects</h2>
@@ -54,29 +123,9 @@ export default function GCDashboard() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {projects.map((project) => {
-              const memberCount = project.project_members?.[0]?.count ?? 0
-              return (
-                <Link
-                  key={project.id}
-                  to={`/gc/projects/${project.id}`}
-                  className="card p-5 hover:shadow-md transition-shadow block"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 truncate">{project.name}</h3>
-                      {project.description && (
-                        <p className="text-sm text-gray-500 mt-1 line-clamp-2">{project.description}</p>
-                      )}
-                    </div>
-                    <FolderOpen size={18} className="text-brand-400 flex-shrink-0 ml-2" />
-                  </div>
-                  <p className="text-xs text-gray-400 mt-3">
-                    {memberCount} member{memberCount !== 1 ? 's' : ''}
-                  </p>
-                </Link>
-              )
-            })}
+            {projects.map((project) => (
+              <ProjectCard key={project.id} project={project} userId={profile?.id ?? ''} />
+            ))}
           </div>
         )}
       </div>
