@@ -19,6 +19,12 @@ import InviteAcceptPage from '@/pages/InviteAcceptPage'
 import ContractorProfilePage from '@/pages/ContractorProfilePage'
 import ProjectSubmissionPage from '@/pages/ProjectSubmissionPage'
 import SubmissionReviewPage from '@/pages/SubmissionReviewPage'
+import QuestionnairesPage from '@/pages/QuestionnairesPage'
+import QuestionnaireBuilderPage from '@/pages/QuestionnaireBuilderPage'
+import QuestionBankPage from '@/pages/QuestionBankPage'
+import AssignQuestionnairePage from '@/pages/AssignQuestionnairePage'
+import QuestionnaireResponsePage from '@/pages/QuestionnaireResponsePage'
+import QuestionnaireReviewPage from '@/pages/QuestionnaireReviewPage'
 
 function RoleRedirect() {
   const { profile, loading } = useAuth()
@@ -68,6 +74,12 @@ export default function App() {
         <Route path="general-contractors" element={<GeneralContractorsPage />} />
         <Route path="trades" element={<TradesPage />} />
         <Route path="prequal/:id" element={<PrequalDetail />} />
+        <Route path="questionnaires" element={<QuestionnairesPage />} />
+        <Route path="questionnaires/new" element={<QuestionnaireBuilderPage />} />
+        <Route path="questionnaires/assign" element={<AssignQuestionnairePage />} />
+        <Route path="questionnaires/:id" element={<QuestionnaireBuilderPage />} />
+        <Route path="question-bank" element={<QuestionBankPage />} />
+        <Route path="assignments/:assignmentId/review" element={<QuestionnaireReviewPage />} />
       </Route>
 
       {/* GC routes */}
@@ -88,6 +100,11 @@ export default function App() {
         <Route path="prequal/new" element={<PrequalForm />} />
         <Route path="prequal/:id" element={<PrequalDetail />} />
         <Route path="prequal/:id/edit" element={<PrequalForm />} />
+        <Route path="questionnaires" element={<QuestionnairesPage />} />
+        <Route path="questionnaires/new" element={<QuestionnaireBuilderPage />} />
+        <Route path="questionnaires/assign" element={<AssignQuestionnairePage />} />
+        <Route path="questionnaires/:id" element={<QuestionnaireBuilderPage />} />
+        <Route path="assignments/:assignmentId/review" element={<QuestionnaireReviewPage />} />
       </Route>
 
       {/* Trade routes */}
@@ -106,6 +123,8 @@ export default function App() {
         <Route path="prequal/new" element={<PrequalForm />} />
         <Route path="prequal/:id" element={<PrequalDetail />} />
         <Route path="prequal/:id/edit" element={<PrequalForm />} />
+        <Route path="assignments/:assignmentId/respond" element={<QuestionnaireResponsePage />} />
+        <Route path="assignments/:assignmentId/review" element={<QuestionnaireReviewPage />} />
       </Route>
 
       {/* Catch-all */}

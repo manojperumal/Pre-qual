@@ -9,6 +9,8 @@ import {
   FolderOpen,
   HardHat,
   Wrench,
+  FileText,
+  Database,
 } from 'lucide-react'
 
 interface NavItem {
@@ -23,10 +25,13 @@ const ROLE_NAV: Record<string, NavItem[]> = {
     { label: 'Projects', to: '/owner/projects', icon: <FolderOpen size={18} /> },
     { label: 'General Contractors', to: '/owner/general-contractors', icon: <HardHat size={18} /> },
     { label: 'Trades', to: '/owner/trades', icon: <Wrench size={18} /> },
+    { label: 'Questionnaires', to: '/owner/questionnaires', icon: <FileText size={18} /> },
+    { label: 'Question Bank', to: '/owner/question-bank', icon: <Database size={18} /> },
   ],
   gc: [
     { label: 'Dashboard', to: '/gc', icon: <LayoutDashboard size={18} /> },
     { label: 'My Profile', to: '/gc/profile', icon: <User size={18} /> },
+    { label: 'Questionnaires', to: '/gc/questionnaires', icon: <FileText size={18} /> },
   ],
   trade: [
     { label: 'Dashboard', to: '/trade', icon: <LayoutDashboard size={18} /> },
