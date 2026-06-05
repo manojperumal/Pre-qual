@@ -3,7 +3,8 @@ import { useAuth } from '@/hooks/useAuth'
 import { useProjects } from '@/hooks/useProjects'
 import { useContractorProfile, useProjectSubmission } from '@/hooks/useContractorProfile'
 import { useSentInvitations } from '@/hooks/usePrequals'
-import { FolderOpen, User, Send, UserPlus, ChevronRight, CheckCircle, Clock, AlertCircle } from 'lucide-react'
+import { useMyAssignments } from '@/hooks/useQuestionnaires'
+import { FolderOpen, User, Send, UserPlus, ChevronRight, CheckCircle, Clock, AlertCircle, ClipboardList } from 'lucide-react'
 import { format } from 'date-fns'
 
 const SUBMISSION_COLORS: Record<string, string> = {
@@ -76,6 +77,7 @@ export default function GCDashboard() {
   const { data: projects = [], isLoading: projectsLoading } = useProjects(profile?.id)
   const { data: invitations = [] } = useSentInvitations(profile?.id)
   const { data: contractorProfile } = useContractorProfile(profile?.id)
+  const { data: myAssignments = [] } = useMyAssignments(profile?.id)
 
   const profileComplete = !!(contractorProfile?.company_name && contractorProfile?.gl_carrier)
   const myProjects = projects.filter((p) => p.owner_id !== profile?.id)
@@ -83,6 +85,9 @@ export default function GCDashboard() {
   // Derive quick stats from projects
   const approvedCount = 0 // would need submissions query — keep simple for now
   const pendingInvites = invitations.filter((i) => i.status === 'pending').length
+  const pendingQuestionnaires = myAssignments.filter((a) =>
+    ['pending', 'in_progress', 'needs_more_info'].includes(a.status)
+  ).length
 
   return (
     <div className="space-y-8">
@@ -119,22 +124,34 @@ export default function GCDashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Projects', value: myProjects.length, color: 'text-brand-600', bg: 'bg-brand-50', icon: <FolderOpen size={18} /> },
-          { label: 'Trades Invited', value: invitations.filter((i) => i.recipient_role === 'trade').length, color: 'text-purple-600', bg: 'bg-purple-50', icon: <UserPlus size={18} /> },
-          { label: 'Pending Invites', value: pendingInvites, color: pendingInvites > 0 ? 'text-amber-600' : 'text-gray-500', bg: pendingInvites > 0 ? 'bg-amber-50' : 'bg-gray-50', icon: <Clock size={18} /> },
-        ].map((s) => (
-          <div key={s.label} className="card px-5 py-4 flex items-center gap-3">
-            <div className={`w-9 h-9 rounded-lg ${s.bg} flex items-center justify-center flex-shrink-0`}>
-              <span className={s.color}>{s.icon}</span>
+          { label: 'Projects', value: myProjects.length, color: 'text-brand-600', bg: 'bg-brand-50', icon: <FolderOpen size={18} />, to: undefined },
+          { label: 'Trades Invited', value: invitations.filter((i) => i.recipient_role === 'trade').length, color: 'text-purple-600', bg: 'bg-purple-50', icon: <UserPlus size={18} />, to: undefined },
+          { label: 'Pending Invites', value: pendingInvites, color: pendingInvites > 0 ? 'text-amber-600' : 'text-gray-500', bg: pendingInvites > 0 ? 'bg-amber-50' : 'bg-gray-50', icon: <Clock size={18} />, to: undefined },
+          { label: 'Pending Questionnaires', value: pendingQuestionnaires, color: pendingQuestionnaires > 0 ? 'text-blue-600' : 'text-gray-500', bg: pendingQuestionnaires > 0 ? 'bg-blue-50' : 'bg-gray-50', icon: <ClipboardList size={18} />, to: '/gc/assignments' },
+        ].map((s) => {
+          const inner = (
+            <>
+              <div className={`w-9 h-9 rounded-lg ${s.bg} flex items-center justify-center flex-shrink-0`}>
+                <span className={s.color}>{s.icon}</span>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">{s.label}</p>
+                <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+              </div>
+            </>
+          )
+          return s.to ? (
+            <Link key={s.label} to={s.to} className="card px-5 py-4 flex items-center gap-3 hover:shadow-md transition-shadow">
+              {inner}
+            </Link>
+          ) : (
+            <div key={s.label} className="card px-5 py-4 flex items-center gap-3">
+              {inner}
             </div>
-            <div>
-              <p className="text-xs text-gray-500">{s.label}</p>
-              <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* My Projects */}
