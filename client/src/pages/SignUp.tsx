@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { supabase } from '@/lib/supabase'
-import { Eye, EyeOff, Building2, Wrench, HardHat } from 'lucide-react'
+import { Eye, EyeOff, Building2, HardHat } from 'lucide-react'
 import { UserRole } from '@/types'
 import { MojoLogo } from '@/components/MojoLogo'
 import clsx from 'clsx'
@@ -25,29 +25,30 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>
 
-const ROLES: { value: UserRole; label: string; description: string; icon: React.ReactNode }[] = [
+const CUSTOMER_ROLES: { value: UserRole; label: string; description: string; icon: React.ReactNode }[] = [
   {
     value: 'owner',
     label: 'Owner',
     description: 'Pre-qualify GCs and Trades for your projects',
-    icon: <Building2 size={20} />,
+    icon: <Building2 size={24} />,
   },
   {
     value: 'gc',
     label: 'General Contractor',
-    description: 'Pre-qualify for Owners and manage Trade subs',
-    icon: <HardHat size={20} />,
-  },
-  {
-    value: 'trade',
-    label: 'Trade',
-    description: 'Complete pre-qualification forms for Owners & GCs',
-    icon: <Wrench size={20} />,
+    description: 'Pre-qualify Trades and manage your subcontractors',
+    icon: <HardHat size={24} />,
   },
 ]
 
 export default function SignUp() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const inviteToken = searchParams.get('invite')
+
+  // If arriving via invite link, the role will be set to 'trade' (or 'gc') by the invite
+  // and the role selector is hidden — they're not buying the product
+  const isInvited = !!inviteToken
+
   const [showPassword, setShowPassword] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
 
@@ -59,7 +60,8 @@ export default function SignUp() {
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { role: 'trade' },
+    // Invited users default to 'trade'; direct signups default to 'owner'
+    defaultValues: { role: isInvited ? 'trade' : 'owner' },
   })
 
   const selectedRole = watch('role')
@@ -124,7 +126,12 @@ export default function SignUp() {
         </div>
 
         <div className="card p-8 rounded-xl shadow-xl">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Create your account</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-1">Create your account</h2>
+          <p className="text-sm text-gray-500 mb-6">
+            {isInvited
+              ? "You've been invited to join the platform."
+              : 'Join as a paying customer to manage your pre-qualification process.'}
+          </p>
 
           {authError && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
@@ -133,33 +140,48 @@ export default function SignUp() {
           )}
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div>
-              <label className="label">I am a...</label>
-              <div className="grid grid-cols-3 gap-2">
-                {ROLES.map((r) => (
-                  <button
-                    key={r.value}
-                    type="button"
-                    onClick={() => setValue('role', r.value, { shouldValidate: true })}
-                    className={clsx(
-                      'flex flex-col items-center gap-2 p-3 rounded-lg border-2 text-center transition-colors',
-                      selectedRole === r.value
-                        ? 'border-brand-500 bg-brand-50 text-brand-700'
-                        : 'border-gray-200 hover:border-gray-300 text-gray-600'
-                    )}
-                  >
-                    {r.icon}
-                    <span className="text-xs font-medium">{r.label}</span>
-                  </button>
-                ))}
-              </div>
-              {selectedRole && (
-                <p className="mt-1 text-xs text-gray-500">
-                  {ROLES.find((r) => r.value === selectedRole)?.description}
+
+            {/* Role selector — only shown for direct signups (not invited users) */}
+            {!isInvited && (
+              <div>
+                <label className="label">I am a...</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {CUSTOMER_ROLES.map((r) => (
+                    <button
+                      key={r.value}
+                      type="button"
+                      onClick={() => setValue('role', r.value, { shouldValidate: true })}
+                      className={clsx(
+                        'flex flex-col items-start gap-2 p-4 rounded-xl border-2 text-left transition-colors',
+                        selectedRole === r.value
+                          ? 'border-brand-500 bg-brand-50 text-brand-700'
+                          : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                      )}
+                    >
+                      <span className={selectedRole === r.value ? 'text-brand-600' : 'text-gray-400'}>
+                        {r.icon}
+                      </span>
+                      <div>
+                        <p className="text-sm font-semibold">{r.label}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{r.description}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-gray-400">
+                  Trades are added to the platform by invitation only.
                 </p>
-              )}
-              {errors.role && <p className="form-error">{errors.role.message}</p>}
-            </div>
+                {errors.role && <p className="form-error">{errors.role.message}</p>}
+              </div>
+            )}
+
+            {/* Invited user — show role badge instead */}
+            {isInvited && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-brand-50 border border-brand-100 rounded-lg text-sm text-brand-700">
+                <HardHat size={16} />
+                Joining as an invited contractor
+              </div>
+            )}
 
             <div>
               <label className="label" htmlFor="full_name">Full Name</label>
