@@ -9,7 +9,7 @@ export function useProjects(userId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('projects')
-        .select('*, project_members(count)')
+        .select('*, project_members(count), gc_contact:profiles!gc_primary_contact_id(id,full_name,email,company_name), trade_contact:profiles!trade_primary_contact_id(id,full_name,email,company_name)')
         .order('created_at', { ascending: false })
       if (error) throw error
       return data as (Project & { project_members: { count: number }[] })[]
@@ -79,6 +79,31 @@ export function useUpdateProject() {
           end_date: endDate || null,
         })
         .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      return data as Project
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
+  })
+}
+
+export function useSetProjectPrimaryContact() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      projectId,
+      field,
+      userId,
+    }: {
+      projectId: string
+      field: 'gc_primary_contact_id' | 'trade_primary_contact_id'
+      userId: string | null
+    }) => {
+      const { data, error } = await supabase
+        .from('projects')
+        .update({ [field]: userId })
+        .eq('id', projectId)
         .select()
         .single()
       if (error) throw error

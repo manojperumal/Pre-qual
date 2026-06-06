@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { useProjectMembers, useUpdateProject } from '@/hooks/useProjects'
+import { useProjectMembers, useUpdateProject, useSetProjectPrimaryContact } from '@/hooks/useProjects'
 import { useProjects } from '@/hooks/useProjects'
 import { useProjectSubmissions } from '@/hooks/useContractorProfile'
 import { useProjectAssignments, AssignmentStatus } from '@/hooks/useQuestionnaires'
-import { Users, UserPlus, ChevronRight, Pencil, X, Check, Calendar, ClipboardList } from 'lucide-react'
+import { Users, UserPlus, ChevronRight, Pencil, X, Check, Calendar, ClipboardList, Star } from 'lucide-react'
 import { format } from 'date-fns'
 import { useForm } from 'react-hook-form'
 
@@ -36,6 +36,7 @@ export default function ProjectDetailPage() {
   const { data: submissions = [], isLoading: subsLoading } = useProjectSubmissions(projectId)
   const { data: projectAssignments = [] } = useProjectAssignments(projectId)
   const updateProject = useUpdateProject()
+  const setPrimaryContact = useSetProjectPrimaryContact()
 
   const [editing, setEditing] = useState(false)
 
@@ -148,6 +149,83 @@ export default function ProjectDetailPage() {
               Edit
             </button>
           )}
+        </div>
+      )}
+
+      {/* Primary Contacts */}
+      {(role === 'owner' || role === 'gc') && (
+        <div className="card p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Star size={16} className="text-amber-400" />
+            <h2 className="text-base font-semibold text-gray-900">Primary Contacts</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {/* GC Primary Contact */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">GC Primary Contact</label>
+              {(role === 'owner' || role === 'gc') ? (
+                <select
+                  value={(project as any)?.gc_primary_contact_id ?? ''}
+                  onChange={e => {
+                    if (!projectId) return
+                    setPrimaryContact.mutate({
+                      projectId,
+                      field: 'gc_primary_contact_id',
+                      userId: e.target.value || null,
+                    })
+                  }}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                >
+                  <option value="">— Not assigned —</option>
+                  {(members as any[])
+                    .filter((m: any) => m.profile?.role === 'gc')
+                    .map((m: any) => (
+                      <option key={m.profile?.id} value={m.profile?.id}>
+                        {m.profile?.full_name || m.profile?.email}
+                        {m.profile?.company_name ? ` (${m.profile.company_name})` : ''}
+                      </option>
+                    ))}
+                </select>
+              ) : (
+                <p className="text-sm text-gray-700">
+                  {(project as any)?.gc_contact?.full_name || (project as any)?.gc_contact?.email || <span className="text-gray-400 italic">Not assigned</span>}
+                </p>
+              )}
+            </div>
+
+            {/* Trade Primary Contact */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Trade Primary Contact</label>
+              {(role === 'owner' || role === 'gc') ? (
+                <select
+                  value={(project as any)?.trade_primary_contact_id ?? ''}
+                  onChange={e => {
+                    if (!projectId) return
+                    setPrimaryContact.mutate({
+                      projectId,
+                      field: 'trade_primary_contact_id',
+                      userId: e.target.value || null,
+                    })
+                  }}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                >
+                  <option value="">— Not assigned —</option>
+                  {(members as any[])
+                    .filter((m: any) => m.profile?.role === 'trade')
+                    .map((m: any) => (
+                      <option key={m.profile?.id} value={m.profile?.id}>
+                        {m.profile?.full_name || m.profile?.email}
+                        {m.profile?.company_name ? ` (${m.profile.company_name})` : ''}
+                      </option>
+                    ))}
+                </select>
+              ) : (
+                <p className="text-sm text-gray-700">
+                  {(project as any)?.trade_contact?.full_name || (project as any)?.trade_contact?.email || <span className="text-gray-400 italic">Not assigned</span>}
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
