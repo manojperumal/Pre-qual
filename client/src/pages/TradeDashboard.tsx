@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { useProjects } from '@/hooks/useProjects'
+import { useProjects, useMyProjects, useTeamMembers } from '@/hooks/useProjects'
 import { useContractorProfile, useProjectSubmission } from '@/hooks/useContractorProfile'
 import { useReceivedInvitations, useMyProjectSubmissions } from '@/hooks/usePrequals'
 import { useMyAssignments } from '@/hooks/useQuestionnaires'
-import { FolderOpen, User, Send, Clock, CheckCircle, AlertCircle, Mail, ChevronRight, ClipboardList } from 'lucide-react'
+import { FolderOpen, User, Send, Clock, CheckCircle, AlertCircle, Mail, ChevronRight, ClipboardList, Users, UserPlus } from 'lucide-react'
 import { format } from 'date-fns'
 
 const SUBMISSION_COLORS: Record<string, string> = {
@@ -75,14 +75,23 @@ function ProjectCard({ project, userId }: { project: any; userId: string }) {
 
 export default function TradeDashboard() {
   const { profile } = useAuth()
-  const { data: projects = [], isLoading: projectsLoading } = useProjects(profile?.id)
+
+  const isTeamMember = !!(profile as any)?.company_id
+  const companyOwnerId = (profile as any)?.company_id || profile?.id
+
+  const { data: allProjects = [], isLoading: allProjectsLoading } = useProjects(isTeamMember ? undefined : profile?.id)
+  const { data: memberProjects = [], isLoading: memberProjectsLoading } = useMyProjects(isTeamMember ? profile?.id : undefined)
+  const { data: teamMembers = [] } = useTeamMembers(isTeamMember ? undefined : profile?.id)
   const { data: invitations = [] } = useReceivedInvitations(profile?.email ?? undefined)
   const { data: contractorProfile } = useContractorProfile(profile?.id)
   const { data: allSubmissions = [] } = useMyProjectSubmissions(profile?.id)
   const { data: myAssignments = [] } = useMyAssignments(profile?.id)
 
+  const projectsLoading = isTeamMember ? memberProjectsLoading : allProjectsLoading
   const profileComplete = !!(contractorProfile?.company_name && contractorProfile?.gl_carrier)
-  const myProjects = projects.filter((p) => p.owner_id !== profile?.id)
+  const myProjects = isTeamMember
+    ? memberProjects
+    : allProjects.filter((p) => p.owner_id !== profile?.id)
   const pendingInvites = invitations.filter((i) => i.status === 'pending')
 
   const approvedCount = allSubmissions.filter((s: any) => s.status === 'approved').length
@@ -93,11 +102,22 @@ export default function TradeDashboard() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Welcome back, {profile?.full_name || profile?.company_name || 'Trade'}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Welcome back, {profile?.full_name || profile?.company_name || 'Trade'}
+          </p>
+        </div>
+        {!isTeamMember && (
+          <Link
+            to="/trade/invite?role=trade_member&from=trade-dashboard"
+            className="btn-secondary inline-flex items-center gap-2 text-sm"
+          >
+            <Users size={16} />
+            Invite Team Member
+          </Link>
+        )}
       </div>
 
       {/* Profile completeness banner */}
@@ -209,6 +229,49 @@ export default function TradeDashboard() {
           </div>
         )}
       </div>
+
+      {/* Team Members */}
+      {!isTeamMember && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">My Team</h2>
+            <Link
+              to="/trade/invite?role=trade_member&from=trade-dashboard"
+              className="text-sm text-brand-600 hover:text-brand-700 font-medium inline-flex items-center gap-1"
+            >
+              + Invite Team Member
+            </Link>
+          </div>
+          {(teamMembers as any[]).length === 0 ? (
+            <div className="card p-6 text-center text-gray-500">
+              <Users size={28} className="mx-auto mb-2 text-gray-300" />
+              <p className="text-sm">No team members yet</p>
+              <p className="text-xs text-gray-400 mt-1">Invite colleagues from your company to collaborate</p>
+            </div>
+          ) : (
+            <div className="card overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    {['Name', 'Email', 'Joined'].map((h) => (
+                      <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {(teamMembers as any[]).map((m: any) => (
+                    <tr key={m.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 text-sm text-gray-900">{m.full_name || '—'}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{m.email}</td>
+                      <td className="px-6 py-4 text-sm text-gray-500">{format(new Date(m.created_at), 'MMM d, yyyy')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Received invitations history */}
       {invitations.length > 0 && (

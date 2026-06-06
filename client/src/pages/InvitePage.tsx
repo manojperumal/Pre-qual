@@ -14,7 +14,7 @@ import clsx from 'clsx'
 
 const schema = z.object({
   recipient_email: z.string().email('Enter a valid email address').or(z.literal('')),
-  recipient_role: z.enum(['gc', 'trade', 'gc_member'] as const),
+  recipient_role: z.enum(['gc', 'trade', 'gc_member', 'owner_member', 'trade_member'] as const),
   project_id: z.string().optional(),
 })
 
@@ -39,7 +39,7 @@ export default function InvitePage() {
   const { data: projects = [] } = useProjects(profile?.id)
 
   const isOwner = profile?.role === 'owner'
-  const defaultRole = (searchParams.get('role') as 'gc' | 'trade' | 'gc_member') || 'gc'
+  const defaultRole = (searchParams.get('role') as 'gc' | 'trade' | 'gc_member' | 'owner_member' | 'trade_member') || 'gc'
   const defaultEmail = searchParams.get('email') || ''
   const fromPage = searchParams.get('from') || ''
 
@@ -130,10 +130,15 @@ export default function InvitePage() {
     ? [
         { value: 'gc' as const, label: 'General Contractor', icon: <HardHat size={18} /> },
         { value: 'trade' as const, label: 'Trade Subcontractor', icon: <Wrench size={18} /> },
+        { value: 'owner_member' as const, label: 'Team Member', icon: <UserPlus size={18} /> },
       ]
-    : [
+    : profile?.role === 'gc'
+    ? [
         { value: 'trade' as const, label: 'Trade Subcontractor', icon: <Wrench size={18} /> },
         { value: 'gc_member' as const, label: 'Team Member', icon: <UserPlus size={18} /> },
+      ]
+    : [
+        { value: 'trade_member' as const, label: 'Team Member', icon: <UserPlus size={18} /> },
       ]
 
   return (

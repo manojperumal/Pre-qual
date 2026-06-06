@@ -25,7 +25,7 @@ function createTransporter() {
 
 const sendSchema = z.object({
   recipient_email: z.string().email(),
-  recipient_role: z.enum(['gc', 'trade', 'gc_member']),
+  recipient_role: z.enum(['gc', 'trade', 'gc_member', 'owner_member', 'trade_member']),
   project_id: z.string().uuid().optional(),
 })
 
@@ -92,8 +92,8 @@ router.post('/send', requireAuth, async (req: Request, res: Response): Promise<v
   const inviteLink = `${clientUrl}/invite/${token}`
   const recipientRoleLabel =
     recipient_role === 'gc' ? 'General Contractor' :
-    recipient_role === 'gc_member' ? 'Team Member' :
-    'Trade Subcontractor'
+    recipient_role === 'trade' ? 'Trade Subcontractor' :
+    'Team Member'
 
   // Send email or log to console
   const transporter = createTransporter()
@@ -243,22 +243,26 @@ router.post('/accept', requireAuth, async (req: Request, res: Response): Promise
     return
   }
 
-  // For gc_member invites: set company_id on the acceptor's profile
-  if (invitation.recipient_role === 'gc_member') {
+  // For team member invites: set company_id and correct role on the acceptor's profile
+  const memberRoleMap: Record<string, string> = {
+    gc_member: 'gc',
+    owner_member: 'owner',
+    trade_member: 'trade',
+  }
+  if (memberRoleMap[invitation.recipient_role]) {
     const sender = invitation.sender as { id?: string; company_id?: string } | null
-    // company_id is either the sender's company_id (if they're also a member) or the sender's own id
     const companyId = sender?.company_id || sender?.id
     if (companyId) {
       await supabaseAdmin
         .from('profiles')
-        .update({ company_id: companyId, role: 'gc' })
+        .update({ company_id: companyId, role: memberRoleMap[invitation.recipient_role] })
         .eq('id', req.userId!)
     }
   }
 
   // Insert project_member if project_id is set
   if (invitation.project_id) {
-    const memberRole = invitation.recipient_role === 'gc_member' ? 'gc' : invitation.recipient_role
+    const memberRole = memberRoleMap[invitation.recipient_role] ?? invitation.recipient_role
     await supabaseAdmin
       .from('project_members')
       .insert({

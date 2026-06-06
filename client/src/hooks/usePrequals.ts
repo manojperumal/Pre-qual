@@ -178,7 +178,7 @@ export function useSendInvitation() {
   return useMutation({
     mutationFn: async (invitation: {
       recipient_email: string
-      recipient_role: 'gc' | 'trade' | 'gc_member'
+      recipient_role: 'gc' | 'trade' | 'gc_member' | 'owner_member' | 'trade_member'
       project_id?: string
     }) => {
       const { data: sessionData } = await supabase.auth.getSession()

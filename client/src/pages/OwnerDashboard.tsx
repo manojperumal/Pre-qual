@@ -1,9 +1,8 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { useProjects } from '@/hooks/useProjects'
-import { useOwnerGCs, useOwnerTrades } from '@/hooks/useProjects'
+import { useProjects, useMyProjects, useTeamMembers, useOwnerGCs, useOwnerTrades } from '@/hooks/useProjects'
 import { useOwnerPendingSubmissions } from '@/hooks/useContractorProfile'
-import { FolderOpen, HardHat, Wrench, ClipboardList, AlertTriangle, ChevronRight, Plus } from 'lucide-react'
+import { FolderOpen, HardHat, Wrench, ClipboardList, AlertTriangle, ChevronRight, Plus, Users } from 'lucide-react'
 import { format } from 'date-fns'
 
 const STATUS_COLORS: Record<string, string> = {
@@ -17,10 +16,18 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function OwnerDashboard() {
   const { profile } = useAuth()
-  const { data: projects = [], isLoading: projectsLoading } = useProjects(profile?.id)
-  const { data: gcs = [] } = useOwnerGCs(profile?.id)
-  const { data: trades = [] } = useOwnerTrades(profile?.id)
-  const { data: pending = [], isLoading: pendingLoading } = useOwnerPendingSubmissions(profile?.id)
+  const isTeamMember = !!(profile as any)?.company_id
+  const companyOwnerId = (profile as any)?.company_id || profile?.id
+
+  const { data: allProjects = [], isLoading: allProjectsLoading } = useProjects(isTeamMember ? undefined : profile?.id)
+  const { data: memberProjects = [], isLoading: memberProjectsLoading } = useMyProjects(isTeamMember ? profile?.id : undefined)
+  const projects = isTeamMember ? memberProjects : allProjects
+  const projectsLoading = isTeamMember ? memberProjectsLoading : allProjectsLoading
+
+  const { data: gcs = [] } = useOwnerGCs(companyOwnerId)
+  const { data: trades = [] } = useOwnerTrades(companyOwnerId)
+  const { data: pending = [], isLoading: pendingLoading } = useOwnerPendingSubmissions(companyOwnerId)
+  const { data: teamMembers = [] } = useTeamMembers(isTeamMember ? undefined : profile?.id)
 
   const uniqueGCs = new Set(gcs.map((r) => r.contractorId)).size
   const uniqueTrades = new Set(trades.map((r) => r.contractorId)).size
@@ -39,10 +46,18 @@ export default function OwnerDashboard() {
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="mt-1 text-sm text-gray-500">Welcome back, {profile?.full_name || 'Owner'}</p>
         </div>
-        <Link to="/owner/projects/new" className="btn-primary inline-flex items-center gap-2 text-sm">
-          <Plus size={16} />
-          New Project
-        </Link>
+        <div className="flex gap-2">
+          {!isTeamMember && (
+            <Link to="/owner/invite?role=owner_member&from=owner-dashboard" className="btn-secondary inline-flex items-center gap-2 text-sm">
+              <Plus size={16} />
+              Invite Team Member
+            </Link>
+          )}
+          <Link to="/owner/projects/new" className="btn-primary inline-flex items-center gap-2 text-sm">
+            <Plus size={16} />
+            New Project
+          </Link>
+        </div>
       </div>
 
       {/* Stats */}
@@ -164,6 +179,40 @@ export default function OwnerDashboard() {
           </div>
         )}
       </div>
+      {/* Team Members — only for company owners */}
+      {!isTeamMember && (teamMembers as any[]).length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">My Team</h2>
+            <Link
+              to="/owner/invite?role=owner_member&from=owner-dashboard"
+              className="text-sm text-brand-600 hover:text-brand-700 font-medium inline-flex items-center gap-1"
+            >
+              + Invite Team Member
+            </Link>
+          </div>
+          <div className="card overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  {['Name', 'Email', 'Joined'].map((h) => (
+                    <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {(teamMembers as any[]).map((m: any) => (
+                  <tr key={m.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm text-gray-900">{m.full_name || '—'}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{m.email}</td>
+                    <td className="px-6 py-4 text-sm text-gray-500">{format(new Date(m.created_at), 'MMM d, yyyy')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
