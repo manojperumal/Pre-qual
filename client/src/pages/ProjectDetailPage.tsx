@@ -4,7 +4,8 @@ import { useAuth } from '@/hooks/useAuth'
 import { useProjectMembers, useUpdateProject } from '@/hooks/useProjects'
 import { useProjects } from '@/hooks/useProjects'
 import { useProjectSubmissions } from '@/hooks/useContractorProfile'
-import { Users, UserPlus, ChevronRight, Pencil, X, Check, Calendar } from 'lucide-react'
+import { useProjectAssignments, AssignmentStatus } from '@/hooks/useQuestionnaires'
+import { Users, UserPlus, ChevronRight, Pencil, X, Check, Calendar, ClipboardList } from 'lucide-react'
 import { format } from 'date-fns'
 import { useForm } from 'react-hook-form'
 
@@ -33,6 +34,7 @@ export default function ProjectDetailPage() {
   const { data: projects = [] } = useProjects(profile?.id)
   const { data: members = [], isLoading } = useProjectMembers(projectId)
   const { data: submissions = [], isLoading: subsLoading } = useProjectSubmissions(projectId)
+  const { data: projectAssignments = [] } = useProjectAssignments(projectId)
   const updateProject = useUpdateProject()
 
   const [editing, setEditing] = useState(false)
@@ -210,6 +212,80 @@ export default function ProjectDetailPage() {
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600 capitalize">{member.role}</td>
                       <td className="px-6 py-4 text-sm text-gray-500">{format(new Date(member.joined_at), 'MMM d, yyyy')}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Questionnaire Assignments */}
+      <div className="card overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ClipboardList size={16} className="text-gray-400" />
+            <h2 className="text-base font-semibold text-gray-900">Questionnaire Assignments</h2>
+          </div>
+          {(role === 'owner' || role === 'gc') && (
+            <Link
+              to={`/${role}/questionnaires/assign`}
+              className="btn-primary text-sm py-1.5 px-3 inline-flex items-center gap-1"
+            >
+              <ClipboardList size={14} />
+              Assign Questionnaire
+            </Link>
+          )}
+        </div>
+        {projectAssignments.length === 0 ? (
+          <div className="text-center py-10 text-gray-500">
+            <p className="text-sm">No questionnaires assigned yet</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  {['Questionnaire', 'Assigned To', 'Due Date', 'Status', 'Action'].map((h) => (
+                    <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {projectAssignments.map((a) => {
+                  const reviewable: AssignmentStatus[] = ['submitted', 'approved', 'rejected']
+                  return (
+                    <tr key={a.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{a.questionnaire?.name ?? '—'}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {a.assignee?.company_name || a.assignee?.full_name || a.assignee?.email || '—'}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {a.due_date ? format(new Date(a.due_date), 'MMM d, yyyy') : '—'}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                          a.status === 'pending' ? 'bg-gray-100 text-gray-600' :
+                          a.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
+                          a.status === 'submitted' ? 'bg-amber-100 text-amber-700' :
+                          a.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                          a.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                          'bg-orange-100 text-orange-700'
+                        }`}>
+                          {a.status.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {reviewable.includes(a.status) && (
+                          <Link
+                            to={`/${role}/assignments/${a.id}/review`}
+                            className="text-sm text-brand-600 hover:text-brand-700 font-medium"
+                          >
+                            Review
+                          </Link>
+                        )}
+                      </td>
                     </tr>
                   )
                 })}

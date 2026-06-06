@@ -3,7 +3,8 @@ import { useAuth } from '@/hooks/useAuth'
 import { useProjects } from '@/hooks/useProjects'
 import { useContractorProfile, useProjectSubmission } from '@/hooks/useContractorProfile'
 import { useReceivedInvitations, useMyProjectSubmissions } from '@/hooks/usePrequals'
-import { FolderOpen, User, Send, Clock, CheckCircle, AlertCircle, Mail, ChevronRight } from 'lucide-react'
+import { useMyAssignments } from '@/hooks/useQuestionnaires'
+import { FolderOpen, User, Send, Clock, CheckCircle, AlertCircle, Mail, ChevronRight, ClipboardList } from 'lucide-react'
 import { format } from 'date-fns'
 
 const SUBMISSION_COLORS: Record<string, string> = {
@@ -78,6 +79,7 @@ export default function TradeDashboard() {
   const { data: invitations = [] } = useReceivedInvitations(profile?.email ?? undefined)
   const { data: contractorProfile } = useContractorProfile(profile?.id)
   const { data: allSubmissions = [] } = useMyProjectSubmissions(profile?.id)
+  const { data: myAssignments = [] } = useMyAssignments(profile?.id)
 
   const profileComplete = !!(contractorProfile?.company_name && contractorProfile?.gl_carrier)
   const myProjects = projects.filter((p) => p.owner_id !== profile?.id)
@@ -85,6 +87,9 @@ export default function TradeDashboard() {
 
   const approvedCount = allSubmissions.filter((s: any) => s.status === 'approved').length
   const needsActionCount = allSubmissions.filter((s: any) => s.status === 'needs_more_info').length
+  const pendingQuestionnaires = myAssignments.filter((a) =>
+    ['pending', 'in_progress', 'needs_more_info'].includes(a.status)
+  ).length
 
   return (
     <div className="space-y-8">
@@ -150,47 +155,35 @@ export default function TradeDashboard() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         {[
-          {
-            label: 'Projects',
-            value: myProjects.length,
-            color: 'text-brand-600',
-            bg: 'bg-brand-50',
-            icon: <FolderOpen size={18} />,
-          },
-          {
-            label: 'Approved',
-            value: approvedCount,
-            color: approvedCount > 0 ? 'text-green-600' : 'text-gray-500',
-            bg: approvedCount > 0 ? 'bg-green-50' : 'bg-gray-50',
-            icon: <CheckCircle size={18} />,
-          },
-          {
-            label: 'Needs Action',
-            value: needsActionCount,
-            color: needsActionCount > 0 ? 'text-orange-600' : 'text-gray-500',
-            bg: needsActionCount > 0 ? 'bg-orange-50' : 'bg-gray-50',
-            icon: <AlertCircle size={18} />,
-          },
-          {
-            label: 'Pending Invites',
-            value: pendingInvites.length,
-            color: pendingInvites.length > 0 ? 'text-blue-600' : 'text-gray-500',
-            bg: pendingInvites.length > 0 ? 'bg-blue-50' : 'bg-gray-50',
-            icon: <Mail size={18} />,
-          },
-        ].map((s) => (
-          <div key={s.label} className="card px-5 py-4 flex items-center gap-3">
-            <div className={`w-9 h-9 rounded-lg ${s.bg} flex items-center justify-center flex-shrink-0`}>
-              <span className={s.color}>{s.icon}</span>
+          { label: 'Projects', value: myProjects.length, color: 'text-brand-600', bg: 'bg-brand-50', icon: <FolderOpen size={18} />, to: undefined },
+          { label: 'Approved', value: approvedCount, color: approvedCount > 0 ? 'text-green-600' : 'text-gray-500', bg: approvedCount > 0 ? 'bg-green-50' : 'bg-gray-50', icon: <CheckCircle size={18} />, to: undefined },
+          { label: 'Needs Action', value: needsActionCount, color: needsActionCount > 0 ? 'text-orange-600' : 'text-gray-500', bg: needsActionCount > 0 ? 'bg-orange-50' : 'bg-gray-50', icon: <AlertCircle size={18} />, to: undefined },
+          { label: 'Pending Invites', value: pendingInvites.length, color: pendingInvites.length > 0 ? 'text-blue-600' : 'text-gray-500', bg: pendingInvites.length > 0 ? 'bg-blue-50' : 'bg-gray-50', icon: <Mail size={18} />, to: undefined },
+          { label: 'Pending Questionnaires', value: pendingQuestionnaires, color: pendingQuestionnaires > 0 ? 'text-blue-600' : 'text-gray-500', bg: pendingQuestionnaires > 0 ? 'bg-blue-50' : 'bg-gray-50', icon: <ClipboardList size={18} />, to: '/trade/assignments' },
+        ].map((s) => {
+          const inner = (
+            <>
+              <div className={`w-9 h-9 rounded-lg ${s.bg} flex items-center justify-center flex-shrink-0`}>
+                <span className={s.color}>{s.icon}</span>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">{s.label}</p>
+                <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+              </div>
+            </>
+          )
+          return s.to ? (
+            <Link key={s.label} to={s.to} className="card px-5 py-4 flex items-center gap-3 hover:shadow-md transition-shadow">
+              {inner}
+            </Link>
+          ) : (
+            <div key={s.label} className="card px-5 py-4 flex items-center gap-3">
+              {inner}
             </div>
-            <div>
-              <p className="text-xs text-gray-500">{s.label}</p>
-              <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* My Projects */}

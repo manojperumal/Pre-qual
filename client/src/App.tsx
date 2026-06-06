@@ -25,6 +25,7 @@ import QuestionBankPage from '@/pages/QuestionBankPage'
 import AssignQuestionnairePage from '@/pages/AssignQuestionnairePage'
 import QuestionnaireResponsePage from '@/pages/QuestionnaireResponsePage'
 import QuestionnaireReviewPage from '@/pages/QuestionnaireReviewPage'
+import MyAssignmentsPage from '@/pages/MyAssignmentsPage'
 
 function RoleRedirect() {
   const { profile, loading } = useAuth()
@@ -104,6 +105,7 @@ export default function App() {
         <Route path="questionnaires/new" element={<QuestionnaireBuilderPage />} />
         <Route path="questionnaires/assign" element={<AssignQuestionnairePage />} />
         <Route path="questionnaires/:id" element={<QuestionnaireBuilderPage />} />
+        <Route path="assignments" element={<MyAssignmentsPage />} />
         <Route path="assignments/:assignmentId/review" element={<QuestionnaireReviewPage />} />
       </Route>
 
@@ -123,6 +125,7 @@ export default function App() {
         <Route path="prequal/new" element={<PrequalForm />} />
         <Route path="prequal/:id" element={<PrequalDetail />} />
         <Route path="prequal/:id/edit" element={<PrequalForm />} />
+        <Route path="assignments" element={<MyAssignmentsPage />} />
         <Route path="assignments/:assignmentId/respond" element={<QuestionnaireResponsePage />} />
         <Route path="assignments/:assignmentId/review" element={<QuestionnaireReviewPage />} />
       </Route>

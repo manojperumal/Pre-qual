@@ -11,6 +11,7 @@ import {
   Wrench,
   FileText,
   Database,
+  ClipboardList,
 } from 'lucide-react'
 
 interface NavItem {
@@ -32,10 +33,12 @@ const ROLE_NAV: Record<string, NavItem[]> = {
     { label: 'Dashboard', to: '/gc', icon: <LayoutDashboard size={18} /> },
     { label: 'My Profile', to: '/gc/profile', icon: <User size={18} /> },
     { label: 'Questionnaires', to: '/gc/questionnaires', icon: <FileText size={18} /> },
+    { label: 'My Assignments', to: '/gc/assignments', icon: <ClipboardList size={18} /> },
   ],
   trade: [
     { label: 'Dashboard', to: '/trade', icon: <LayoutDashboard size={18} /> },
     { label: 'My Profile', to: '/trade/profile', icon: <User size={18} /> },
+    { label: 'My Assignments', to: '/trade/assignments', icon: <ClipboardList size={18} /> },
   ],
 }
 
