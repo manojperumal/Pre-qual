@@ -8,13 +8,13 @@ import { useAuth } from '@/hooks/useAuth'
 import { useSendInvitation, useSentInvitations } from '@/hooks/usePrequals'
 import { useProjects } from '@/hooks/useProjects'
 import { StatusBadge } from '@/components/StatusBadge'
-import { Send, Users, HardHat, Wrench, ChevronRight, QrCode, Copy, Check, X, Mail } from 'lucide-react'
+import { Send, Users, HardHat, Wrench, ChevronRight, QrCode, Copy, Check, X, Mail, UserPlus } from 'lucide-react'
 import { format } from 'date-fns'
 import clsx from 'clsx'
 
 const schema = z.object({
   recipient_email: z.string().email('Enter a valid email address').or(z.literal('')),
-  recipient_role: z.enum(['gc', 'trade'] as const),
+  recipient_role: z.enum(['gc', 'trade', 'gc_member'] as const),
   project_id: z.string().optional(),
 })
 
@@ -39,7 +39,7 @@ export default function InvitePage() {
   const { data: projects = [] } = useProjects(profile?.id)
 
   const isOwner = profile?.role === 'owner'
-  const defaultRole = (searchParams.get('role') as 'gc' | 'trade') || 'gc'
+  const defaultRole = (searchParams.get('role') as 'gc' | 'trade' | 'gc_member') || 'gc'
   const defaultEmail = searchParams.get('email') || ''
   const fromPage = searchParams.get('from') || ''
 
@@ -53,7 +53,7 @@ export default function InvitePage() {
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      recipient_role: defaultRole,
+      recipient_role: defaultRole || (isOwner ? 'gc' : 'trade'),
       recipient_email: defaultEmail,
       project_id: routeProjectId || '',
     },
@@ -126,10 +126,15 @@ export default function InvitePage() {
     ? invitations.filter((inv) => (inv as any).project_id === routeProjectId)
     : invitations
 
-  const roleOptions = [
-    { value: 'gc' as const, label: 'General Contractor', icon: <HardHat size={18} /> },
-    { value: 'trade' as const, label: 'Trade Subcontractor', icon: <Wrench size={18} /> },
-  ]
+  const roleOptions = isOwner
+    ? [
+        { value: 'gc' as const, label: 'General Contractor', icon: <HardHat size={18} /> },
+        { value: 'trade' as const, label: 'Trade Subcontractor', icon: <Wrench size={18} /> },
+      ]
+    : [
+        { value: 'trade' as const, label: 'Trade Subcontractor', icon: <Wrench size={18} /> },
+        { value: 'gc_member' as const, label: 'Team Member', icon: <UserPlus size={18} /> },
+      ]
 
   return (
     <div className="space-y-8 max-w-2xl">
