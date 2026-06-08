@@ -25,7 +25,7 @@ function createTransporter() {
 
 const sendSchema = z.object({
   recipient_email: z.string().email(),
-  recipient_role: z.enum(['gc', 'trade']),
+  recipient_role: z.enum(['gc', 'trade', 'gc_member', 'owner_member', 'trade_member']),
   project_id: z.string().uuid().optional(),
 })
 
@@ -66,7 +66,7 @@ router.post('/send', requireAuth, async (req: Request, res: Response): Promise<v
     projectName = project?.name
   }
 
-  // Insert invitation record
+  // Insert invitation record (store gc_member as-is in recipient_role)
   const { data: invitation, error: insertErr } = await supabaseAdmin
     .from('invitations')
     .insert({
@@ -90,7 +90,10 @@ router.post('/send', requireAuth, async (req: Request, res: Response): Promise<v
   const senderName = (sender as any)?.company_name || (sender as any)?.full_name || 'A construction company'
   const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173'
   const inviteLink = `${clientUrl}/invite/${token}`
-  const recipientRoleLabel = recipient_role === 'gc' ? 'General Contractor' : 'Trade Subcontractor'
+  const recipientRoleLabel =
+    recipient_role === 'gc' ? 'General Contractor' :
+    recipient_role === 'trade' ? 'Trade Subcontractor' :
+    'Team Member'
 
   // Send email or log to console
   const transporter = createTransporter()
@@ -104,7 +107,7 @@ router.post('/send', requireAuth, async (req: Request, res: Response): Promise<v
     await transporter.sendMail({
       from: `"PreQual Pro" <${process.env.FROM_EMAIL || 'noreply@prequalpro.com'}>`,
       to: recipient_email,
-      subject: `Pre-Qualification Invitation from ${senderName}`,
+      subject: `You've been invited to join ${senderName} on PreQual Pro`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -123,11 +126,11 @@ router.post('/send', requireAuth, async (req: Request, res: Response): Promise<v
         <body>
           <div class="container">
             <div class="header">
-              <h1>PreQual Pro — Pre-Qualification Invitation</h1>
+              <h1>PreQual Pro — Invitation</h1>
             </div>
             <div class="body">
               <p>Hello,</p>
-              <p><strong>${senderName}</strong> has invited you to complete a pre-qualification as a <strong>${recipientRoleLabel}</strong>${projectName ? ` for the project <strong>${projectName}</strong>` : ''}.</p>
+              <p><strong>${senderName}</strong> has invited you to join their team as a <strong>${recipientRoleLabel}</strong>${projectName ? ` for the project <strong>${projectName}</strong>` : ''}.</p>
               <p>Please click the button below to accept your invitation:</p>
               <a href="${inviteLink}" class="btn">Accept Invitation →</a>
               <p style="margin-top: 24px; color: #6b7280; font-size: 13px;">Or copy this link: ${inviteLink}</p>
@@ -146,7 +149,6 @@ router.post('/send', requireAuth, async (req: Request, res: Response): Promise<v
   } catch (err: unknown) {
     console.error('[invitations] Email send error:', err)
     console.log(`[invitations] Invite link (email failed): ${inviteLink}`)
-    // Don't fail — invitation is created, just email didn't send
     res.json({ success: true, message: 'Invitation created (email delivery failed)', invitation })
   }
 })
@@ -160,7 +162,7 @@ router.get('/token/:token', async (req: Request, res: Response): Promise<void> =
 
   const { data: invitation, error } = await supabaseAdmin
     .from('invitations')
-    .select('*, sender:profiles!sender_id(full_name, company_name), project:projects(name)')
+    .select('*, sender:profiles!sender_id(id, full_name, company_name), project:projects(name)')
     .eq('token', token)
     .single()
 
@@ -169,7 +171,6 @@ router.get('/token/:token', async (req: Request, res: Response): Promise<void> =
     return
   }
 
-  // Check expiry
   if (invitation.expires_at && new Date(invitation.expires_at) < new Date()) {
     res.status(404).json({ error: 'Invitation has expired' })
     return
@@ -180,7 +181,7 @@ router.get('/token/:token', async (req: Request, res: Response): Promise<void> =
     return
   }
 
-  const sender = invitation.sender as { full_name?: string; company_name?: string } | null
+  const sender = invitation.sender as { id?: string; full_name?: string; company_name?: string } | null
   const project = invitation.project as { name?: string } | null
 
   res.json({
@@ -188,13 +189,15 @@ router.get('/token/:token', async (req: Request, res: Response): Promise<void> =
     recipient_role: invitation.recipient_role,
     project_id: invitation.project_id,
     project_name: project?.name,
+    sender_id: sender?.id,
     sender_name: sender?.company_name || sender?.full_name,
   })
 })
 
 /**
  * POST /api/invitations/accept
- * Requires auth. Accepts { token }, verifies email match, marks accepted, inserts project_member.
+ * Requires auth. Accepts { token }, verifies email match, marks accepted,
+ * inserts project_member and/or sets company_id for gc_member invites.
  */
 router.post('/accept', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const schema = z.object({ token: z.string().min(1) })
@@ -208,7 +211,7 @@ router.post('/accept', requireAuth, async (req: Request, res: Response): Promise
 
   const { data: invitation, error } = await supabaseAdmin
     .from('invitations')
-    .select('*')
+    .select('*, sender:profiles!sender_id(id, company_id)')
     .eq('token', token)
     .single()
 
@@ -222,7 +225,9 @@ router.post('/accept', requireAuth, async (req: Request, res: Response): Promise
     return
   }
 
-  if (invitation.recipient_email !== req.userEmail) {
+  // QR invites have a placeholder email — skip email check for those
+  const isQrInvite = (invitation.recipient_email as string).endsWith('@placeholder.invalid')
+  if (!isQrInvite && invitation.recipient_email !== req.userEmail) {
     res.status(403).json({ error: 'This invitation is not for your email address' })
     return
   }
@@ -238,14 +243,36 @@ router.post('/accept', requireAuth, async (req: Request, res: Response): Promise
     return
   }
 
+  // For team member invites: set company_id and correct role on the acceptor's profile
+  const memberRoleMap: Record<string, string> = {
+    gc_member: 'gc',
+    owner_member: 'owner',
+    trade_member: 'trade',
+  }
+  if (memberRoleMap[invitation.recipient_role]) {
+    const sender = invitation.sender as { id?: string; company_id?: string } | null
+    const companyId = sender?.company_id || sender?.id
+    if (companyId) {
+      await supabaseAdmin
+        .from('profiles')
+        .update({
+          company_id: companyId,
+          role: memberRoleMap[invitation.recipient_role],
+          member_role: 'contributor',
+        })
+        .eq('id', req.userId!)
+    }
+  }
+
   // Insert project_member if project_id is set
   if (invitation.project_id) {
+    const memberRole = memberRoleMap[invitation.recipient_role] ?? invitation.recipient_role
     await supabaseAdmin
       .from('project_members')
       .insert({
         project_id: invitation.project_id,
         user_id: req.userId,
-        role: invitation.recipient_role,
+        role: memberRole,
       })
       .select()
       .single()

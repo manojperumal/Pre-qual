@@ -17,6 +17,80 @@ export function useProjects(userId: string | undefined) {
   })
 }
 
+// For GC team members: only returns projects they're explicitly a member of
+export function useMyProjects(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['my_projects', userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('project_members')
+        .select('project:projects(*, project_members(count), gc_contact:profiles!gc_primary_contact_id(id,full_name,email,company_name), trade_contact:profiles!trade_primary_contact_id(id,full_name,email,company_name))')
+        .eq('user_id', userId!)
+      if (error) throw error
+      return (data?.map((d: any) => d.project).filter(Boolean) ?? []) as (Project & { project_members: { count: number }[] })[]
+    },
+  })
+}
+
+// Team members under a GC company (profiles where company_id = gcId)
+export function useTeamMembers(gcId: string | undefined) {
+  return useQuery({
+    queryKey: ['team_members', gcId],
+    enabled: !!gcId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('company_id', gcId!)
+        .order('created_at', { ascending: true })
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+// For GC/Trade admins: all projects any member of their company is on
+export function useCompanyProjects(companyId: string | undefined) {
+  return useQuery({
+    queryKey: ['company_projects', companyId],
+    enabled: !!companyId,
+    queryFn: async () => {
+      const { data: members } = await supabase
+        .from('profiles')
+        .select('id')
+        .or(`id.eq.${companyId},company_id.eq.${companyId}`)
+      if (!members?.length) return []
+      const memberIds = members.map((m: any) => m.id)
+
+      const { data: pm } = await supabase
+        .from('project_members')
+        .select('project:projects(*, project_members(count), gc_contact:profiles!gc_primary_contact_id(id,full_name,email,company_name), trade_contact:profiles!trade_primary_contact_id(id,full_name,email,company_name))')
+        .in('user_id', memberIds)
+      if (!pm) return []
+
+      const seen = new Set<string>()
+      return pm
+        .map((r: any) => r.project)
+        .filter((p: any) => p && !seen.has(p.id) && seen.add(p.id)) as (Project & { project_members: { count: number }[] })[]
+    },
+  })
+}
+
+export function useUpdateMemberRole() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ userId, memberRole }: { userId: string; memberRole: 'admin' | 'contributor' }) => {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ member_role: memberRole })
+        .eq('id', userId)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['team_members'] }),
+  })
+}
+
 export function useCreateProject() {
   const qc = useQueryClient()
   return useMutation({

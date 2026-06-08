@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { useProjects } from '@/hooks/useProjects'
+import { useProjects, useMyProjects, useTeamMembers, useCompanyProjects, useUpdateMemberRole } from '@/hooks/useProjects'
 import { useContractorProfile, useProjectSubmission } from '@/hooks/useContractorProfile'
 import { useSentInvitations } from '@/hooks/usePrequals'
 import { useMyAssignments } from '@/hooks/useQuestionnaires'
-import { FolderOpen, User, Send, UserPlus, ChevronRight, CheckCircle, Clock, AlertCircle, ClipboardList } from 'lucide-react'
+import { FolderOpen, User, Send, UserPlus, CheckCircle, Clock, AlertCircle, ClipboardList, Users } from 'lucide-react'
 import { format } from 'date-fns'
 
 const SUBMISSION_COLORS: Record<string, string> = {
@@ -74,13 +74,34 @@ function ProjectCard({ project, userId }: { project: any; userId: string }) {
 
 export default function GCDashboard() {
   const { profile } = useAuth()
-  const { data: projects = [], isLoading: projectsLoading } = useProjects(profile?.id)
-  const { data: invitations = [] } = useSentInvitations(profile?.id)
+
+  // If this GC is a team member (has company_id), scope to their project_members only
+  const isTeamMember = !!(profile as any)?.company_id
+  const memberRole: 'admin' | 'contributor' = (profile as any)?.member_role ?? 'admin'
+  const companyOwnerId = (profile as any)?.company_id || profile?.id
+
+  const { data: companyProjects = [], isLoading: companyLoading } = useCompanyProjects(
+    isTeamMember && memberRole === 'admin' ? companyOwnerId : undefined
+  )
+  const { data: memberProjects = [], isLoading: memberProjectsLoading } = useMyProjects(
+    (isTeamMember && memberRole === 'contributor') ? profile?.id : undefined
+  )
+  const { data: allProjects = [], isLoading: allProjectsLoading } = useProjects(
+    !isTeamMember ? profile?.id : undefined
+  )
+  const { data: invitations = [] } = useSentInvitations(companyOwnerId)
   const { data: contractorProfile } = useContractorProfile(profile?.id)
   const { data: myAssignments = [] } = useMyAssignments(profile?.id)
+  const { data: teamMembers = [] } = useTeamMembers(isTeamMember ? undefined : profile?.id)
+  const updateMemberRole = useUpdateMemberRole()
 
+  const projectsLoading = isTeamMember
+    ? (memberRole === 'admin' ? companyLoading : memberProjectsLoading)
+    : allProjectsLoading
   const profileComplete = !!(contractorProfile?.company_name && contractorProfile?.gl_carrier)
-  const myProjects = projects.filter((p) => p.owner_id !== profile?.id)
+  const myProjects = isTeamMember
+    ? (memberRole === 'admin' ? companyProjects : memberProjects)
+    : allProjects.filter((p) => p.owner_id !== profile?.id)
 
   // Derive quick stats from projects
   const approvedCount = 0 // would need submissions query — keep simple for now
@@ -96,13 +117,24 @@ export default function GCDashboard() {
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="mt-1 text-sm text-gray-500">Welcome back, {profile?.full_name || profile?.company_name || 'GC'}</p>
         </div>
-        <Link
-          to="/gc/invite?role=trade&from=gc-dashboard"
-          className="btn-primary inline-flex items-center gap-2 text-sm"
-        >
-          <UserPlus size={16} />
-          Invite Trade
-        </Link>
+        <div className="flex gap-2">
+          {!isTeamMember && (
+            <Link
+              to="/gc/invite?role=gc_member&from=gc-dashboard"
+              className="btn-secondary inline-flex items-center gap-2 text-sm"
+            >
+              <Users size={16} />
+              Invite Team Member
+            </Link>
+          )}
+          <Link
+            to="/gc/invite?role=trade&from=gc-dashboard"
+            className="btn-primary inline-flex items-center gap-2 text-sm"
+          >
+            <UserPlus size={16} />
+            Invite Trade
+          </Link>
+        </div>
       </div>
 
       {/* Profile completeness banner */}
@@ -175,6 +207,59 @@ export default function GCDashboard() {
           </div>
         )}
       </div>
+
+      {/* Team Members — only shown for company owners (not team members themselves) */}
+      {!isTeamMember && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">My Team</h2>
+            <Link
+              to="/gc/invite?role=gc_member&from=gc-dashboard"
+              className="text-sm text-brand-600 hover:text-brand-700 font-medium inline-flex items-center gap-1"
+            >
+              + Invite Team Member
+            </Link>
+          </div>
+          {teamMembers.length === 0 ? (
+            <div className="card p-6 text-center text-gray-500">
+              <Users size={28} className="mx-auto mb-2 text-gray-300" />
+              <p className="text-sm">No team members yet</p>
+              <p className="text-xs text-gray-400 mt-1">Invite colleagues to join your company on the platform</p>
+            </div>
+          ) : (
+            <div className="card overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    {['Name', 'Email', 'Access Level', 'Joined'].map((h) => (
+                      <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {(teamMembers as any[]).map((m: any) => (
+                    <tr key={m.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 text-sm text-gray-900">{m.full_name || '—'}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{m.email}</td>
+                      <td className="px-6 py-4">
+                        <select
+                          value={m.member_role ?? 'contributor'}
+                          onChange={e => updateMemberRole.mutate({ userId: m.id, memberRole: e.target.value as 'admin' | 'contributor' })}
+                          className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        >
+                          <option value="admin">Admin — all projects</option>
+                          <option value="contributor">Contributor — assigned only</option>
+                        </select>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">{format(new Date(m.created_at), 'MMM d, yyyy')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Sent invitations */}
       {invitations.length > 0 && (

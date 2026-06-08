@@ -119,6 +119,7 @@ export default function App() {
         }
       >
         <Route index element={<TradeDashboard />} />
+        <Route path="invite" element={<InvitePage />} />
         <Route path="profile" element={<ContractorProfilePage />} />
         <Route path="projects/:projectId" element={<ProjectDetailPage />} />
         <Route path="projects/:projectId/submit" element={<ProjectSubmissionPage />} />
