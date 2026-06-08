@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { useProjects, useMyProjects, useTeamMembers } from '@/hooks/useProjects'
+import { useProjects, useMyProjects, useTeamMembers, useCompanyProjects, useUpdateMemberRole } from '@/hooks/useProjects'
 import { useContractorProfile, useProjectSubmission } from '@/hooks/useContractorProfile'
 import { useReceivedInvitations, useMyProjectSubmissions } from '@/hooks/usePrequals'
 import { useMyAssignments } from '@/hooks/useQuestionnaires'
@@ -77,20 +77,31 @@ export default function TradeDashboard() {
   const { profile } = useAuth()
 
   const isTeamMember = !!(profile as any)?.company_id
+  const memberRole: 'admin' | 'contributor' = (profile as any)?.member_role ?? 'admin'
   const companyOwnerId = (profile as any)?.company_id || profile?.id
 
-  const { data: allProjects = [], isLoading: allProjectsLoading } = useProjects(isTeamMember ? undefined : profile?.id)
-  const { data: memberProjects = [], isLoading: memberProjectsLoading } = useMyProjects(isTeamMember ? profile?.id : undefined)
+  const { data: companyProjects = [], isLoading: companyLoading } = useCompanyProjects(
+    isTeamMember && memberRole === 'admin' ? companyOwnerId : undefined
+  )
+  const { data: memberProjects = [], isLoading: memberProjectsLoading } = useMyProjects(
+    (isTeamMember && memberRole === 'contributor') ? profile?.id : undefined
+  )
+  const { data: allProjects = [], isLoading: allProjectsLoading } = useProjects(
+    !isTeamMember ? profile?.id : undefined
+  )
   const { data: teamMembers = [] } = useTeamMembers(isTeamMember ? undefined : profile?.id)
+  const updateMemberRole = useUpdateMemberRole()
   const { data: invitations = [] } = useReceivedInvitations(profile?.email ?? undefined)
   const { data: contractorProfile } = useContractorProfile(profile?.id)
   const { data: allSubmissions = [] } = useMyProjectSubmissions(profile?.id)
   const { data: myAssignments = [] } = useMyAssignments(profile?.id)
 
-  const projectsLoading = isTeamMember ? memberProjectsLoading : allProjectsLoading
+  const projectsLoading = isTeamMember
+    ? (memberRole === 'admin' ? companyLoading : memberProjectsLoading)
+    : allProjectsLoading
   const profileComplete = !!(contractorProfile?.company_name && contractorProfile?.gl_carrier)
   const myProjects = isTeamMember
-    ? memberProjects
+    ? (memberRole === 'admin' ? companyProjects : memberProjects)
     : allProjects.filter((p) => p.owner_id !== profile?.id)
   const pendingInvites = invitations.filter((i) => i.status === 'pending')
 
@@ -253,7 +264,7 @@ export default function TradeDashboard() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    {['Name', 'Email', 'Joined'].map((h) => (
+                    {['Name', 'Email', 'Access Level', 'Joined'].map((h) => (
                       <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
@@ -263,6 +274,16 @@ export default function TradeDashboard() {
                     <tr key={m.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 text-sm text-gray-900">{m.full_name || '—'}</td>
                       <td className="px-6 py-4 text-sm text-gray-600">{m.email}</td>
+                      <td className="px-6 py-4">
+                        <select
+                          value={m.member_role ?? 'contributor'}
+                          onChange={e => updateMemberRole.mutate({ userId: m.id, memberRole: e.target.value as 'admin' | 'contributor' })}
+                          className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        >
+                          <option value="admin">Admin — all projects</option>
+                          <option value="contributor">Contributor — assigned only</option>
+                        </select>
+                      </td>
                       <td className="px-6 py-4 text-sm text-gray-500">{format(new Date(m.created_at), 'MMM d, yyyy')}</td>
                     </tr>
                   ))}

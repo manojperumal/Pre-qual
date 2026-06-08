@@ -255,7 +255,11 @@ router.post('/accept', requireAuth, async (req: Request, res: Response): Promise
     if (companyId) {
       await supabaseAdmin
         .from('profiles')
-        .update({ company_id: companyId, role: memberRoleMap[invitation.recipient_role] })
+        .update({
+          company_id: companyId,
+          role: memberRoleMap[invitation.recipient_role],
+          member_role: 'contributor',
+        })
         .eq('id', req.userId!)
     }
   }

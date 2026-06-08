@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { useProjects, useMyProjects, useTeamMembers, useOwnerGCs, useOwnerTrades } from '@/hooks/useProjects'
+import { useProjects, useMyProjects, useTeamMembers, useCompanyProjects, useUpdateMemberRole, useOwnerGCs, useOwnerTrades } from '@/hooks/useProjects'
 import { useOwnerPendingSubmissions } from '@/hooks/useContractorProfile'
 import { FolderOpen, HardHat, Wrench, ClipboardList, AlertTriangle, ChevronRight, Plus, Users } from 'lucide-react'
 import { format } from 'date-fns'
@@ -17,17 +17,24 @@ const STATUS_COLORS: Record<string, string> = {
 export default function OwnerDashboard() {
   const { profile } = useAuth()
   const isTeamMember = !!(profile as any)?.company_id
+  const memberRole: 'admin' | 'contributor' = (profile as any)?.member_role ?? 'admin'
   const companyOwnerId = (profile as any)?.company_id || profile?.id
 
+  const { data: companyProjects = [], isLoading: companyLoading } = useCompanyProjects(
+    isTeamMember && memberRole === 'admin' ? companyOwnerId : undefined
+  )
+  const { data: memberProjects = [], isLoading: memberProjectsLoading } = useMyProjects(
+    (isTeamMember && memberRole === 'contributor') ? profile?.id : undefined
+  )
   const { data: allProjects = [], isLoading: allProjectsLoading } = useProjects(isTeamMember ? undefined : profile?.id)
-  const { data: memberProjects = [], isLoading: memberProjectsLoading } = useMyProjects(isTeamMember ? profile?.id : undefined)
-  const projects = isTeamMember ? memberProjects : allProjects
-  const projectsLoading = isTeamMember ? memberProjectsLoading : allProjectsLoading
+  const projects = isTeamMember ? (memberRole === 'admin' ? companyProjects : memberProjects) : allProjects
+  const projectsLoading = isTeamMember ? (memberRole === 'admin' ? companyLoading : memberProjectsLoading) : allProjectsLoading
 
   const { data: gcs = [] } = useOwnerGCs(companyOwnerId)
   const { data: trades = [] } = useOwnerTrades(companyOwnerId)
   const { data: pending = [], isLoading: pendingLoading } = useOwnerPendingSubmissions(companyOwnerId)
   const { data: teamMembers = [] } = useTeamMembers(isTeamMember ? undefined : profile?.id)
+  const updateMemberRole = useUpdateMemberRole()
 
   const uniqueGCs = new Set(gcs.map((r) => r.contractorId)).size
   const uniqueTrades = new Set(trades.map((r) => r.contractorId)).size
@@ -195,7 +202,7 @@ export default function OwnerDashboard() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  {['Name', 'Email', 'Joined'].map((h) => (
+                  {['Name', 'Email', 'Access Level', 'Joined'].map((h) => (
                     <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
                   ))}
                 </tr>
@@ -205,6 +212,16 @@ export default function OwnerDashboard() {
                   <tr key={m.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm text-gray-900">{m.full_name || '—'}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{m.email}</td>
+                    <td className="px-6 py-4">
+                      <select
+                        value={m.member_role ?? 'contributor'}
+                        onChange={e => updateMemberRole.mutate({ userId: m.id, memberRole: e.target.value as 'admin' | 'contributor' })}
+                        className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      >
+                        <option value="admin">Admin — all projects</option>
+                        <option value="contributor">Contributor — assigned only</option>
+                      </select>
+                    </td>
                     <td className="px-6 py-4 text-sm text-gray-500">{format(new Date(m.created_at), 'MMM d, yyyy')}</td>
                   </tr>
                 ))}
