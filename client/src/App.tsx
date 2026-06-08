@@ -26,6 +26,7 @@ import AssignQuestionnairePage from '@/pages/AssignQuestionnairePage'
 import QuestionnaireResponsePage from '@/pages/QuestionnaireResponsePage'
 import QuestionnaireReviewPage from '@/pages/QuestionnaireReviewPage'
 import MyAssignmentsPage from '@/pages/MyAssignmentsPage'
+import GCProfileViewPage from '@/pages/GCProfileViewPage'
 
 function RoleRedirect() {
   const { profile, loading } = useAuth()
@@ -73,6 +74,7 @@ export default function App() {
         <Route path="projects/:projectId/invite" element={<InvitePage />} />
         <Route path="projects/:projectId/submissions/:submissionId" element={<SubmissionReviewPage />} />
         <Route path="general-contractors" element={<GeneralContractorsPage />} />
+        <Route path="general-contractors/:contractorId" element={<GCProfileViewPage />} />
         <Route path="trades" element={<TradesPage />} />
         <Route path="prequal/:id" element={<PrequalDetail />} />
         <Route path="questionnaires" element={<QuestionnairesPage />} />
