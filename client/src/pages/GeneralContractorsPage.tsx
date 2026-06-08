@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useOwnerGCs } from '@/hooks/useProjects'
 import { format } from 'date-fns'
-import { HardHat, UserPlus, FolderPlus } from 'lucide-react'
+import { HardHat, UserPlus, FolderPlus, User } from 'lucide-react'
 
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
@@ -61,7 +61,7 @@ export default function GeneralContractorsPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  {['GC / Company', 'Project', 'Start Date', 'End Date', 'Pre-Qual Status', ''].map((h) => (
+                  {['GC / Company', 'Project', 'Start Date', 'End Date', 'Pre-Qual Status', 'Actions'].map((h) => (
                     <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       {h}
                     </th>
@@ -95,16 +95,25 @@ export default function GeneralContractorsPage() {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      {row.contractorEmail && (
+                      <div className="flex items-center gap-3">
                         <Link
-                          to={`/owner/invite?role=gc&email=${encodeURIComponent(row.contractorEmail)}&from=general-contractors`}
+                          to={`/owner/general-contractors/${row.contractorId}`}
                           className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 font-medium whitespace-nowrap"
-                          title="Add to another project"
                         >
-                          <FolderPlus size={14} />
-                          Add to Project
+                          <User size={14} />
+                          View Profile
                         </Link>
-                      )}
+                        {row.contractorEmail && (
+                          <Link
+                            to={`/owner/invite?role=gc&email=${encodeURIComponent(row.contractorEmail)}&from=general-contractors`}
+                            className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 font-medium whitespace-nowrap"
+                            title="Add to another project"
+                          >
+                            <FolderPlus size={14} />
+                            Add to Project
+                          </Link>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
