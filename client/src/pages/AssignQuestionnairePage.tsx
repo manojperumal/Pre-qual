@@ -3,15 +3,20 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useQuestionnaires, useCreateAssignment } from '@/hooks/useQuestionnaires'
-import { useProjects, useProjectMembers } from '@/hooks/useProjects'
+import { useProjects, useCompanyProjects, useProjectMembers } from '@/hooks/useProjects'
 
 export default function AssignQuestionnairePage() {
   const { profile } = useAuth()
   const navigate = useNavigate()
   const { projectId: routeProjectId } = useParams()
 
-  const { data: questionnaires = [] } = useQuestionnaires(profile?.id)
-  const { data: projects = [] } = useProjects(profile?.id)
+  const isOwner = profile?.role === 'owner'
+  const companyOwnerId = (profile as any)?.company_id || profile?.id
+
+  const { data: questionnaires = [] } = useQuestionnaires(profile?.id, companyOwnerId)
+  const { data: ownerProjects = [] } = useProjects(isOwner ? profile?.id : undefined)
+  const { data: memberProjects = [] } = useCompanyProjects(!isOwner ? companyOwnerId : undefined)
+  const projects = isOwner ? ownerProjects : memberProjects
   const createAssignment = useCreateAssignment()
 
   const [questionnaireId, setQuestionnaireId] = useState('')
@@ -21,7 +26,13 @@ export default function AssignQuestionnairePage() {
 
   const { data: members = [] } = useProjectMembers(projectId || undefined)
 
-  const basePath = profile?.role === 'gc' ? '/gc' : '/owner'
+  // Owners can assign to GCs and Trades; GCs can assign to Trades only
+  const assignableRoles = isOwner ? ['gc', 'trade'] : ['trade']
+  const assignableMembers = members.filter((m: any) =>
+    m.profile?.id !== profile?.id && assignableRoles.includes(m.profile?.role)
+  )
+
+  const basePath = isOwner ? '/owner' : '/gc'
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -91,7 +102,7 @@ export default function AssignQuestionnairePage() {
         {/* Assignee */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Assign To *</label>
-          {members.length > 0 ? (
+          {assignableMembers.length > 0 ? (
             <select
               required
               value={assigneeId}
@@ -99,7 +110,7 @@ export default function AssignQuestionnairePage() {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
               <option value="">Select a member…</option>
-              {members.map((m: any) => (
+              {assignableMembers.map((m: any) => (
                 <option key={m.profile?.id ?? m.id} value={m.profile?.id ?? m.id}>
                   {m.profile?.full_name || m.profile?.email || 'Unknown'}
                   {m.profile?.company_name ? ` (${m.profile.company_name})` : ''} — {m.profile?.role}
@@ -108,7 +119,11 @@ export default function AssignQuestionnairePage() {
             </select>
           ) : (
             <p className="text-sm text-gray-400 italic">
-              {projectId ? 'No members found on this project.' : 'Select a project first.'}
+              {!projectId
+                ? 'Select a project first.'
+                : isOwner
+                ? 'No GCs or trades found on this project.'
+                : 'No trades found on this project.'}
             </p>
           )}
         </div>

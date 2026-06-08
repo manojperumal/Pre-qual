@@ -124,15 +124,17 @@ export function useDeleteQuestion() {
 
 // ─── Questionnaires ───────────────────────────────────────────────────────
 
-export function useQuestionnaires(createdBy: string | undefined) {
+// companyOwnerId: pass the company owner's ID for team members so they see company questionnaires
+export function useQuestionnaires(createdBy: string | undefined, companyOwnerId?: string) {
+  const effectiveId = companyOwnerId || createdBy
   return useQuery({
-    queryKey: ['questionnaires', createdBy],
-    enabled: !!createdBy,
+    queryKey: ['questionnaires', effectiveId],
+    enabled: !!effectiveId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('questionnaires')
         .select('*')
-        .eq('created_by', createdBy!)
+        .eq('created_by', effectiveId!)
         .order('created_at', { ascending: false })
       if (error) throw error
       return data as Questionnaire[]
