@@ -6,7 +6,8 @@ import { format } from 'date-fns'
 
 export default function QuestionnairesPage() {
   const { profile } = useAuth()
-  const { data: questionnaires = [], isLoading } = useQuestionnaires(profile?.id)
+  const companyOwnerId = (profile as any)?.company_id || profile?.id
+  const { data: questionnaires = [], isLoading } = useQuestionnaires(profile?.id, companyOwnerId)
   const deleteQuestionnaire = useDeleteQuestionnaire()
 
   const basePath = profile?.role === 'gc' ? '/gc' : '/owner'
