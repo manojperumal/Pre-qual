@@ -136,9 +136,12 @@ export default function QuestionnaireResponsePage() {
     setAiSuccess(false)
     try {
       const data = await aiComplete.mutateAsync({ assignmentId, documentPaths: uploadedDocs })
+      console.log('[AI] response from server:', JSON.stringify(data, null, 2))
       if (data.responses?.length) {
         setAnswers(prev => {
           const next = { ...prev }
+          console.log('[AI] setting answers for question_ids:', data.responses.map((r: Response) => r.question_id))
+          console.log('[AI] current answers keys:', Object.keys(prev))
           for (const r of data.responses as Response[]) {
             next[r.question_id] = {
               text: r.answer_text ?? undefined,
@@ -333,6 +336,10 @@ export default function QuestionnaireResponsePage() {
           const q = qq.question
           if (!q) return null
           const a = answers[q.id] ?? {}
+          // debug: log first question lookup on first render only
+          if (idx === 0 && Object.keys(answers).length > 0) {
+            console.log('[AI] q.id:', q.id, 'qq.question_id:', qq.question_id, 'answer found:', !!answers[q.id])
+          }
 
           return (
             <div key={qq.id} className={`bg-white rounded-xl shadow-sm border p-5 ${a.aiSuggested ? 'border-brand-200' : 'border-gray-200'}`}>
