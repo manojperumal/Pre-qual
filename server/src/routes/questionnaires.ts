@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express'
 import Anthropic from '@anthropic-ai/sdk'
+import mammoth from 'mammoth'
 import { requireAuth } from '../middleware/auth.js'
 import { supabaseAdmin } from '../lib/supabase.js'
 
@@ -122,18 +123,30 @@ router.post('/:assignmentId/ai-complete', requireAuth, async (req: Request, res:
       type: 'text',
       text: `Document: ${DOCUMENT_TYPE_LABELS[doc.type] ?? doc.type} — "${doc.name}"`,
     })
-    const isDocument = doc.mimeType === 'application/pdf' ||
-      doc.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-      doc.mimeType === 'application/msword'
-    if (isDocument) {
+    if (doc.mimeType === 'application/pdf') {
       contentBlocks.push({
         type: 'document',
-        source: {
-          type: 'base64',
-          media_type: doc.mimeType,
-          data: doc.base64,
-        },
+        source: { type: 'base64', media_type: 'application/pdf', data: doc.base64 },
       } as any)
+    } else if (
+      doc.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      doc.mimeType === 'application/msword'
+    ) {
+      // Extract text from Word doc and send as plain text block
+      try {
+        const buffer = Buffer.from(doc.base64, 'base64')
+        const result = await mammoth.extractRawText({ buffer })
+        contentBlocks.push({
+          type: 'text',
+          text: `[Word Document Content — ${doc.name}]\n${result.value}`,
+        })
+      } catch (err) {
+        console.warn(`[ai-complete] Could not extract text from Word doc ${doc.name}:`, err)
+        contentBlocks.push({
+          type: 'text',
+          text: `[Word Document — ${doc.name}: could not extract text]`,
+        })
+      }
     } else {
       contentBlocks.push({
         type: 'image',
