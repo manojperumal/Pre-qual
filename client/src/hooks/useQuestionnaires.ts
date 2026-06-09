@@ -401,8 +401,8 @@ export function useAICompleteQuestionnaire() {
       }
       return res.json()
     },
-    onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ['responses', vars.assignmentId] })
+    onSuccess: async (_data, vars) => {
+      await qc.refetchQueries({ queryKey: ['responses', vars.assignmentId] })
       qc.invalidateQueries({ queryKey: ['assignment', vars.assignmentId] })
     },
   })
