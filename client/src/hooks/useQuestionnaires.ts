@@ -22,10 +22,11 @@ export interface Question {
 
 export interface Questionnaire {
   id: string
-  created_by: string
+  created_by: string | null
   name: string
   description: string | null
   is_template: boolean
+  is_global: boolean
   created_at: string
   updated_at: string
 }
@@ -136,7 +137,8 @@ export function useQuestionnaires(createdBy: string | undefined, companyOwnerId?
       const { data, error } = await supabase
         .from('questionnaires')
         .select('*')
-        .eq('created_by', effectiveId!)
+        .or(`created_by.eq.${effectiveId!},is_global.eq.true`)
+        .order('is_global', { ascending: false })
         .order('created_at', { ascending: false })
       if (error) throw error
       return data as Questionnaire[]

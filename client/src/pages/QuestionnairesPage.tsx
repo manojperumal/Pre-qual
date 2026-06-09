@@ -48,34 +48,45 @@ export default function QuestionnairesPage() {
             <div key={q.id} className="card p-5 flex flex-col gap-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-gray-900 truncate">{q.name}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-gray-900 truncate">{q.name}</h3>
+                    {q.is_global && (
+                      <span className="flex-shrink-0 text-xs bg-brand-50 text-brand-600 border border-brand-200 px-1.5 py-0.5 rounded font-medium">
+                        Mojo
+                      </span>
+                    )}
+                  </div>
                   {q.description && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{q.description}</p>}
                 </div>
                 <ClipboardList size={16} className="text-brand-400 flex-shrink-0 mt-0.5" />
               </div>
-              <p className="text-xs text-gray-400">Created {format(new Date(q.created_at), 'MMM d, yyyy')}</p>
+              <p className="text-xs text-gray-400">{q.is_global ? 'Standard template' : `Created ${format(new Date(q.created_at), 'MMM d, yyyy')}`}</p>
               <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
-                <Link
-                  to={`${basePath}/questionnaires/${q.id}`}
-                  className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 font-medium"
-                >
-                  <Pencil size={13} />
-                  Edit
-                </Link>
+                {!q.is_global && (
+                  <Link
+                    to={`${basePath}/questionnaires/${q.id}`}
+                    className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 font-medium"
+                  >
+                    <Pencil size={13} />
+                    Edit
+                  </Link>
+                )}
                 <Link
                   to={`${basePath}/questionnaires/assign`}
                   className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 ml-auto"
                 >
                   Assign <ChevronRight size={12} />
                 </Link>
-                <button
-                  onClick={() => {
-                    if (confirm('Delete this questionnaire?')) deleteQuestionnaire.mutate(q.id)
-                  }}
-                  className="p-1 text-gray-300 hover:text-red-500 transition-colors"
-                >
-                  <Trash2 size={14} />
-                </button>
+                {!q.is_global && (
+                  <button
+                    onClick={() => {
+                      if (confirm('Delete this questionnaire?')) deleteQuestionnaire.mutate(q.id)
+                    }}
+                    className="p-1 text-gray-300 hover:text-red-500 transition-colors"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
               </div>
             </div>
           ))}
