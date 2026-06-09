@@ -470,8 +470,8 @@ export default function QuestionnaireResponsePage() {
                 </div>
               )}
 
-              {/* Comments — shown for all question types */}
-              {q.answer_type !== 'radio_yes_no' && q.answer_type !== 'radio_yes_no_comments' && (
+              {/* Comments — shown for all types except radio_yes_no_comments (has its own inline) */}
+              {q.answer_type !== 'radio_yes_no_comments' && (
                 <div className="mt-3">
                   <label className="block text-xs font-medium text-gray-500 mb-1">Comments (optional)</label>
                   <textarea
@@ -485,8 +485,8 @@ export default function QuestionnaireResponsePage() {
                 </div>
               )}
 
-              {/* Mojo Feedback */}
-              {a.mojoFeedback && (
+              {/* Mojo Feedback — shown for all types except radio_yes_no_comments (has its own inline) */}
+              {q.answer_type !== 'radio_yes_no_comments' && a.mojoFeedback && (
                 <div className="mt-3 flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
                   <Info size={13} className="text-amber-500 flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-amber-800">{a.mojoFeedback}</p>
