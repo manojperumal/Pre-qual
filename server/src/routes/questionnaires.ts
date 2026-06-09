@@ -214,7 +214,7 @@ ${questionsText}`,
   try {
     console.log(`[ai-complete] Sending ${qqList.length} questions to Claude, ${documentContents.length} docs`)
     const message = await anthropic.messages.create({
-      model: 'claude-opus-4-8',
+      model: 'claude-sonnet-4-6',
       max_tokens: 16000,
       tools: [submitAnswersTool],
       tool_choice: { type: 'any' },
