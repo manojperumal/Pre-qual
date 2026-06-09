@@ -26,7 +26,7 @@ export default function QuestionnaireResponsePage() {
   const updateStatus = useUpdateAssignmentStatus()
 
   // Local answer state keyed by question_id
-  const [answers, setAnswers] = useState<Record<string, { text?: string; options?: string[]; docName?: string; docPath?: string }>>({})
+  const [answers, setAnswers] = useState<Record<string, { text?: string; options?: string[]; docName?: string; docPath?: string; companyComments?: string }>>({})
   const [saving, setSaving] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
@@ -40,6 +40,7 @@ export default function QuestionnaireResponsePage() {
         options: r.answer_options ?? undefined,
         docName: r.document_name ?? undefined,
         docPath: r.document_path ?? undefined,
+        companyComments: r.company_comments ?? undefined,
       }
     }
     setAnswers(init)
@@ -98,6 +99,7 @@ export default function QuestionnaireResponsePage() {
           answer_options: a.options ?? null,
           document_path: a.docPath ?? null,
           document_name: a.docName ?? null,
+          company_comments: a.companyComments ?? null,
         })
       }
     } finally {
@@ -201,6 +203,43 @@ export default function QuestionnaireResponsePage() {
                       <span className="text-sm capitalize">{v}</span>
                     </label>
                   ))}
+                </div>
+              )}
+
+              {/* Radio yes/no with comment fields */}
+              {q.answer_type === 'radio_yes_no_comments' && (
+                <div className="space-y-4">
+                  <div className="flex gap-4">
+                    {['yes', 'no'].map(v => (
+                      <label key={v} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name={q.id}
+                          value={v}
+                          checked={a.text === v}
+                          onChange={() => !isReadOnly && setTextAnswer(q.id, v)}
+                          disabled={isReadOnly}
+                          className="accent-brand-600"
+                        />
+                        <span className="text-sm capitalize">{v}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Company Comments</label>
+                    <textarea
+                      rows={2}
+                      value={a.companyComments ?? ''}
+                      onChange={e => !isReadOnly && setAnswers(prev => ({ ...prev, [q.id]: { ...prev[q.id], companyComments: e.target.value } }))}
+                      disabled={isReadOnly}
+                      placeholder="Add any relevant comments…"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50"
+                    />
+                  </div>
+                  <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                    <p className="text-xs font-medium text-blue-700 mb-1">Mojo Feedback</p>
+                    <p className="text-xs text-blue-500 italic">Feedback will be provided by Mojo after review.</p>
+                  </div>
                 </div>
               )}
 

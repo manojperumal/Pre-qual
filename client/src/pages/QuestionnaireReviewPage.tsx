@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { ChevronRight, ThumbsUp, XCircle, MessageSquare } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
@@ -7,6 +7,7 @@ import {
   useQuestionnaireQuestions,
   useAssignmentResponses,
   useUpdateAssignmentStatus,
+  useUpsertResponse,
   type AssignmentStatus,
   type Response,
 } from '@/hooks/useQuestionnaires'
@@ -39,11 +40,22 @@ export default function QuestionnaireReviewPage() {
   const { data: qqList = [] } = useQuestionnaireQuestions(assignment?.questionnaire_id)
   const { data: responses = [] } = useAssignmentResponses(assignmentId)
   const updateStatus = useUpdateAssignmentStatus()
+  const upsertResponse = useUpsertResponse()
 
   const [notes, setNotes] = useState('')
   const [acting, setActing] = useState(false)
+  const [mojoFeedback, setMojoFeedback] = useState<Record<string, string>>({})
 
   const responseMap = Object.fromEntries((responses as Response[]).map(r => [r.question_id, r]))
+
+  // Init mojo feedback from saved responses
+  useEffect(() => {
+    const init: Record<string, string> = {}
+    for (const r of responses as Response[]) {
+      if (r.mojo_feedback) init[r.question_id] = r.mojo_feedback
+    }
+    setMojoFeedback(init)
+  }, [(responses as Response[]).length])
 
   const basePath = profile?.role === 'trade'
     ? '/trade'
@@ -55,6 +67,22 @@ export default function QuestionnaireReviewPage() {
     if (!assignmentId || !profile) return
     setActing(true)
     try {
+      // Save mojo feedback for any question that has it
+      for (const [questionId, feedback] of Object.entries(mojoFeedback)) {
+        if (!feedback.trim()) continue
+        const existing = responseMap[questionId]
+        if (!existing) continue
+        await upsertResponse.mutateAsync({
+          assignment_id: assignmentId,
+          question_id: questionId,
+          answer_text: existing.answer_text,
+          answer_options: existing.answer_options,
+          document_path: existing.document_path,
+          document_name: existing.document_name,
+          company_comments: existing.company_comments,
+          mojo_feedback: feedback,
+        })
+      }
       await updateStatus.mutateAsync({
         id: assignmentId,
         status,
@@ -123,6 +151,32 @@ export default function QuestionnaireReviewPage() {
                 <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${r.answer_text === 'yes' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                   {r.answer_text === 'yes' ? 'Yes' : 'No'}
                 </span>
+              ) : q.answer_type === 'radio_yes_no_comments' ? (
+                <div className="space-y-3">
+                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${r.answer_text === 'yes' ? 'bg-emerald-100 text-emerald-700' : r.answer_text === 'no' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>
+                    {r.answer_text === 'yes' ? 'Yes' : r.answer_text === 'no' ? 'No' : 'Not answered'}
+                  </span>
+                  {r.company_comments && (
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-xs font-medium text-gray-500 mb-1">Company Comments</p>
+                      <p className="text-sm text-gray-700">{r.company_comments}</p>
+                    </div>
+                  )}
+                  <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+                    <p className="text-xs font-medium text-blue-700 mb-1">Mojo Feedback</p>
+                    {canAct ? (
+                      <textarea
+                        rows={2}
+                        value={mojoFeedback[q.id] ?? ''}
+                        onChange={e => setMojoFeedback(prev => ({ ...prev, [q.id]: e.target.value }))}
+                        placeholder="Enter feedback for this item…"
+                        className="w-full bg-white border border-blue-200 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      />
+                    ) : (
+                      <p className="text-sm text-blue-800">{mojoFeedback[q.id] || <span className="italic text-blue-400">No feedback yet</span>}</p>
+                    )}
+                  </div>
+                </div>
               ) : q.answer_type === 'multi_select' ? (
                 <div className="flex flex-wrap gap-2">
                   {(r.answer_options ?? []).map(opt => (
