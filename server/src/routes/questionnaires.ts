@@ -74,7 +74,14 @@ router.post('/:assignmentId/ai-complete', requireAuth, async (req: Request, res:
 
       const arrayBuffer = await data.arrayBuffer()
       const base64 = Buffer.from(arrayBuffer).toString('base64')
-      const mimeType = doc.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'
+      const nameLower = doc.name.toLowerCase()
+      const mimeType = nameLower.endsWith('.pdf')
+        ? 'application/pdf'
+        : nameLower.endsWith('.docx')
+        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        : nameLower.endsWith('.doc')
+        ? 'application/msword'
+        : 'image/jpeg'
       documentContents.push({ name: doc.name, type: doc.type, base64, mimeType })
     } catch (err) {
       console.warn(`[ai-complete] Error processing document ${doc.name}:`, err)
@@ -115,12 +122,15 @@ router.post('/:assignmentId/ai-complete', requireAuth, async (req: Request, res:
       type: 'text',
       text: `Document: ${DOCUMENT_TYPE_LABELS[doc.type] ?? doc.type} — "${doc.name}"`,
     })
-    if (doc.mimeType === 'application/pdf') {
+    const isDocument = doc.mimeType === 'application/pdf' ||
+      doc.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      doc.mimeType === 'application/msword'
+    if (isDocument) {
       contentBlocks.push({
         type: 'document',
         source: {
           type: 'base64',
-          media_type: 'application/pdf',
+          media_type: doc.mimeType,
           data: doc.base64,
         },
       } as any)

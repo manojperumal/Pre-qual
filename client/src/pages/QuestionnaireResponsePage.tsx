@@ -251,7 +251,7 @@ export default function QuestionnaireResponsePage() {
             <label className="cursor-pointer">
               <input
                 type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
+                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                 className="hidden"
                 disabled={uploadingDoc}
                 onChange={e => {
