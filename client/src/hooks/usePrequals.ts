@@ -206,6 +206,35 @@ export function useSendInvitation() {
   })
 }
 
+export function useResendInvitation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (invitationId: string) => {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+
+      const res = await fetch(`${API_URL}/api/invitations/resend`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ invitation_id: invitationId }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to resend invitation')
+      }
+
+      return res.json()
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['invitations'] })
+    },
+  })
+}
+
 export function useMyProjectSubmissions(contractorId: string | undefined) {
   return useQuery({
     queryKey: ['my_project_submissions', contractorId],
