@@ -223,6 +223,10 @@ ${questionsText}`,
     const toolUse = message.content.find((b) => b.type === 'tool_use') as any
     if (!toolUse) throw new Error('Claude did not call the tool')
     answers = (toolUse.input as any).answers ?? []
+    console.log(`[ai-complete] Claude returned ${answers.length} answers`)
+    if (answers.length > 0) {
+      console.log('[ai-complete] First answer sample:', JSON.stringify(answers[0]))
+    }
   } catch (err: any) {
     console.error('[ai-complete] Claude API error:', err)
     res.status(500).json({ error: 'AI processing failed: ' + (err.message ?? 'Unknown error') })
@@ -248,7 +252,7 @@ ${questionsText}`,
         { onConflict: 'assignment_id,question_id' }
       )
     if (upsertErr) {
-      console.error('[ai-complete] Upsert error for question', answer.question_id, ':', upsertErr.message)
+      console.error('[ai-complete] Upsert error for question', answer.question_id, ':', upsertErr.message, upsertErr.details, upsertErr.hint)
     } else {
       savedCount++
     }
