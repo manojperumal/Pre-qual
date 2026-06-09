@@ -2,9 +2,9 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useProjects, useMyProjects, useTeamMembers, useCompanyProjects, useUpdateMemberRole } from '@/hooks/useProjects'
 import { useContractorProfile, useProjectSubmission } from '@/hooks/useContractorProfile'
-import { useSentInvitations } from '@/hooks/usePrequals'
+import { useSentInvitations, useSendInvitation } from '@/hooks/usePrequals'
 import { useMyAssignments } from '@/hooks/useQuestionnaires'
-import { FolderOpen, User, Send, UserPlus, CheckCircle, Clock, AlertCircle, ClipboardList, Users } from 'lucide-react'
+import { FolderOpen, User, Send, UserPlus, CheckCircle, Clock, AlertCircle, ClipboardList, Users, RefreshCw } from 'lucide-react'
 import { format } from 'date-fns'
 
 const SUBMISSION_COLORS: Record<string, string> = {
@@ -90,6 +90,7 @@ export default function GCDashboard() {
     !isTeamMember ? profile?.id : undefined
   )
   const { data: invitations = [] } = useSentInvitations(companyOwnerId)
+  const resendInvitation = useSendInvitation()
   const { data: contractorProfile } = useContractorProfile(profile?.id)
   const { data: myAssignments = [] } = useMyAssignments(profile?.id)
   const { data: teamMembers = [] } = useTeamMembers(isTeamMember ? undefined : profile?.id)
@@ -274,7 +275,7 @@ export default function GCDashboard() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  {['Recipient', 'Role', 'Sent', 'Status'].map((h) => (
+                  {['Recipient', 'Role', 'Sent', 'Status', ''].map((h) => (
                     <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
                   ))}
                 </tr>
@@ -293,6 +294,22 @@ export default function GCDashboard() {
                       }`}>
                         {inv.status}
                       </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {inv.status !== 'accepted' && (
+                        <button
+                          onClick={() => resendInvitation.mutate({
+                            recipient_email: inv.recipient_email,
+                            recipient_role: inv.recipient_role as any,
+                            project_id: inv.project_id ?? undefined,
+                          })}
+                          disabled={resendInvitation.isPending}
+                          className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 font-medium disabled:opacity-50"
+                        >
+                          <RefreshCw size={12} className={resendInvitation.isPending ? 'animate-spin' : ''} />
+                          Resend
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
