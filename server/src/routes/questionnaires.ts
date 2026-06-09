@@ -167,72 +167,64 @@ router.post('/:assignmentId/ai-complete', requireAuth, async (req: Request, res:
 The contractor has uploaded the following documents:
 ${docDescriptions}
 
-Your task is to review these documents and answer each question in the pre-qualification questionnaire. For each question, provide:
-1. The best answer based on document content
-2. A brief "mojo_feedback" comment explaining what you found (or didn't find) in the documents
-
-**Questionnaire Questions:**
-${questionsText}
-
-**Response Format:**
-Return a JSON object with a "answers" key containing an array of objects, one per question. Each object must have:
-- "question_id": the exact UUID from [ID: ...] above
-- "answer_text": for radio_yes_no (must be "yes" or "no"), text_area, or number questions
-- "answer_options": for multi_select questions (array of option strings from the provided options)
-- "mojo_feedback": a 1-2 sentence explanation of what was found in documents or why manual input is needed
-- "ai_suggested": always true
+Review these documents and call the submit_answers tool with your findings for each question below.
 
 Rules:
 - For radio_yes_no: answer_text must be exactly "yes" or "no"
 - For number: answer_text must be a numeric string (e.g. "1.2" or "5")
 - For multi_select: answer_options must only contain values from the provided options list
-- For document_upload questions: set answer_text to null; in mojo_feedback note if the document type was provided
+- For document_upload: set answer_text to null; note in mojo_feedback whether the relevant document was provided
 - For text_area: provide a concise extracted answer
-- If you cannot determine an answer from the documents, set answer_text/answer_options to null and in mojo_feedback explain what additional document is needed
-- Be precise and conservative — only answer "yes" when you have clear evidence
+- If you cannot determine an answer, set answer_text/answer_options to null and explain in mojo_feedback what is needed
+- Be conservative — only answer "yes" when you have clear evidence
 
-Return ONLY valid JSON, no markdown, no explanation outside the JSON.`,
+Questions:
+${questionsText}`,
   })
 
-  // Call Claude
+  // Call Claude using tool use to force structured output
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-  let aiResponse: string
+  const submitAnswersTool: Anthropic.Tool = {
+    name: 'submit_answers',
+    description: 'Submit pre-qualification answers for all questions based on the uploaded documents.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        answers: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              question_id: { type: 'string', description: 'The exact UUID of the question' },
+              answer_text: { type: ['string', 'null'], description: 'Answer for radio_yes_no ("yes"/"no"), text_area, or number questions' },
+              answer_options: { type: ['array', 'null'], items: { type: 'string' }, description: 'Selected options for multi_select questions' },
+              mojo_feedback: { type: 'string', description: 'Brief explanation of what was found in documents or what is needed' },
+            },
+            required: ['question_id', 'mojo_feedback'],
+          },
+        },
+      },
+      required: ['answers'],
+    },
+  }
+
+  let answers: any[]
   try {
     const message = await anthropic.messages.create({
       model: 'claude-opus-4-8',
       max_tokens: 4096,
+      tools: [submitAnswersTool],
+      tool_choice: { type: 'any' },
       messages: [{ role: 'user', content: contentBlocks }],
     })
 
-    const textBlock = message.content.find((b) => b.type === 'text')
-    aiResponse = (textBlock as any)?.text ?? ''
+    const toolUse = message.content.find((b) => b.type === 'tool_use') as any
+    if (!toolUse) throw new Error('Claude did not call the tool')
+    answers = (toolUse.input as any).answers ?? []
   } catch (err: any) {
     console.error('[ai-complete] Claude API error:', err)
     res.status(500).json({ error: 'AI processing failed: ' + (err.message ?? 'Unknown error') })
-    return
-  }
-
-  // Parse response — try multiple strategies to extract JSON
-  let answers: any[]
-  try {
-    // Strategy 1: strip markdown fences and parse directly
-    let cleaned = aiResponse.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
-
-    // Strategy 2: extract first JSON object found in the string
-    if (!cleaned.startsWith('{') && !cleaned.startsWith('[')) {
-      const match = cleaned.match(/\{[\s\S]*\}/)
-      if (match) cleaned = match[0]
-    }
-
-    const parsed = JSON.parse(cleaned)
-    // Handle both { answers: [...] } and a bare array
-    answers = Array.isArray(parsed) ? parsed : (parsed.answers ?? [])
-
-    if (!Array.isArray(answers)) throw new Error('answers is not an array')
-  } catch (err) {
-    console.error('[ai-complete] Failed to parse Claude response. Raw response:', aiResponse.slice(0, 500))
-    res.status(500).json({ error: 'AI returned an unexpected format. Please try again.' })
     return
   }
 

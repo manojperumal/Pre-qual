@@ -449,6 +449,21 @@ export default function QuestionnaireResponsePage() {
                 </div>
               )}
 
+              {/* Comments — shown for all question types */}
+              {q.answer_type !== 'radio_yes_no' && q.answer_type !== 'radio_yes_no_comments' && (
+                <div className="mt-3">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Comments (optional)</label>
+                  <textarea
+                    rows={2}
+                    value={a.companyComments ?? ''}
+                    onChange={e => !isReadOnly && setAnswers(prev => ({ ...prev, [q.id]: { ...prev[q.id], companyComments: e.target.value } }))}
+                    disabled={isReadOnly}
+                    placeholder="Add any relevant comments…"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50"
+                  />
+                </div>
+              )}
+
               {/* Mojo Feedback */}
               {a.mojoFeedback && (
                 <div className="mt-3 flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
