@@ -10,12 +10,14 @@ const router = Router()
 // Create nodemailer transporter (returns null if SMTP not configured)
 function createTransporter() {
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn('[invitations] SMTP env vars missing: SMTP_HOST, SMTP_USER, SMTP_PASS must all be set')
     return null
   }
+  const port = Number(process.env.SMTP_PORT) || 465
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT) || 587,
-    secure: false,
+    port,
+    secure: port === 465,
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
@@ -27,6 +29,31 @@ const sendSchema = z.object({
   recipient_email: z.string().email(),
   recipient_role: z.enum(['gc', 'trade', 'gc_member', 'owner_member', 'trade_member']),
   project_id: z.string().uuid().optional(),
+})
+
+/**
+ * GET /api/invitations/smtp-check
+ * Debug endpoint — verifies SMTP env vars are present and connection works.
+ */
+router.get('/smtp-check', requireAuth, async (_req: Request, res: Response): Promise<void> => {
+  const vars = {
+    SMTP_HOST: process.env.SMTP_HOST || '(not set)',
+    SMTP_PORT: process.env.SMTP_PORT || '(not set, defaults to 465)',
+    SMTP_USER: process.env.SMTP_USER ? '(set)' : '(not set)',
+    SMTP_PASS: process.env.SMTP_PASS ? '(set)' : '(not set)',
+    FROM_EMAIL: process.env.FROM_EMAIL || '(not set)',
+  }
+  const transporter = createTransporter()
+  if (!transporter) {
+    res.json({ ok: false, reason: 'SMTP env vars missing', vars })
+    return
+  }
+  try {
+    await transporter.verify()
+    res.json({ ok: true, message: 'SMTP connection verified', vars })
+  } catch (err: any) {
+    res.json({ ok: false, reason: err.message, vars })
+  }
 })
 
 /**
