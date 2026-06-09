@@ -263,7 +263,14 @@ ${questionsText}`,
       .eq('id', assignmentId)
   }
 
-  res.json({ success: true, answers_count: answers.length })
+  // Return the saved responses directly so the frontend can apply them without a refetch
+  const { data: savedResponses } = await supabaseAdmin
+    .from('questionnaire_responses')
+    .select('*')
+    .eq('assignment_id', assignmentId)
+
+  console.log(`[ai-complete] Returning ${savedResponses?.length ?? 0} responses from DB`)
+  res.json({ success: true, answers_count: savedCount, responses: savedResponses ?? [] })
 })
 
 export default router
