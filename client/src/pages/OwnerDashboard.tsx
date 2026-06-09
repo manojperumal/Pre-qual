@@ -4,6 +4,7 @@ import { useProjects, useMyProjects, useTeamMembers, useCompanyProjects, useUpda
 import { useOwnerPendingSubmissions } from '@/hooks/useContractorProfile'
 import { useSentInvitations, useSendInvitation } from '@/hooks/usePrequals'
 import { FolderOpen, HardHat, Wrench, ClipboardList, AlertTriangle, ChevronRight, Plus, Users, RefreshCw } from 'lucide-react'
+import { roleLabel } from '@/lib/roleLabels'
 import { format } from 'date-fns'
 
 const STATUS_COLORS: Record<string, string> = {
@@ -256,7 +257,7 @@ export default function OwnerDashboard() {
                 {invitations.slice(0, 10).map((inv) => (
                   <tr key={inv.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm text-gray-900">{inv.recipient_email}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600 capitalize">{inv.recipient_role}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{roleLabel(inv.recipient_role)}</td>
                     <td className="px-6 py-4 text-sm text-gray-500">{format(new Date(inv.created_at), 'MMM d, yyyy')}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${

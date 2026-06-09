@@ -11,6 +11,7 @@ import { StatusBadge } from '@/components/StatusBadge'
 import { Send, Users, HardHat, Wrench, ChevronRight, QrCode, Copy, Check, X, Mail, UserPlus } from 'lucide-react'
 import { format } from 'date-fns'
 import clsx from 'clsx'
+import { roleLabel } from '@/lib/roleLabels'
 
 const schema = z.object({
   recipient_email: z.string().email('Enter a valid email address').or(z.literal('')),
@@ -392,7 +393,7 @@ export default function InvitePage() {
                   return (
                     <tr key={inv.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 text-sm text-gray-900">{inv.recipient_email}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600 capitalize">{inv.recipient_role}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{roleLabel(inv.recipient_role)}</td>
                       <td className="px-6 py-4 text-sm text-gray-600">
                         {project ? (
                           <Link to={`${basePath}/projects/${project.id}`} className="text-brand-600 hover:text-brand-700">

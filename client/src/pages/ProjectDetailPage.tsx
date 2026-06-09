@@ -8,6 +8,7 @@ import { useProjectAssignments, AssignmentStatus } from '@/hooks/useQuestionnair
 import { Users, UserPlus, ChevronRight, Pencil, X, Check, Calendar, ClipboardList, Star } from 'lucide-react'
 import { format } from 'date-fns'
 import { useForm } from 'react-hook-form'
+import { roleLabel } from '@/lib/roleLabels'
 
 const SUBMISSION_STATUS_COLORS: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
@@ -288,7 +289,7 @@ export default function ProjectDetailPage() {
                           <span className="text-gray-400 italic">—</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 capitalize">{member.role}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{roleLabel(member.role)}</td>
                       <td className="px-6 py-4 text-sm text-gray-500">{format(new Date(member.joined_at), 'MMM d, yyyy')}</td>
                     </tr>
                   )
