@@ -212,20 +212,24 @@ ${questionsText}`,
 
   let answers: any[]
   try {
+    console.log(`[ai-complete] Sending ${qqList.length} questions to Claude, ${documentContents.length} docs`)
     const message = await anthropic.messages.create({
       model: 'claude-opus-4-8',
-      max_tokens: 4096,
+      max_tokens: 16000,
       tools: [submitAnswersTool],
       tool_choice: { type: 'any' },
       messages: [{ role: 'user', content: contentBlocks }],
     })
 
+    console.log(`[ai-complete] Claude stop_reason: ${message.stop_reason}`)
     const toolUse = message.content.find((b) => b.type === 'tool_use') as any
     if (!toolUse) throw new Error('Claude did not call the tool')
     answers = (toolUse.input as any).answers ?? []
     console.log(`[ai-complete] Claude returned ${answers.length} answers`)
     if (answers.length > 0) {
       console.log('[ai-complete] First answer sample:', JSON.stringify(answers[0]))
+    } else {
+      console.log('[ai-complete] Full tool input:', JSON.stringify(toolUse.input))
     }
   } catch (err: any) {
     console.error('[ai-complete] Claude API error:', err)
