@@ -241,11 +241,7 @@ export default function OwnerDashboard() {
           <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <h2 className="text-base font-semibold text-gray-900">Invitations Sent</h2>
             <Link to="/owner/invite?role=gc" className="text-sm text-brand-600 hover:text-brand-700 font-medium inline-flex items-center gap-1">
-<<<<<<< HEAD
               + Invite General Contractor
-=======
-              + Invite GC
->>>>>>> origin/main
             </Link>
           </div>
           <div className="overflow-x-auto">
@@ -261,11 +257,7 @@ export default function OwnerDashboard() {
                 {invitations.slice(0, 10).map((inv) => (
                   <tr key={inv.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm text-gray-900">{inv.recipient_email}</td>
-<<<<<<< HEAD
                     <td className="px-6 py-4 text-sm text-gray-600">{roleLabel(inv.recipient_role)}</td>
-=======
-                    <td className="px-6 py-4 text-sm text-gray-600 capitalize">{inv.recipient_role}</td>
->>>>>>> origin/main
                     <td className="px-6 py-4 text-sm text-gray-500">{format(new Date(inv.created_at), 'MMM d, yyyy')}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
