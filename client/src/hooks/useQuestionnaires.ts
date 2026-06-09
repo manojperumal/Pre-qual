@@ -401,7 +401,11 @@ export function useAICompleteQuestionnaire() {
       }
       return res.json()
     },
-    onSuccess: async (_data, vars) => {
+    onSuccess: async (data, vars) => {
+      // Directly populate the cache with the responses returned by the server
+      if (data.responses?.length) {
+        qc.setQueryData(['responses', vars.assignmentId], data.responses)
+      }
       await qc.refetchQueries({ queryKey: ['responses', vars.assignmentId] })
       qc.invalidateQueries({ queryKey: ['assignment', vars.assignmentId] })
     },
