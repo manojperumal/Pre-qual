@@ -212,7 +212,6 @@ ${questionsText}`,
 
   let answers: any[]
   try {
-    console.log(`[ai-complete] Sending ${qqList.length} questions to Claude, ${documentContents.length} docs`)
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 16000,
@@ -221,16 +220,9 @@ ${questionsText}`,
       messages: [{ role: 'user', content: contentBlocks }],
     })
 
-    console.log(`[ai-complete] Claude stop_reason: ${message.stop_reason}`)
     const toolUse = message.content.find((b) => b.type === 'tool_use') as any
     if (!toolUse) throw new Error('Claude did not call the tool')
     answers = (toolUse.input as any).answers ?? []
-    console.log(`[ai-complete] Claude returned ${answers.length} answers`)
-    if (answers.length > 0) {
-      console.log('[ai-complete] First answer sample:', JSON.stringify(answers[0]))
-    } else {
-      console.log('[ai-complete] Full tool input:', JSON.stringify(toolUse.input))
-    }
   } catch (err: any) {
     console.error('[ai-complete] Claude API error:', err)
     res.status(500).json({ error: 'AI processing failed: ' + (err.message ?? 'Unknown error') })
@@ -256,7 +248,7 @@ ${questionsText}`,
         { onConflict: 'assignment_id,question_id' }
       )
     if (upsertErr) {
-      console.error('[ai-complete] Upsert error for question', answer.question_id, ':', upsertErr.message, upsertErr.details, upsertErr.hint)
+      console.error('[ai-complete] Upsert error for question', answer.question_id, ':', upsertErr.message)
     } else {
       savedCount++
     }
