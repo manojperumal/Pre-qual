@@ -213,15 +213,25 @@ Return ONLY valid JSON, no markdown, no explanation outside the JSON.`,
     return
   }
 
-  // Parse response
+  // Parse response — try multiple strategies to extract JSON
   let answers: any[]
   try {
-    // Strip any markdown code fences if present
-    const cleaned = aiResponse.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
+    // Strategy 1: strip markdown fences and parse directly
+    let cleaned = aiResponse.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
+
+    // Strategy 2: extract first JSON object found in the string
+    if (!cleaned.startsWith('{') && !cleaned.startsWith('[')) {
+      const match = cleaned.match(/\{[\s\S]*\}/)
+      if (match) cleaned = match[0]
+    }
+
     const parsed = JSON.parse(cleaned)
-    answers = parsed.answers ?? []
+    // Handle both { answers: [...] } and a bare array
+    answers = Array.isArray(parsed) ? parsed : (parsed.answers ?? [])
+
+    if (!Array.isArray(answers)) throw new Error('answers is not an array')
   } catch (err) {
-    console.error('[ai-complete] Failed to parse Claude response:', aiResponse)
+    console.error('[ai-complete] Failed to parse Claude response. Raw response:', aiResponse.slice(0, 500))
     res.status(500).json({ error: 'AI returned an unexpected format. Please try again.' })
     return
   }
