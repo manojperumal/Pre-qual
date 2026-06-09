@@ -170,13 +170,13 @@ ${docDescriptions}
 Review these documents and call the submit_answers tool with your findings for each question below.
 
 Rules:
-- For radio_yes_no: answer_text must be exactly "yes" or "no"
-- For number: answer_text must be a numeric string (e.g. "1.2" or "5")
-- For multi_select: answer_options must only contain values from the provided options list
-- For document_upload: set answer_text to null; note in mojo_feedback whether the relevant document was provided
-- For text_area: provide a concise extracted answer
-- If you cannot determine an answer, set answer_text/answer_options to null and explain in mojo_feedback what is needed
-- Be conservative — only answer "yes" when you have clear evidence
+- For radio_yes_no: answer_text must be exactly "yes" or "no". Also populate company_comments with a brief explanation of what the document shows (e.g. policy number, coverage limits, expiry date, EMR value, etc.)
+- For number: answer_text must be a numeric string (e.g. "1.2" or "5"). Populate company_comments with where in the document the value was found.
+- For multi_select: answer_options must only contain values from the provided options list. Populate company_comments with supporting details from the document.
+- For document_upload: set answer_text to null. Populate company_comments noting whether the relevant document was provided and any key details visible.
+- For text_area: provide a concise extracted answer in answer_text.
+- If you cannot determine an answer, set answer_text/answer_options to null and use company_comments to explain what additional document or information is needed.
+- Be conservative — only answer "yes" when you have clear evidence.
 
 Questions:
 ${questionsText}`,
@@ -199,9 +199,10 @@ ${questionsText}`,
               question_id: { type: 'string', description: 'The exact UUID of the question' },
               answer_text: { type: ['string', 'null'], description: 'Answer for radio_yes_no ("yes"/"no"), text_area, or number questions' },
               answer_options: { type: ['array', 'null'], items: { type: 'string' }, description: 'Selected options for multi_select questions' },
-              mojo_feedback: { type: 'string', description: 'Brief explanation of what was found in documents or what is needed' },
+              company_comments: { type: 'string', description: 'Supporting details from the document — policy numbers, values found, coverage details, or what is missing' },
+              mojo_feedback: { type: 'string', description: 'Internal Mojo note: confidence level and source reference in the document' },
             },
-            required: ['question_id', 'mojo_feedback'],
+            required: ['question_id', 'company_comments', 'mojo_feedback'],
           },
         },
       },
@@ -239,6 +240,7 @@ ${questionsText}`,
           question_id: answer.question_id,
           answer_text: answer.answer_text ?? null,
           answer_options: answer.answer_options ?? null,
+          company_comments: answer.company_comments ?? null,
           mojo_feedback: answer.mojo_feedback ?? null,
           ai_suggested: true,
         },
