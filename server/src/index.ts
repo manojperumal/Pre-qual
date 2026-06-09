@@ -10,9 +10,26 @@ const PORT = Number(process.env.PORT) || 3001
 
 // ─── Middleware ──────────────────────────────────────────────────────────────
 
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  // Allow any Vercel deployment for this project
+  /^https:\/\/pre-qual[a-zA-Z0-9\-]*\.vercel\.app$/,
+  // Allow explicit CLIENT_URL if set
+  ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []),
+]
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: (origin, callback) => {
+      // Allow non-browser requests (Postman, Railway health checks, etc.)
+      if (!origin) return callback(null, true)
+      const allowed = allowedOrigins.some((o) =>
+        typeof o === 'string' ? o === origin : o.test(origin)
+      )
+      if (allowed) return callback(null, true)
+      callback(new Error(`CORS: origin ${origin} not allowed`))
+    },
     credentials: true,
   })
 )
