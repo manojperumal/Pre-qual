@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useProjects, useMyProjects, useTeamMembers, useCompanyProjects, useUpdateMemberRole, useOwnerGCs, useOwnerTrades } from '@/hooks/useProjects'
 import { useOwnerPendingSubmissions } from '@/hooks/useContractorProfile'
-import { useSentInvitations, useSendInvitation } from '@/hooks/usePrequals'
+import { useSentInvitations, useResendInvitation } from '@/hooks/usePrequals'
 import { FolderOpen, HardHat, Wrench, ClipboardList, AlertTriangle, ChevronRight, Plus, Users, RefreshCw } from 'lucide-react'
 import { roleLabel } from '@/lib/roleLabels'
 import { format } from 'date-fns'
@@ -38,7 +38,7 @@ export default function OwnerDashboard() {
   const { data: teamMembers = [] } = useTeamMembers(isTeamMember ? undefined : profile?.id)
   const updateMemberRole = useUpdateMemberRole()
   const { data: invitations = [] } = useSentInvitations(companyOwnerId)
-  const resendInvitation = useSendInvitation()
+  const resendInvitation = useResendInvitation()
 
   const uniqueGCs = new Set(gcs.map((r) => r.contractorId)).size
   const uniqueTrades = new Set(trades.map((r) => r.contractorId)).size
@@ -279,11 +279,7 @@ export default function OwnerDashboard() {
                     <td className="px-6 py-4">
                       {inv.status !== 'accepted' && (
                         <button
-                          onClick={() => resendInvitation.mutate({
-                            recipient_email: inv.recipient_email,
-                            recipient_role: inv.recipient_role as any,
-                            project_id: inv.project_id ?? undefined,
-                          })}
+                          onClick={() => resendInvitation.mutate(inv.id)}
                           disabled={resendInvitation.isPending}
                           className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 font-medium disabled:opacity-50"
                         >

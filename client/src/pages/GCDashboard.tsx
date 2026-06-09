@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useProjects, useMyProjects, useTeamMembers, useCompanyProjects, useUpdateMemberRole } from '@/hooks/useProjects'
 import { useContractorProfile, useProjectSubmission } from '@/hooks/useContractorProfile'
-import { useSentInvitations, useSendInvitation } from '@/hooks/usePrequals'
+import { useSentInvitations, useResendInvitation } from '@/hooks/usePrequals'
 import { useMyAssignments } from '@/hooks/useQuestionnaires'
 import { FolderOpen, User, Send, UserPlus, CheckCircle, Clock, AlertCircle, ClipboardList, Users, RefreshCw } from 'lucide-react'
 import { format } from 'date-fns'
@@ -91,7 +91,7 @@ export default function GCDashboard() {
     !isTeamMember ? profile?.id : undefined
   )
   const { data: invitations = [] } = useSentInvitations(companyOwnerId)
-  const resendInvitation = useSendInvitation()
+  const resendInvitation = useResendInvitation()
   const { data: contractorProfile } = useContractorProfile(profile?.id)
   const { data: myAssignments = [] } = useMyAssignments(profile?.id)
   const { data: teamMembers = [] } = useTeamMembers(isTeamMember ? undefined : profile?.id)
@@ -299,11 +299,7 @@ export default function GCDashboard() {
                     <td className="px-6 py-4">
                       {inv.status !== 'accepted' && (
                         <button
-                          onClick={() => resendInvitation.mutate({
-                            recipient_email: inv.recipient_email,
-                            recipient_role: inv.recipient_role as any,
-                            project_id: inv.project_id ?? undefined,
-                          })}
+                          onClick={() => resendInvitation.mutate(inv.id)}
                           disabled={resendInvitation.isPending}
                           className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 font-medium disabled:opacity-50"
                         >

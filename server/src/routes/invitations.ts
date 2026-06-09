@@ -154,6 +154,130 @@ router.post('/send', requireAuth, async (req: Request, res: Response): Promise<v
 })
 
 /**
+ * POST /api/invitations/resend
+ * Refreshes an existing invitation's token + expiry and resends the email.
+ * Requires auth.
+ */
+router.post('/resend', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const schema = z.object({ invitation_id: z.string().uuid() })
+  const parsed = schema.safeParse(req.body)
+  if (!parsed.success) {
+    res.status(400).json({ error: 'invitation_id is required' })
+    return
+  }
+
+  const { invitation_id } = parsed.data
+  const senderId = req.userId!
+
+  // Verify the invitation belongs to this sender
+  const { data: existing, error: fetchErr } = await supabaseAdmin
+    .from('invitations')
+    .select('*')
+    .eq('id', invitation_id)
+    .eq('sender_id', senderId)
+    .single()
+
+  if (fetchErr || !existing) {
+    res.status(404).json({ error: 'Invitation not found' })
+    return
+  }
+
+  // Refresh token and expiry
+  const token = randomBytes(32).toString('hex')
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+
+  const { error: updateErr } = await supabaseAdmin
+    .from('invitations')
+    .update({ token, expires_at: expiresAt, status: 'pending' })
+    .eq('id', invitation_id)
+
+  if (updateErr) {
+    res.status(500).json({ error: 'Failed to refresh invitation' })
+    return
+  }
+
+  // Fetch sender profile and project name
+  const { data: sender } = await supabaseAdmin
+    .from('profiles')
+    .select('full_name, company_name, email')
+    .eq('id', senderId)
+    .single()
+
+  let projectName: string | undefined
+  if (existing.project_id) {
+    const { data: project } = await supabaseAdmin
+      .from('projects')
+      .select('name')
+      .eq('id', existing.project_id)
+      .single()
+    projectName = project?.name
+  }
+
+  const senderName = (sender as any)?.company_name || (sender as any)?.full_name || 'A construction company'
+  const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173'
+  const inviteLink = `${clientUrl}/invite/${token}`
+  const recipientRoleLabel =
+    existing.recipient_role === 'gc' ? 'General Contractor' :
+    existing.recipient_role === 'trade' ? 'Trade Subcontractor' :
+    'Team Member'
+
+  const transporter = createTransporter()
+  if (!transporter) {
+    console.log(`[invitations] SMTP not configured. Resend link: ${inviteLink}`)
+    res.json({ success: true, message: 'Invitation refreshed (email not sent — SMTP not configured)' })
+    return
+  }
+
+  try {
+    await transporter.sendMail({
+      from: `"PreQual Pro" <${process.env.FROM_EMAIL || 'noreply@prequalpro.com'}>`,
+      to: existing.recipient_email,
+      subject: `You've been invited to join ${senderName} on PreQual Pro`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; color: #111827; background: #f9fafb; }
+            .container { max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; border: 1px solid #e5e7eb; }
+            .header { background: #1e40af; color: white; padding: 24px 32px; }
+            .header h1 { margin: 0; font-size: 20px; }
+            .body { padding: 32px; }
+            .btn { display: inline-block; background: #2563eb; color: white; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 600; margin-top: 16px; }
+            .footer { padding: 16px 32px; background: #f3f4f6; color: #6b7280; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>PreQual Pro — Invitation</h1>
+            </div>
+            <div class="body">
+              <p>Hello,</p>
+              <p><strong>${senderName}</strong> has invited you to join their team as a <strong>${recipientRoleLabel}</strong>${projectName ? ` for the project <strong>${projectName}</strong>` : ''}.</p>
+              <p>Please click the button below to accept your invitation:</p>
+              <a href="${inviteLink}" class="btn">Accept Invitation →</a>
+              <p style="margin-top: 24px; color: #6b7280; font-size: 13px;">Or copy this link: ${inviteLink}</p>
+            </div>
+            <div class="footer">
+              <p>You received this email because ${senderName} invited you to PreQual Pro. If you believe this was sent in error, please ignore it.</p>
+              <p>This invitation expires in 7 days.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    })
+    res.json({ success: true, message: 'Invitation email resent' })
+  } catch (err: unknown) {
+    console.error('[invitations] Resend email error:', err)
+    console.log(`[invitations] Resend link (email failed): ${inviteLink}`)
+    res.json({ success: true, message: 'Invitation refreshed (email delivery failed)' })
+  }
+})
+
+/**
  * GET /api/invitations/token/:token
  * Public — look up an invitation by token.
  */
