@@ -241,7 +241,7 @@ export default function OwnerDashboard() {
           <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <h2 className="text-base font-semibold text-gray-900">Invitations Sent</h2>
             <Link to="/owner/invite?role=gc" className="text-sm text-brand-600 hover:text-brand-700 font-medium inline-flex items-center gap-1">
-              + Invite GC
+              + Invite General Contractor
             </Link>
           </div>
           <div className="overflow-x-auto">

@@ -230,7 +230,7 @@ export default function TradeDashboard() {
             <FolderOpen size={32} className="mx-auto mb-3 text-gray-300" />
             <p className="font-medium">No projects yet</p>
             <p className="text-sm mt-1">
-              Accept an invitation from an Owner or GC to join a project
+              Accept an invitation from an Owner or General Contractor to join a project
             </p>
           </div>
         ) : (

@@ -123,7 +123,7 @@ export default function AssignQuestionnairePage() {
               {!projectId
                 ? 'Select a project first.'
                 : isOwner
-                ? 'No GCs or trades found on this project.'
+                ? 'No General Contractors or trades found on this project.'
                 : 'No trades found on this project.'}
             </p>
           )}

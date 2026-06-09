@@ -163,7 +163,7 @@ export default function ProjectDetailPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {/* GC Primary Contact */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">GC Primary Contact</label>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">General Contractor Primary Contact</label>
               {(role === 'owner' || role === 'gc') ? (
                 <select
                   value={(project as any)?.gc_primary_contact_id ?? ''}
