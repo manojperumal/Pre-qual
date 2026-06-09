@@ -53,6 +53,8 @@ export default function QuestionnaireResponsePage() {
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiSuccess, setAiSuccess] = useState(false)
 
+  const responsesKey = existingResponses.map(r => `${r.question_id}:${r.updated_at}`).join(',')
+
   useEffect(() => {
     if (existingResponses.length === 0) return
     const init: typeof answers = {}
@@ -68,7 +70,7 @@ export default function QuestionnaireResponsePage() {
       }
     }
     setAnswers(init)
-  }, [existingResponses.length])
+  }, [responsesKey])
 
   const isReadOnly = assignment?.status === 'submitted' || assignment?.status === 'approved'
   const basePath = profile?.role === 'gc' ? '/gc' : '/trade'
