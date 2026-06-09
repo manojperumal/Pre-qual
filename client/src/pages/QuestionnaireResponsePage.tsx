@@ -135,7 +135,24 @@ export default function QuestionnaireResponsePage() {
     setAiError(null)
     setAiSuccess(false)
     try {
-      await aiComplete.mutateAsync({ assignmentId, documentPaths: uploadedDocs })
+      const data = await aiComplete.mutateAsync({ assignmentId, documentPaths: uploadedDocs })
+      if (data.responses?.length) {
+        setAnswers(prev => {
+          const next = { ...prev }
+          for (const r of data.responses as Response[]) {
+            next[r.question_id] = {
+              text: r.answer_text ?? undefined,
+              options: r.answer_options ?? undefined,
+              docName: r.document_name ?? undefined,
+              docPath: r.document_path ?? undefined,
+              companyComments: r.company_comments ?? undefined,
+              mojoFeedback: r.mojo_feedback ?? undefined,
+              aiSuggested: r.ai_suggested ?? false,
+            }
+          }
+          return next
+        })
+      }
       setAiSuccess(true)
     } catch (err: any) {
       setAiError(err.message ?? 'AI completion failed')
