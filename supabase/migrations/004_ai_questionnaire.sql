@@ -1,6 +1,7 @@
 -- Add AI-related columns to questionnaire_responses
 alter table questionnaire_responses add column if not exists mojo_feedback text;
 alter table questionnaire_responses add column if not exists ai_suggested boolean default false;
+alter table questionnaire_responses add column if not exists company_comments text;
 
 -- Contractor documents table for AI-powered completion
 create table if not exists contractor_documents (

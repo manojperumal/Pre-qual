@@ -230,9 +230,10 @@ ${questionsText}`,
   }
 
   // Upsert each AI-suggested response into DB
+  let savedCount = 0
   for (const answer of answers) {
     if (!answer.question_id) continue
-    await supabaseAdmin
+    const { error: upsertErr } = await supabaseAdmin
       .from('questionnaire_responses')
       .upsert(
         {
@@ -246,7 +247,13 @@ ${questionsText}`,
         },
         { onConflict: 'assignment_id,question_id' }
       )
+    if (upsertErr) {
+      console.error('[ai-complete] Upsert error for question', answer.question_id, ':', upsertErr.message)
+    } else {
+      savedCount++
+    }
   }
+  console.log(`[ai-complete] Saved ${savedCount}/${answers.length} answers for assignment ${assignmentId}`)
 
   // Update assignment status to in_progress if still pending
   if (assignment.status === 'pending') {
