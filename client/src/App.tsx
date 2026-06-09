@@ -108,6 +108,7 @@ export default function App() {
         <Route path="questionnaires/assign" element={<AssignQuestionnairePage />} />
         <Route path="questionnaires/:id" element={<QuestionnaireBuilderPage />} />
         <Route path="assignments" element={<MyAssignmentsPage />} />
+        <Route path="assignments/:assignmentId/respond" element={<QuestionnaireResponsePage />} />
         <Route path="assignments/:assignmentId/review" element={<QuestionnaireReviewPage />} />
       </Route>
 

@@ -69,6 +69,7 @@ export interface Response {
   document_name: string | null
   company_comments: string | null
   mojo_feedback: string | null
+  ai_suggested: boolean
   created_at: string
   updated_at: string
 }
@@ -369,6 +370,40 @@ export function useAssignmentResponses(assignmentId: string | undefined) {
         .eq('assignment_id', assignmentId!)
       if (error) throw error
       return data as Response[]
+    },
+  })
+}
+
+export function useAICompleteQuestionnaire() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      assignmentId,
+      documentPaths,
+    }: {
+      assignmentId: string
+      documentPaths: Array<{ path: string; type: string; name: string }>
+    }) => {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      const apiUrl = import.meta.env.VITE_API_URL || ''
+      const res = await fetch(`${apiUrl}/api/questionnaires/${assignmentId}/ai-complete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ document_paths: documentPaths }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as any).error || 'AI completion failed')
+      }
+      return res.json()
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['responses', vars.assignmentId] })
+      qc.invalidateQueries({ queryKey: ['assignment', vars.assignmentId] })
     },
   })
 }
