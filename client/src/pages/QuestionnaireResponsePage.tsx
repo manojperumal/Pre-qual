@@ -136,12 +136,9 @@ export default function QuestionnaireResponsePage() {
     setAiSuccess(false)
     try {
       const data = await aiComplete.mutateAsync({ assignmentId, documentPaths: uploadedDocs })
-      console.log('[AI] response from server:', JSON.stringify(data, null, 2))
       if (data.responses?.length) {
         setAnswers(prev => {
           const next = { ...prev }
-          console.log('[AI] setting answers for question_ids:', data.responses.map((r: Response) => r.question_id))
-          console.log('[AI] current answers keys:', Object.keys(prev))
           for (const r of data.responses as Response[]) {
             next[r.question_id] = {
               text: r.answer_text ?? undefined,
@@ -336,10 +333,6 @@ export default function QuestionnaireResponsePage() {
           const q = qq.question
           if (!q) return null
           const a = answers[q.id] ?? {}
-          // debug: log first question lookup on first render only
-          if (idx === 0 && Object.keys(answers).length > 0) {
-            console.log('[AI] q.id:', q.id, 'qq.question_id:', qq.question_id, 'answer found:', !!answers[q.id])
-          }
 
           return (
             <div key={qq.id} className={`bg-white rounded-xl shadow-sm border p-5 ${a.aiSuggested ? 'border-brand-200' : 'border-gray-200'}`}>
@@ -406,10 +399,12 @@ export default function QuestionnaireResponsePage() {
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50"
                     />
                   </div>
-                  <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
-                    <p className="text-xs font-medium text-blue-700 mb-1">Mojo Feedback</p>
-                    <p className="text-xs text-blue-500 italic">Feedback will be provided by Mojo after review.</p>
-                  </div>
+                  {a.mojoFeedback && (
+                    <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                      <Info size={13} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-amber-800">{a.mojoFeedback}</p>
+                    </div>
+                  )}
                 </div>
               )}
 
