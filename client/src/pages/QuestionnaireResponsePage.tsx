@@ -332,34 +332,21 @@ export default function QuestionnaireResponsePage() {
 
               {/* Radio yes/no */}
               {q.answer_type === 'radio_yes_no' && (
-                <div className="space-y-3">
-                  <div className="flex gap-4">
-                    {['yes', 'no'].map(v => (
-                      <label key={v} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name={q.id}
-                          value={v}
-                          checked={a.text === v}
-                          onChange={() => !isReadOnly && setTextAnswer(q.id, v)}
-                          disabled={isReadOnly}
-                          className="accent-brand-600"
-                        />
-                        <span className="text-sm capitalize">{v}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Comments (optional)</label>
-                    <textarea
-                      rows={2}
-                      value={a.companyComments ?? ''}
-                      onChange={e => !isReadOnly && setAnswers(prev => ({ ...prev, [q.id]: { ...prev[q.id], companyComments: e.target.value } }))}
-                      disabled={isReadOnly}
-                      placeholder="Add any relevant comments…"
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50"
-                    />
-                  </div>
+                <div className="flex gap-4">
+                  {['yes', 'no'].map(v => (
+                    <label key={v} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name={q.id}
+                        value={v}
+                        checked={a.text === v}
+                        onChange={() => !isReadOnly && setTextAnswer(q.id, v)}
+                        disabled={isReadOnly}
+                        className="accent-brand-600"
+                      />
+                      <span className="text-sm capitalize">{v}</span>
+                    </label>
+                  ))}
                 </div>
               )}
 
@@ -459,6 +446,21 @@ export default function QuestionnaireResponsePage() {
                       />
                     )
                   )}
+                </div>
+              )}
+
+              {/* Comments — shown for all question types */}
+              {q.answer_type !== 'radio_yes_no' && q.answer_type !== 'radio_yes_no_comments' && (
+                <div className="mt-3">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Comments (optional)</label>
+                  <textarea
+                    rows={2}
+                    value={a.companyComments ?? ''}
+                    onChange={e => !isReadOnly && setAnswers(prev => ({ ...prev, [q.id]: { ...prev[q.id], companyComments: e.target.value } }))}
+                    disabled={isReadOnly}
+                    placeholder="Add any relevant comments…"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50"
+                  />
                 </div>
               )}
 
