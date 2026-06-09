@@ -1,4 +1,5 @@
 import { useAuth } from '@/hooks/useAuth'
+import { roleLabel } from '@/lib/roleLabels'
 import { Bell, Settings, Search } from 'lucide-react'
 
 export function TopBar() {
@@ -40,7 +41,7 @@ export function TopBar() {
         </div>
         <div className="hidden sm:block">
           <p className="text-sm text-white font-medium leading-tight">{profile?.full_name || 'User'}</p>
-          <p className="text-xs text-gray-400 leading-tight capitalize">{profile?.role}</p>
+          <p className="text-xs text-gray-400 leading-tight">{roleLabel(profile?.role)}</p>
         </div>
       </div>
     </header>

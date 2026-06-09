@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
+import { roleLabel } from '@/lib/roleLabels'
 import { useAuth } from '@/hooks/useAuth'
 import { useQuestionnaires, useCreateAssignment } from '@/hooks/useQuestionnaires'
 import { useProjects, useCompanyProjects, useProjectMembers } from '@/hooks/useProjects'
@@ -113,7 +114,7 @@ export default function AssignQuestionnairePage() {
               {assignableMembers.map((m: any) => (
                 <option key={m.profile?.id ?? m.id} value={m.profile?.id ?? m.id}>
                   {m.profile?.full_name || m.profile?.email || 'Unknown'}
-                  {m.profile?.company_name ? ` (${m.profile.company_name})` : ''} — {m.profile?.role}
+                  {m.profile?.company_name ? ` (${m.profile.company_name})` : ''} — {roleLabel(m.profile?.role)}
                 </option>
               ))}
             </select>
@@ -122,7 +123,7 @@ export default function AssignQuestionnairePage() {
               {!projectId
                 ? 'Select a project first.'
                 : isOwner
-                ? 'No GCs or trades found on this project.'
+                ? 'No General Contractors or trades found on this project.'
                 : 'No trades found on this project.'}
             </p>
           )}

@@ -6,6 +6,7 @@ import { useReceivedInvitations, useMyProjectSubmissions } from '@/hooks/usePreq
 import { useMyAssignments } from '@/hooks/useQuestionnaires'
 import { FolderOpen, User, Send, Clock, CheckCircle, AlertCircle, Mail, ChevronRight, ClipboardList, Users, UserPlus } from 'lucide-react'
 import { format } from 'date-fns'
+import { roleLabel } from '@/lib/roleLabels'
 
 const SUBMISSION_COLORS: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
@@ -229,7 +230,7 @@ export default function TradeDashboard() {
             <FolderOpen size={32} className="mx-auto mb-3 text-gray-300" />
             <p className="font-medium">No projects yet</p>
             <p className="text-sm mt-1">
-              Accept an invitation from an Owner or GC to join a project
+              Accept an invitation from an Owner or General Contractor to join a project
             </p>
           </div>
         ) : (
@@ -320,7 +321,7 @@ export default function TradeDashboard() {
                       <td className="px-6 py-4">
                         <p className="text-sm text-gray-900">{senderName}</p>
                         {inv.sender?.role && (
-                          <p className="text-xs text-gray-400 capitalize">{inv.sender.role}</p>
+                          <p className="text-xs text-gray-400">{roleLabel(inv.sender.role)}</p>
                         )}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
