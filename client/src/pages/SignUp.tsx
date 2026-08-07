@@ -87,10 +87,7 @@ export default function SignUp() {
 
     const { data: sessionData } = await supabase.auth.getSession()
     if (sessionData.session) {
-      await supabase
-        .from('profiles')
-        .update({ company_name: data.company_name })
-        .eq('id', sessionData.session.user.id)
+      // company_name is now handled by the handle_new_user trigger — no profiles.update needed
 
       const pendingToken = sessionStorage.getItem('pending_invite_token')
       if (pendingToken) {
@@ -106,7 +103,9 @@ export default function SignUp() {
           sessionStorage.removeItem('pending_invite_token')
           if (res.ok) {
             const role = data.role
-            navigate(role === 'owner' ? '/owner' : role === 'gc' ? '/gc' : '/trade')
+            if (role === 'owner') navigate('/owner')
+            else if (role === 'gc') navigate('/gc')
+            else navigate('/trade')
             return
           }
         } catch {
