@@ -75,10 +75,10 @@ router.post('/send', requireAuth, async (req: Request, res: Response): Promise<v
   const token = randomBytes(32).toString('hex')
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
 
-  // Fetch sender profile
+  // Fetch sender profile + company name
   const { data: sender } = await supabaseAdmin
     .from('profiles')
-    .select('full_name, company_name, email')
+    .select('full_name, company_name, email, company:companies!new_company_id(name)')
     .eq('id', senderId)
     .single()
 
@@ -114,7 +114,7 @@ router.post('/send', requireAuth, async (req: Request, res: Response): Promise<v
     return
   }
 
-  const senderName = (sender as any)?.company_name || (sender as any)?.full_name || 'A construction company'
+  const senderName = (sender as any)?.company?.name || (sender as any)?.company_name || (sender as any)?.full_name || 'A construction company'
   const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173'
   const inviteLink = `${clientUrl}/invite/${token}`
   const recipientRoleLabel =
@@ -223,10 +223,10 @@ router.post('/resend', requireAuth, async (req: Request, res: Response): Promise
     return
   }
 
-  // Fetch sender profile and project name
+  // Fetch sender profile + company name
   const { data: sender } = await supabaseAdmin
     .from('profiles')
-    .select('full_name, company_name, email')
+    .select('full_name, company_name, email, company:companies!new_company_id(name)')
     .eq('id', senderId)
     .single()
 
@@ -240,7 +240,7 @@ router.post('/resend', requireAuth, async (req: Request, res: Response): Promise
     projectName = project?.name
   }
 
-  const senderName = (sender as any)?.company_name || (sender as any)?.full_name || 'A construction company'
+  const senderName = (sender as any)?.company?.name || (sender as any)?.company_name || (sender as any)?.full_name || 'A construction company'
   const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173'
   const inviteLink = `${clientUrl}/invite/${token}`
   const recipientRoleLabel =
@@ -313,7 +313,7 @@ router.get('/token/:token', async (req: Request, res: Response): Promise<void> =
 
   const { data: invitation, error } = await supabaseAdmin
     .from('invitations')
-    .select('*, sender:profiles!sender_id(id, full_name, company_name), project:projects(name)')
+    .select('*, sender:profiles!sender_id(id, full_name, company_name, company:companies!new_company_id(name)), project:projects(name)')
     .eq('token', token)
     .single()
 
@@ -332,7 +332,7 @@ router.get('/token/:token', async (req: Request, res: Response): Promise<void> =
     return
   }
 
-  const sender = invitation.sender as { id?: string; full_name?: string; company_name?: string } | null
+  const sender = invitation.sender as { id?: string; full_name?: string; company_name?: string; company?: { name?: string } } | null
   const project = invitation.project as { name?: string } | null
 
   res.json({
@@ -341,7 +341,7 @@ router.get('/token/:token', async (req: Request, res: Response): Promise<void> =
     project_id: invitation.project_id,
     project_name: project?.name,
     sender_id: sender?.id,
-    sender_name: sender?.company_name || sender?.full_name,
+    sender_name: sender?.company?.name || sender?.company_name || sender?.full_name,
   })
 })
 
