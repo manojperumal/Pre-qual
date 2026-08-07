@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { useAuth } from '@/hooks/useAuth'
 import { useContractorProfile, useUpsertContractorProfile } from '@/hooks/useContractorProfile'
+import { useUpdateCompany } from '@/hooks/useCompany'
 import { ContractorProfile } from '@/types'
 import { CheckCircle } from 'lucide-react'
 
@@ -43,14 +44,16 @@ function StepIndicator({ current, total }: { current: number; total: number }) {
 }
 
 export default function ContractorProfilePage() {
-  const { profile } = useAuth()
+  const { profile, company } = useAuth()
   const navigate = useNavigate()
   const [step, setStep] = useState(0)
   const [saved, setSaved] = useState(false)
   const { data: existing, isLoading } = useContractorProfile(profile?.id)
   const upsert = useUpsertContractorProfile()
+  const { updateCompany } = useUpdateCompany()
 
-  const dashPath = profile?.role === 'gc' ? '/gc' : '/trade'
+  const effectiveRole = profile?.company_type ?? profile?.role
+  const dashPath = effectiveRole === 'gc' ? '/gc' : '/trade'
 
   // Step 1: Company Info
   const companyForm = useForm<Partial<ContractorProfile>>()
@@ -67,17 +70,36 @@ export default function ContractorProfilePage() {
 
   useEffect(() => {
     if (existing) {
-      companyForm.reset(existing)
+      // Prefer company name from the companies table if available
+      const merged = {
+        ...existing,
+        company_name: company?.name ?? existing.company_name,
+        address: company?.address ?? existing.address,
+        city: company?.city ?? existing.city,
+        state: company?.state ?? existing.state,
+        zip: company?.zip ?? existing.zip,
+      }
+      companyForm.reset(merged)
       insuranceForm.reset(existing)
       safetyForm.reset(existing)
       ptpForm.reset(existing)
       bondingForm.reset(existing)
     }
-  }, [existing])
+  }, [existing, company])
 
   async function saveStep(data: Partial<ContractorProfile>) {
     if (!profile?.id) return
     await upsert.mutateAsync({ ...data, user_id: profile.id })
+    // Step 0 is Company Info — mirror relevant fields to the companies table
+    if (step === 0 && profile.new_company_id) {
+      await updateCompany(profile.new_company_id, {
+        name: data.company_name ?? company?.name ?? '',
+        address: data.address ?? null,
+        city: data.city ?? null,
+        state: data.state ?? null,
+        zip: data.zip ?? null,
+      })
+    }
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
