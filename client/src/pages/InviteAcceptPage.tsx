@@ -64,8 +64,10 @@ export default function InviteAcceptPage() {
         })
         .then(() => {
           sessionStorage.removeItem('pending_invite_token')
-          const role = profile.role
-          navigate(role === 'owner' ? '/owner' : role === 'gc' ? '/gc' : '/trade', { replace: true })
+          const effectiveRole = profile.company_type ?? profile.role
+          if (profile.is_mojo_admin || effectiveRole === 'owner') navigate('/owner', { replace: true })
+          else if (effectiveRole === 'gc') navigate('/gc', { replace: true })
+          else navigate('/trade', { replace: true })
         })
         .catch((err) => {
           setError(err.message)
