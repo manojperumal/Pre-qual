@@ -18,12 +18,12 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function OwnerDashboard() {
   const { profile } = useAuth()
-  const isTeamMember = !!(profile as any)?.company_id
-  const memberRole: 'admin' | 'contributor' = (profile as any)?.member_role ?? 'admin'
-  const companyOwnerId = (profile as any)?.company_id || profile?.id
+  const companyId = profile?.new_company_id ?? (profile as any)?.company_id ?? null
+  const isTeamMember = profile?.user_role === 'contributor'
+  const memberRole: 'admin' | 'contributor' = profile?.user_role ?? 'admin'
 
   const { data: companyProjects = [], isLoading: companyLoading } = useCompanyProjects(
-    isTeamMember && memberRole === 'admin' ? companyOwnerId : undefined
+    isTeamMember && memberRole === 'admin' ? companyId : undefined
   )
   const { data: memberProjects = [], isLoading: memberProjectsLoading } = useMyProjects(
     (isTeamMember && memberRole === 'contributor') ? profile?.id : undefined
@@ -32,12 +32,12 @@ export default function OwnerDashboard() {
   const projects = isTeamMember ? (memberRole === 'admin' ? companyProjects : memberProjects) : allProjects
   const projectsLoading = isTeamMember ? (memberRole === 'admin' ? companyLoading : memberProjectsLoading) : allProjectsLoading
 
-  const { data: gcs = [] } = useOwnerGCs(companyOwnerId)
-  const { data: trades = [] } = useOwnerTrades(companyOwnerId)
-  const { data: pending = [], isLoading: pendingLoading } = useOwnerPendingSubmissions(companyOwnerId)
-  const { data: teamMembers = [] } = useTeamMembers(isTeamMember ? undefined : profile?.id)
+  const { data: gcs = [] } = useOwnerGCs(companyId ?? profile?.id)
+  const { data: trades = [] } = useOwnerTrades(companyId ?? profile?.id)
+  const { data: pending = [], isLoading: pendingLoading } = useOwnerPendingSubmissions(companyId ?? profile?.id)
+  const { data: teamMembers = [] } = useTeamMembers(!isTeamMember ? (companyId ?? undefined) : undefined)
   const updateMemberRole = useUpdateMemberRole()
-  const { data: invitations = [] } = useSentInvitations(companyOwnerId)
+  const { data: invitations = [] } = useSentInvitations(companyId ?? profile?.id)
   const resendInvitation = useResendInvitation()
 
   const uniqueGCs = new Set(gcs.map((r) => r.contractorId)).size
@@ -218,7 +218,7 @@ export default function OwnerDashboard() {
                     <td className="px-6 py-4 text-sm text-gray-600">{m.email}</td>
                     <td className="px-6 py-4">
                       <select
-                        value={m.member_role ?? 'contributor'}
+                        value={m.user_role ?? m.member_role ?? 'contributor'}
                         onChange={e => updateMemberRole.mutate({ userId: m.id, memberRole: e.target.value as 'admin' | 'contributor' })}
                         className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand-500"
                       >
