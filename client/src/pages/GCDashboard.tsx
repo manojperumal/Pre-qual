@@ -76,13 +76,13 @@ function ProjectCard({ project, userId }: { project: any; userId: string }) {
 export default function GCDashboard() {
   const { profile } = useAuth()
 
-  // If this GC is a team member (has company_id), scope to their project_members only
-  const isTeamMember = !!(profile as any)?.company_id
-  const memberRole: 'admin' | 'contributor' = (profile as any)?.member_role ?? 'admin'
-  const companyOwnerId = (profile as any)?.company_id || profile?.id
+  // Use new_company_id as the company identifier; fall back to old company_id during transition
+  const companyId = profile?.new_company_id ?? (profile as any)?.company_id ?? null
+  const isTeamMember = profile?.user_role === 'contributor'
+  const memberRole: 'admin' | 'contributor' = profile?.user_role ?? 'admin'
 
   const { data: companyProjects = [], isLoading: companyLoading } = useCompanyProjects(
-    isTeamMember && memberRole === 'admin' ? companyOwnerId : undefined
+    isTeamMember && memberRole === 'admin' ? companyId : undefined
   )
   const { data: memberProjects = [], isLoading: memberProjectsLoading } = useMyProjects(
     (isTeamMember && memberRole === 'contributor') ? profile?.id : undefined
@@ -90,11 +90,11 @@ export default function GCDashboard() {
   const { data: allProjects = [], isLoading: allProjectsLoading } = useProjects(
     !isTeamMember ? profile?.id : undefined
   )
-  const { data: invitations = [] } = useSentInvitations(companyOwnerId)
+  const { data: invitations = [] } = useSentInvitations(companyId ?? profile?.id)
   const resendInvitation = useResendInvitation()
   const { data: contractorProfile } = useContractorProfile(profile?.id)
   const { data: myAssignments = [] } = useMyAssignments(profile?.id)
-  const { data: teamMembers = [] } = useTeamMembers(isTeamMember ? undefined : profile?.id)
+  const { data: teamMembers = [] } = useTeamMembers(!isTeamMember ? (companyId ?? undefined) : undefined)
   const updateMemberRole = useUpdateMemberRole()
 
   const projectsLoading = isTeamMember
@@ -117,7 +117,7 @@ export default function GCDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-500">Welcome back, {profile?.full_name || profile?.company_name || 'GC'}</p>
+          <p className="mt-1 text-sm text-gray-500">Welcome back, {profile?.full_name || profile?.company_name || 'GC'} {profile?.company?.name ? `· ${profile.company.name}` : ''}</p>
         </div>
         <div className="flex gap-2">
           {!isTeamMember && (
@@ -245,7 +245,7 @@ export default function GCDashboard() {
                       <td className="px-6 py-4 text-sm text-gray-600">{m.email}</td>
                       <td className="px-6 py-4">
                         <select
-                          value={m.member_role ?? 'contributor'}
+                          value={m.user_role ?? m.member_role ?? 'contributor'}
                           onChange={e => updateMemberRole.mutate({ userId: m.id, memberRole: e.target.value as 'admin' | 'contributor' })}
                           className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         >
