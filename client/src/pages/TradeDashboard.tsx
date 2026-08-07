@@ -77,12 +77,12 @@ function ProjectCard({ project, userId }: { project: any; userId: string }) {
 export default function TradeDashboard() {
   const { profile } = useAuth()
 
-  const isTeamMember = !!(profile as any)?.company_id
-  const memberRole: 'admin' | 'contributor' = (profile as any)?.member_role ?? 'admin'
-  const companyOwnerId = (profile as any)?.company_id || profile?.id
+  const companyId = profile?.new_company_id ?? (profile as any)?.company_id ?? null
+  const isTeamMember = profile?.user_role === 'contributor'
+  const memberRole: 'admin' | 'contributor' = profile?.user_role ?? 'admin'
 
   const { data: companyProjects = [], isLoading: companyLoading } = useCompanyProjects(
-    isTeamMember && memberRole === 'admin' ? companyOwnerId : undefined
+    isTeamMember && memberRole === 'admin' ? companyId : undefined
   )
   const { data: memberProjects = [], isLoading: memberProjectsLoading } = useMyProjects(
     (isTeamMember && memberRole === 'contributor') ? profile?.id : undefined
@@ -90,7 +90,7 @@ export default function TradeDashboard() {
   const { data: allProjects = [], isLoading: allProjectsLoading } = useProjects(
     !isTeamMember ? profile?.id : undefined
   )
-  const { data: teamMembers = [] } = useTeamMembers(isTeamMember ? undefined : profile?.id)
+  const { data: teamMembers = [] } = useTeamMembers(!isTeamMember ? (companyId ?? undefined) : undefined)
   const updateMemberRole = useUpdateMemberRole()
   const { data: invitations = [] } = useReceivedInvitations(profile?.email ?? undefined)
   const { data: contractorProfile } = useContractorProfile(profile?.id)
@@ -118,7 +118,7 @@ export default function TradeDashboard() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Welcome back, {profile?.full_name || profile?.company_name || 'Trade'}
+            Welcome back, {profile?.full_name || profile?.company_name || 'Trade'} {profile?.company?.name ? `· ${profile.company.name}` : ''}
           </p>
         </div>
         {!isTeamMember && (
@@ -163,7 +163,7 @@ export default function TradeDashboard() {
           </div>
           <div className="space-y-2">
             {pendingInvites.map((inv) => {
-              const senderName = inv.sender?.company_name || inv.sender?.full_name || 'Someone'
+              const senderName = (inv.sender as any)?.company?.name || inv.sender?.company_name || inv.sender?.full_name || 'Someone'
               return (
                 <div key={inv.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-blue-100">
                   <div>
@@ -277,7 +277,7 @@ export default function TradeDashboard() {
                       <td className="px-6 py-4 text-sm text-gray-600">{m.email}</td>
                       <td className="px-6 py-4">
                         <select
-                          value={m.member_role ?? 'contributor'}
+                          value={m.user_role ?? m.member_role ?? 'contributor'}
                           onChange={e => updateMemberRole.mutate({ userId: m.id, memberRole: e.target.value as 'admin' | 'contributor' })}
                           className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         >
@@ -315,7 +315,7 @@ export default function TradeDashboard() {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {invitations.map((inv) => {
-                  const senderName = inv.sender?.company_name || inv.sender?.full_name || '—'
+                  const senderName = (inv.sender as any)?.company?.name || inv.sender?.company_name || inv.sender?.full_name || '—'
                   return (
                     <tr key={inv.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
