@@ -41,8 +41,9 @@ function RoleRedirect() {
 
   if (!profile) return <Navigate to="/login" replace />
 
-  if (profile.role === 'owner') return <Navigate to="/owner" replace />
-  if (profile.role === 'gc') return <Navigate to="/gc" replace />
+  const effectiveRole = profile.company_type ?? profile.role
+  if (profile.is_mojo_admin || effectiveRole === 'owner') return <Navigate to="/owner" replace />
+  if (effectiveRole === 'gc') return <Navigate to="/gc" replace />
   return <Navigate to="/trade" replace />
 }
 
