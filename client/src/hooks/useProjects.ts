@@ -33,16 +33,16 @@ export function useMyProjects(userId: string | undefined) {
   })
 }
 
-// Team members under a GC company (profiles where company_id = gcId)
-export function useTeamMembers(gcId: string | undefined) {
+// Team members under a company (profiles where new_company_id = companyId)
+export function useTeamMembers(companyId: string | undefined) {
   return useQuery({
-    queryKey: ['team_members', gcId],
-    enabled: !!gcId,
+    queryKey: ['team_members', companyId],
+    enabled: !!companyId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('company_id', gcId!)
+        .eq('new_company_id', companyId!)
         .order('created_at', { ascending: true })
       if (error) throw error
       return data
@@ -59,7 +59,7 @@ export function useCompanyProjects(companyId: string | undefined) {
       const { data: members } = await supabase
         .from('profiles')
         .select('id')
-        .or(`id.eq.${companyId},company_id.eq.${companyId}`)
+        .eq('new_company_id', companyId!)
       if (!members?.length) return []
       const memberIds = members.map((m: any) => m.id)
 
@@ -83,7 +83,7 @@ export function useUpdateMemberRole() {
     mutationFn: async ({ userId, memberRole }: { userId: string; memberRole: 'admin' | 'contributor' }) => {
       const { error } = await supabase
         .from('profiles')
-        .update({ member_role: memberRole })
+        .update({ member_role: memberRole, user_role: memberRole })
         .eq('id', userId)
       if (error) throw error
     },
@@ -235,11 +235,11 @@ export function useOwnerGCs(ownerId: string | undefined) {
 
       const { data: members, error: mErr } = await supabase
         .from('project_members')
-        .select('id, project_id, user_id, joined_at, profile:profiles!inner(id, full_name, email, company_name, role)')
+        .select('id, project_id, user_id, joined_at, profile:profiles!inner(id, full_name, email, company_name, company_type, role, company:companies!new_company_id(name))')
         .in('project_id', projectIds)
       if (mErr) throw mErr
 
-      const gcMembers = (members ?? []).filter((m: any) => m.profile?.role === 'gc')
+      const gcMembers = (members ?? []).filter((m: any) => (m.profile?.company_type ?? m.profile?.role) === 'gc')
       if (!gcMembers.length) return []
 
       const { data: submissions } = await supabase
@@ -266,7 +266,7 @@ export function useOwnerGCs(ownerId: string | undefined) {
           contractorId: m.user_id,
           contractorName: m.profile?.full_name ?? null,
           contractorEmail: m.profile?.email ?? null,
-          companyName: m.profile?.company_name ?? null,
+          companyName: m.profile?.company?.name ?? m.profile?.company_name ?? null,
           submissionStatus: subMap.get(`${m.project_id}:${m.user_id}`) ?? null,
           gcName: null,
           gcCompany: null,
@@ -292,11 +292,11 @@ export function useOwnerTrades(ownerId: string | undefined) {
 
       const { data: members, error: mErr } = await supabase
         .from('project_members')
-        .select('id, project_id, user_id, joined_at, profile:profiles!inner(id, full_name, email, company_name, role)')
+        .select('id, project_id, user_id, joined_at, profile:profiles!inner(id, full_name, email, company_name, company_type, role, company:companies!new_company_id(name))')
         .in('project_id', projectIds)
       if (mErr) throw mErr
 
-      const tradeMembers = (members ?? []).filter((m: any) => m.profile?.role === 'trade')
+      const tradeMembers = (members ?? []).filter((m: any) => (m.profile?.company_type ?? m.profile?.role) === 'trade')
       if (!tradeMembers.length) return []
 
       const { data: submissions } = await supabase
@@ -312,7 +312,7 @@ export function useOwnerTrades(ownerId: string | undefined) {
       const tradeEmails = [...new Set(tradeMembers.map((m: any) => m.profile?.email).filter(Boolean))]
       const { data: invitations } = await supabase
         .from('invitations')
-        .select('project_id, recipient_email, sender:profiles!sender_id(full_name, company_name, role)')
+        .select('project_id, recipient_email, sender:profiles!sender_id(full_name, company_name, company_type, role, company:companies!new_company_id(name))')
         .in('project_id', projectIds)
         .eq('recipient_role', 'trade')
         .eq('status', 'accepted')
@@ -321,10 +321,10 @@ export function useOwnerTrades(ownerId: string | undefined) {
       const gcMap = new Map<string, { gcName: string | null; gcCompany: string | null }>()
       for (const inv of invitations ?? []) {
         const sender = inv.sender as any
-        if (sender?.role === 'gc') {
+        if ((sender?.company_type ?? sender?.role) === 'gc') {
           gcMap.set(`${inv.project_id}:${inv.recipient_email}`, {
             gcName: sender.full_name ?? null,
-            gcCompany: sender.company_name ?? null,
+            gcCompany: sender.company?.name ?? sender.company_name ?? null,
           })
         }
       }
@@ -344,7 +344,7 @@ export function useOwnerTrades(ownerId: string | undefined) {
           contractorId: m.user_id,
           contractorName: m.profile?.full_name ?? null,
           contractorEmail: m.profile?.email ?? null,
-          companyName: m.profile?.company_name ?? null,
+          companyName: m.profile?.company?.name ?? m.profile?.company_name ?? null,
           submissionStatus: subMap.get(`${m.project_id}:${m.user_id}`) ?? null,
           gcName: gcInfo.gcName,
           gcCompany: gcInfo.gcCompany,
