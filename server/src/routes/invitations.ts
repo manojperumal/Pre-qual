@@ -362,7 +362,7 @@ router.post('/accept', requireAuth, async (req: Request, res: Response): Promise
 
   const { data: invitation, error } = await supabaseAdmin
     .from('invitations')
-    .select('*, sender:profiles!sender_id(id, company_id)')
+    .select('*, sender:profiles!sender_id(id, company_id, new_company_id)')
     .eq('token', token)
     .single()
 
@@ -394,22 +394,31 @@ router.post('/accept', requireAuth, async (req: Request, res: Response): Promise
     return
   }
 
-  // For team member invites: set company_id and correct role on the acceptor's profile
+  // For team member invites: set company on the acceptor's profile
   const memberRoleMap: Record<string, string> = {
     gc_member: 'gc',
     owner_member: 'owner',
     trade_member: 'trade',
   }
   if (memberRoleMap[invitation.recipient_role]) {
-    const sender = invitation.sender as { id?: string; company_id?: string } | null
-    const companyId = sender?.company_id || sender?.id
-    if (companyId) {
+    const sender = invitation.sender as { id?: string; company_id?: string; new_company_id?: string } | null
+    const companyType = memberRoleMap[invitation.recipient_role]
+    // Legacy self-ref company_id fallback: sender.company_id || sender.id
+    const legacyCompanyId = sender?.company_id || sender?.id
+    const newCompanyId = sender?.new_company_id
+
+    if (legacyCompanyId || newCompanyId) {
       await supabaseAdmin
         .from('profiles')
         .update({
-          company_id: companyId,
-          role: memberRoleMap[invitation.recipient_role],
+          // Legacy columns — keep populated during transition
+          company_id: legacyCompanyId,
+          role: companyType,
           member_role: 'contributor',
+          // New columns
+          new_company_id: newCompanyId ?? null,
+          company_type: companyType,
+          user_role: 'contributor',
         })
         .eq('id', req.userId!)
     }
