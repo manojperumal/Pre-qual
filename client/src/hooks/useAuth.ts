@@ -1,12 +1,13 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import { Profile } from '@/types'
+import { Company, Profile } from '@/types'
 
 interface AuthState {
   session: Session | null
   user: User | null
   profile: Profile | null
+  company: Company | null
   loading: boolean
 }
 
@@ -15,16 +16,19 @@ export function useAuth() {
     session: null,
     user: null,
     profile: null,
+    company: null,
     loading: true,
   })
 
   const fetchProfile = useCallback(async (userId: string) => {
     const { data } = await supabase
       .from('profiles')
-      .select('*')
+      .select('*, company:companies!new_company_id(*)')
       .eq('id', userId)
       .single()
-    return data as Profile | null
+    const profile = data as Profile | null
+    const company = (data as any)?.company as Company | null
+    return { profile, company }
   }, [])
 
   useEffect(() => {
@@ -33,10 +37,10 @@ export function useAuth() {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!mounted) return
       if (session?.user) {
-        const profile = await fetchProfile(session.user.id)
-        setState({ session, user: session.user, profile, loading: false })
+        const { profile, company } = await fetchProfile(session.user.id)
+        setState({ session, user: session.user, profile, company, loading: false })
       } else {
-        setState({ session: null, user: null, profile: null, loading: false })
+        setState({ session: null, user: null, profile: null, company: null, loading: false })
       }
     })
 
@@ -45,10 +49,10 @@ export function useAuth() {
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!mounted) return
       if (session?.user) {
-        const profile = await fetchProfile(session.user.id)
-        setState({ session, user: session.user, profile, loading: false })
+        const { profile, company } = await fetchProfile(session.user.id)
+        setState({ session, user: session.user, profile, company, loading: false })
       } else {
-        setState({ session: null, user: null, profile: null, loading: false })
+        setState({ session: null, user: null, profile: null, company: null, loading: false })
       }
     })
 
