@@ -1,4 +1,31 @@
 export type UserRole = 'owner' | 'gc' | 'trade'
+export type CompanyType = 'owner' | 'gc' | 'trade'
+export type UserRoleWithinCompany = 'admin' | 'contributor'
+
+export interface Company {
+  id: string
+  name: string
+  type: CompanyType
+  address: string | null
+  city: string | null
+  state: string | null
+  zip: string | null
+  phone: string | null
+  website: string | null
+  logo_path: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CompanyDocument {
+  id: string
+  company_id: string
+  document_type: 'safety_manual' | 'coi' | 'w9' | 'loss_runs' | 'license' | 'other'
+  document_name: string
+  storage_path: string
+  uploaded_by: string | null
+  created_at: string
+}
 
 export type PrequalStatus =
   | 'draft'
@@ -13,11 +40,22 @@ export type DocType = 'coi' | 'safety' | 'financial'
 
 export interface Profile {
   id: string
+  // Legacy — keep during transition
   role: UserRole
   company_name: string | null
+  company_id: string | null
+  member_role: UserRoleWithinCompany | null
+  // New
+  new_company_id: string | null
+  company_type: CompanyType | null
+  user_role: UserRoleWithinCompany
+  is_mojo_admin: boolean
+  // Personal
   full_name: string | null
   email: string | null
   created_at: string
+  // Joined
+  company?: Company | null
 }
 
 export interface Project {
