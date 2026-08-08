@@ -35,7 +35,7 @@ begin
     v_role,
     v_company_type,
     'admin',
-    (v_role = 'owner'),
+    false,
     v_company_id
   );
 

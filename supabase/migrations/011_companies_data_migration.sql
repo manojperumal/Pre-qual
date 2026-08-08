@@ -21,7 +21,7 @@ update profiles p
 set new_company_id = c.id,
     company_type   = p.role,
     user_role      = coalesce(p.member_role, 'admin'),
-    is_mojo_admin  = (p.role = 'owner')
+    is_mojo_admin  = false
 from companies c
 where c.type = case p.role when 'owner' then 'owner' when 'gc' then 'gc' else 'trade' end
   and c.name = coalesce(nullif(trim(p.company_name), ''), p.full_name, p.email)

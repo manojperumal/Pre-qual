@@ -62,7 +62,7 @@ export default function SignUp() {
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     // Invited users default to 'trade'; direct signups default to 'owner'
-    defaultValues: { role: isInvited ? 'trade' : 'owner', email: prefillEmail },
+    defaultValues: { role: isInvited ? 'trade' : 'owner', email: prefillEmail, company_name: isInvited ? 'N/A' : '' },
   })
 
   const selectedRole = watch('role')
@@ -75,7 +75,8 @@ export default function SignUp() {
       options: {
         data: {
           full_name: data.full_name,
-          company_name: data.company_name,
+          // Invited users join an existing company via accept — don't spin up a throwaway one
+          company_name: isInvited ? undefined : data.company_name,
           role: data.role,
         },
       },
@@ -189,11 +190,13 @@ export default function SignUp() {
               {errors.full_name && <p className="form-error">{errors.full_name.message}</p>}
             </div>
 
-            <div>
-              <label className="label" htmlFor="company_name">Company Name</label>
-              <input id="company_name" type="text" className="input-field" placeholder="Acme Construction LLC" {...register('company_name')} />
-              {errors.company_name && <p className="form-error">{errors.company_name.message}</p>}
-            </div>
+            {!isInvited && (
+              <div>
+                <label className="label" htmlFor="company_name">Company Name</label>
+                <input id="company_name" type="text" className="input-field" placeholder="Acme Construction LLC" {...register('company_name')} />
+                {errors.company_name && <p className="form-error">{errors.company_name.message}</p>}
+              </div>
+            )}
 
             <div>
               <label className="label" htmlFor="email">Email Address</label>
