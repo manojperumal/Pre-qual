@@ -216,13 +216,14 @@ export interface OwnerContractorRow {
   companyName: string | null
   city: string | null
   state: string | null
+  logoPath: string | null
   submissionStatus: string | null
   /** Company name(s) of the GC(s) coordinating this contractor on this project — empty if invited directly. */
   gcCompanies: string[]
 }
 
 const CONTRACTOR_MEMBER_SELECT =
-  'id, project_id, user_id, joined_at, profile:profiles!inner(id, full_name, email, company_name, company_type, role, company:companies!new_company_id(name, city, state))'
+  'id, project_id, user_id, joined_at, profile:profiles!inner(id, full_name, email, company_name, company_type, role, company:companies!new_company_id(name, city, state, logo_path))'
 
 function roleOf(profile: any): string {
   return profile?.company_type ?? profile?.role
@@ -278,6 +279,7 @@ export function useOwnerGCs(ownerId: string | undefined) {
           companyName: m.profile?.company?.name ?? m.profile?.company_name ?? null,
           city: m.profile?.company?.city ?? null,
           state: m.profile?.company?.state ?? null,
+          logoPath: m.profile?.company?.logo_path ?? null,
           submissionStatus: subMap.get(`${m.project_id}:${m.user_id}`) ?? null,
           gcCompanies: [],
         }
@@ -340,6 +342,7 @@ async function fetchTradeRows(projectIds: string[]): Promise<OwnerContractorRow[
       companyName: m.profile?.company?.name ?? m.profile?.company_name ?? null,
       city: m.profile?.company?.city ?? null,
       state: m.profile?.company?.state ?? null,
+      logoPath: m.profile?.company?.logo_path ?? null,
       submissionStatus: subMap.get(`${m.project_id}:${m.user_id}`) ?? null,
       gcCompanies: gcByProject.get(m.project_id) ?? [],
     }

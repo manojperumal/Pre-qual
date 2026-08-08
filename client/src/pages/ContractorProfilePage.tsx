@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { useAuth } from '@/hooks/useAuth'
 import { useContractorProfile, useUpsertContractorProfile } from '@/hooks/useContractorProfile'
 import { useUpdateCompany } from '@/hooks/useCompany'
+import { CompanyLogoUpload } from '@/components/CompanyLogoUpload'
 import { ContractorProfile } from '@/types'
 import { CheckCircle } from 'lucide-react'
 
@@ -51,6 +52,7 @@ export default function ContractorProfilePage() {
   const { data: existing, isLoading } = useContractorProfile(profile?.id)
   const upsert = useUpsertContractorProfile()
   const { updateCompany } = useUpdateCompany()
+  const [logoPath, setLogoPath] = useState<string | null | undefined>(company?.logo_path)
 
   const effectiveRole = profile?.company_type ?? profile?.role
   const dashPath = effectiveRole === 'gc' ? '/gc' : '/trade'
@@ -85,6 +87,7 @@ export default function ContractorProfilePage() {
       ptpForm.reset(existing)
       bondingForm.reset(existing)
     }
+    setLogoPath(company?.logo_path)
   }, [existing, company])
 
   async function saveStep(data: Partial<ContractorProfile>) {
@@ -145,6 +148,13 @@ export default function ContractorProfilePage() {
       {step === 0 && (
         <form onSubmit={companyForm.handleSubmit(handleNext)} className="card p-6 space-y-4">
           <h2 className="text-base font-semibold text-gray-900">Company Information</h2>
+
+          <CompanyLogoUpload
+            companyId={profile?.new_company_id}
+            logoPath={logoPath}
+            onUploaded={setLogoPath}
+          />
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Company Name</label>

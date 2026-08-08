@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useProjects, useMyProjects, useTeamMembers, useCompanyProjects, useUpdateMemberRole } from '@/hooks/useProjects'
 import { useContractorProfile, useProjectSubmission } from '@/hooks/useContractorProfile'
 import { useSentInvitations } from '@/hooks/usePrequals'
+import { getCompanyLogoUrl } from '@/hooks/useCompany'
 import { useMyAssignments } from '@/hooks/useQuestionnaires'
 import { FolderOpen, User, Send, UserPlus, CheckCircle, Clock, AlertCircle, ClipboardList, Users } from 'lucide-react'
 import { format } from 'date-fns'
@@ -113,9 +114,18 @@ export default function GCDashboard() {
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-500">Welcome back, {profile?.full_name || profile?.company_name || 'GC'} {profile?.company?.name ? `· ${profile.company.name}` : ''}</p>
+        <div className="flex items-center gap-3">
+          {profile?.company?.logo_path && (
+            <img
+              src={getCompanyLogoUrl(profile.company.logo_path) ?? undefined}
+              alt=""
+              className="w-11 h-11 rounded-xl object-cover border border-gray-200 flex-shrink-0"
+            />
+          )}
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+            <p className="mt-1 text-sm text-gray-500">Welcome back, {profile?.full_name || profile?.company_name || 'GC'} {profile?.company?.name ? `· ${profile.company.name}` : ''}</p>
+          </div>
         </div>
         <div className="flex gap-2">
           {!isTeamMember && (

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useAuth } from '@/hooks/useAuth'
 import { useUpdateCompany } from '@/hooks/useCompany'
+import { CompanyLogoUpload } from '@/components/CompanyLogoUpload'
 import { supabase } from '@/lib/supabase'
 import { CheckCircle } from 'lucide-react'
 
@@ -23,6 +24,9 @@ export default function OwnerSettingsPage() {
   const { profile, company } = useAuth()
   const { updateCompany, loading: companyLoading, error: companyError } = useUpdateCompany()
   const isAdmin = profile?.user_role === 'admin'
+
+  const [logoPath, setLogoPath] = useState<string | null | undefined>(company?.logo_path)
+  useEffect(() => setLogoPath(company?.logo_path), [company?.logo_path])
 
   const [accountSaved, setAccountSaved] = useState(false)
   const [companySaved, setCompanySaved] = useState(false)
@@ -142,6 +146,13 @@ export default function OwnerSettingsPage() {
             Only company admins can edit this information.
           </div>
         )}
+
+        <CompanyLogoUpload
+          companyId={profile?.new_company_id}
+          logoPath={logoPath}
+          disabled={!isAdmin}
+          onUploaded={setLogoPath}
+        />
 
         <fieldset disabled={!isAdmin} className="space-y-4 disabled:opacity-60">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

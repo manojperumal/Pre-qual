@@ -26,6 +26,54 @@ export function useUpdateCompany() {
   return { updateCompany, loading, error }
 }
 
+export function getCompanyLogoUrl(logoPath: string | null | undefined): string | null {
+  if (!logoPath) return null
+  const { data } = supabase.storage.from('company-logos').getPublicUrl(logoPath)
+  return data.publicUrl
+}
+
+export function useUploadCompanyLogo() {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const uploadLogo = useCallback(async (companyId: string, file: File, previousLogoPath?: string | null) => {
+    setLoading(true)
+    setError(null)
+
+    const ext = file.name.split('.').pop()
+    const path = `${companyId}/logo-${Date.now()}.${ext}`
+
+    const { error: uploadErr } = await supabase.storage.from('company-logos').upload(path, file)
+    if (uploadErr) {
+      setError(uploadErr.message)
+      setLoading(false)
+      return null
+    }
+
+    const { data, error: updateErr } = await supabase
+      .from('companies')
+      .update({ logo_path: path })
+      .eq('id', companyId)
+      .select()
+      .single()
+
+    if (updateErr) {
+      setError(updateErr.message)
+      setLoading(false)
+      return null
+    }
+
+    if (previousLogoPath) {
+      await supabase.storage.from('company-logos').remove([previousLogoPath])
+    }
+
+    setLoading(false)
+    return data as Company
+  }, [])
+
+  return { uploadLogo, loading, error }
+}
+
 export function useCompanyDocuments(companyId: string | null | undefined) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)

@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useOwnerTrades, useGCTrades } from '@/hooks/useProjects'
 import { useContractorProfileCompleteness } from '@/hooks/useContractorProfile'
+import { getCompanyLogoUrl } from '@/hooks/useCompany'
 import { Wrench, UserPlus, FolderPlus, CheckCircle, Clock } from 'lucide-react'
 
 const STATUS_COLORS: Record<string, string> = {
@@ -109,8 +110,17 @@ export default function TradesPage() {
                 {rows.map((row) => (
                   <tr key={row.memberId} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
-                      <p className="text-sm font-medium text-gray-900">{row.contractorName || row.contractorEmail || '—'}</p>
-                      {row.companyName && <p className="text-xs text-gray-500 mt-0.5">{row.companyName}</p>}
+                      <div className="flex items-center gap-3">
+                        {row.logoPath ? (
+                          <img src={getCompanyLogoUrl(row.logoPath) ?? undefined} alt="" className="w-8 h-8 rounded-lg object-cover border border-gray-200 flex-shrink-0" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-lg bg-gray-100 flex-shrink-0" />
+                        )}
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{row.contractorName || row.contractorEmail || '—'}</p>
+                          {row.companyName && <p className="text-xs text-gray-500 mt-0.5">{row.companyName}</p>}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">{cityState(row.city, row.state)}</td>
                     <td className="px-6 py-4">
