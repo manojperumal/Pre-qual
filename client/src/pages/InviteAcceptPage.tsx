@@ -134,13 +134,13 @@ export default function InviteAcceptPage() {
 
         <div className="space-y-3">
           <Link
-            to={`/signup?invite=${token}`}
+            to={`/signup?invite=${token}&email=${encodeURIComponent(inviteInfo.recipient_email)}`}
             className="btn-primary w-full text-center block"
           >
             Create Account & Accept
           </Link>
           <Link
-            to={`/login?invite=${token}`}
+            to={`/login?invite=${token}&email=${encodeURIComponent(inviteInfo.recipient_email)}`}
             className="btn-secondary w-full text-center block"
           >
             Sign In & Accept

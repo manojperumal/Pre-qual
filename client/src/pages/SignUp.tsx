@@ -44,6 +44,7 @@ export default function SignUp() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const inviteToken = searchParams.get('invite')
+  const prefillEmail = searchParams.get('email') || ''
 
   // If arriving via invite link, the role will be set to 'trade' (or 'gc') by the invite
   // and the role selector is hidden — they're not buying the product
@@ -61,7 +62,7 @@ export default function SignUp() {
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     // Invited users default to 'trade'; direct signups default to 'owner'
-    defaultValues: { role: isInvited ? 'trade' : 'owner' },
+    defaultValues: { role: isInvited ? 'trade' : 'owner', email: prefillEmail },
   })
 
   const selectedRole = watch('role')
