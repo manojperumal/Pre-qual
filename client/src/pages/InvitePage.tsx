@@ -10,8 +10,6 @@ import { useProjects, useMyProjects } from '@/hooks/useProjects'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Send, Users, HardHat, Wrench, ChevronRight, QrCode, Copy, Check, X, Mail, UserPlus } from 'lucide-react'
 import { format } from 'date-fns'
-import clsx from 'clsx'
-import { roleLabel } from '@/lib/roleLabels'
 
 const schema = z.object({
   recipient_email: z.string().email('Enter a valid email address').or(z.literal('')),
@@ -21,8 +19,17 @@ const schema = z.object({
 })
 
 type FormData = z.infer<typeof schema>
+type RecipientRole = FormData['recipient_role']
 
 type Tab = 'email' | 'qr'
+
+const ROLE_META: Record<RecipientRole, { heading: string; icon: React.ReactNode }> = {
+  gc: { heading: 'Invite a General Contractor', icon: <HardHat size={22} /> },
+  trade: { heading: 'Invite a Trade Subcontractor', icon: <Wrench size={22} /> },
+  gc_member: { heading: 'Invite a Team Member', icon: <UserPlus size={22} /> },
+  owner_member: { heading: 'Invite a Team Member', icon: <UserPlus size={22} /> },
+  trade_member: { heading: 'Invite a Team Member', icon: <UserPlus size={22} /> },
+}
 
 export default function InvitePage() {
   const { profile } = useAuth()
@@ -48,9 +55,13 @@ export default function InvitePage() {
   const { data: memberProjects = [] } = useMyProjects(isGC ? profile?.id : undefined)
   const projects = isOwner ? ownedProjects : memberProjects
 
-  const defaultRole = (searchParams.get('role') as 'gc' | 'trade' | 'gc_member' | 'owner_member' | 'trade_member') || 'gc'
+  // The role is fixed by whichever "Invite" button the user came from
+  // (Trades page -> trade, GCs page -> gc, My Team -> *_member) — no in-page switcher.
+  const recipientRole = (searchParams.get('role') as RecipientRole) || (isOwner ? 'gc' : 'trade')
   const defaultEmail = searchParams.get('email') || ''
   const fromPage = searchParams.get('from') || ''
+  const isMemberInvite = recipientRole.endsWith('_member')
+  const isNewCompanyInvite = recipientRole === 'gc' || recipientRole === 'trade'
 
   const {
     register,
@@ -62,17 +73,14 @@ export default function InvitePage() {
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      recipient_role: defaultRole || (isOwner ? 'gc' : 'trade'),
+      recipient_role: recipientRole,
       recipient_email: defaultEmail,
       recipient_company_name: '',
       project_ids: routeProjectId ? [routeProjectId] : [],
     },
   })
 
-  const selectedRole = watch('recipient_role')
   const selectedProjectIds = watch('project_ids') ?? []
-  // A "trade"/"gc" invite brings on a brand-new company; a "*_member" invite joins the sender's own company
-  const isNewCompanyInvite = selectedRole === 'gc' || selectedRole === 'trade'
 
   function toggleProject(id: string) {
     const current = new Set(selectedProjectIds)
@@ -87,7 +95,7 @@ export default function InvitePage() {
     try {
       const result = await sendInvitation.mutateAsync({
         recipient_email: data.recipient_email,
-        recipient_role: data.recipient_role,
+        recipient_role: recipientRole,
         recipient_company_name: isNewCompanyInvite ? data.recipient_company_name : undefined,
         project_ids: projectIds,
       })
@@ -98,7 +106,7 @@ export default function InvitePage() {
       }
       setSentEmail(data.recipient_email)
       setEmailSent(true)
-      reset({ recipient_role: data.recipient_role, recipient_email: '', recipient_company_name: '', project_ids: data.project_ids })
+      reset({ recipient_role: recipientRole, recipient_email: '', recipient_company_name: '', project_ids: data.project_ids })
     } catch (err) {
       console.error('Failed to send invitation', err)
     }
@@ -110,7 +118,7 @@ export default function InvitePage() {
     try {
       const result = await sendInvitation.mutateAsync({
         recipient_email: `qr+${Date.now()}@placeholder.invalid`,
-        recipient_role: data.recipient_role,
+        recipient_role: recipientRole,
         recipient_company_name: isNewCompanyInvite ? data.recipient_company_name : undefined,
         project_ids: projectIds,
       })
@@ -132,7 +140,7 @@ export default function InvitePage() {
 
   // Breadcrumb logic
   const breadcrumbs: { label: string; to: string }[] = []
-  const basePath = isOwner ? '/owner' : '/gc'
+  const basePath = isOwner ? '/owner' : isGC ? '/gc' : '/trade'
   if (routeProjectId) {
     breadcrumbs.push({ label: 'Projects', to: `${basePath}/projects` })
     breadcrumbs.push({ label: 'Project', to: `${basePath}/projects/${routeProjectId}` })
@@ -140,42 +148,29 @@ export default function InvitePage() {
     breadcrumbs.push({ label: 'General Contractors', to: '/owner/general-contractors' })
   } else if (fromPage === 'trades') {
     breadcrumbs.push({ label: 'Trades', to: `${basePath}/trades` })
+  } else if (fromPage === 'my-team') {
+    breadcrumbs.push({ label: 'My Team', to: `${basePath}/my-team` })
   } else {
     breadcrumbs.push({ label: 'Dashboard', to: basePath })
   }
 
-  const recentInvitations = routeProjectId
-    ? invitations.filter((inv) =>
-        (inv.invitation_projects ?? []).some((ip) => ip.project.id === routeProjectId)
-      )
-    : invitations
+  const recentInvitations = (
+    routeProjectId
+      ? invitations.filter((inv) => (inv.invitation_projects ?? []).some((ip) => ip.project.id === routeProjectId))
+      : invitations
+  ).filter((inv) => inv.recipient_role === recipientRole)
 
-  const roleOptions = isOwner
-    ? [
-        { value: 'gc' as const, label: 'General Contractor', icon: <HardHat size={18} /> },
-        { value: 'trade' as const, label: 'Trade Subcontractor', icon: <Wrench size={18} /> },
-        { value: 'owner_member' as const, label: 'Team Member', icon: <UserPlus size={18} /> },
-      ]
-    : isGC
-    ? [
-        { value: 'trade' as const, label: 'Trade Subcontractor', icon: <Wrench size={18} /> },
-        { value: 'gc_member' as const, label: 'Team Member', icon: <UserPlus size={18} /> },
-      ]
-    : [
-        { value: 'trade_member' as const, label: 'Team Member', icon: <UserPlus size={18} /> },
-      ]
-
-  const showRoleSelector = isOwner || isGC
+  const { heading, icon } = ROLE_META[recipientRole]
 
   function ProjectPicker() {
-    if (routeProjectId) return null
+    if (routeProjectId || isMemberInvite) return null
     return (
       <div>
         <label className="label">
           Attach to Project(s) <span className="text-gray-400 font-normal">(optional)</span>
         </label>
         {projects.length === 0 ? (
-          <p className="text-xs text-gray-400">No projects yet — the trade will be added to your ecosystem and you can connect them to a project later.</p>
+          <p className="text-xs text-gray-400">No projects yet — they'll be added to your ecosystem and you can connect them to a project later.</p>
         ) : (
           <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-48 overflow-y-auto">
             {projects.map((p) => (
@@ -203,7 +198,7 @@ export default function InvitePage() {
     return (
       <div>
         <label className="label" htmlFor="recipient_company_name">
-          {selectedRole === 'gc' ? 'GC' : 'Trade'} Company Name *
+          {recipientRole === 'gc' ? 'GC' : 'Trade'} Company Name *
         </label>
         <input
           id="recipient_company_name"
@@ -230,31 +225,36 @@ export default function InvitePage() {
         <span className="text-gray-900 font-medium">Invite</span>
       </nav>
 
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Invite to Pre-Qual</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Send an email invite or generate a QR code to share in person
-        </p>
+      <div className="flex items-center gap-3">
+        <div className="w-11 h-11 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600 flex-shrink-0">
+          {icon}
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">{heading}</h1>
+          <p className="mt-0.5 text-sm text-gray-500">
+            {isMemberInvite
+              ? 'Invite a colleague to join your company on the platform'
+              : 'Send an email invite or generate a QR code to share in person'}
+          </p>
+        </div>
       </div>
 
       {/* Tab switcher */}
       <div className="flex gap-1 p-1 bg-gray-100 rounded-xl w-fit">
         <button
           onClick={() => setActiveTab('email')}
-          className={clsx(
-            'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeTab === 'email' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-          )}
+          }`}
         >
           <Mail size={15} />
           Email Invite
         </button>
         <button
           onClick={() => setActiveTab('qr')}
-          className={clsx(
-            'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeTab === 'qr' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-          )}
+          }`}
         >
           <QrCode size={15} />
           QR Code
@@ -293,30 +293,6 @@ export default function InvitePage() {
 
           <div className="card p-6">
             <form onSubmit={handleSubmit(onSubmitEmail)} className="space-y-5">
-              {showRoleSelector && (
-                <div>
-                  <label className="label">Invite as</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {roleOptions.map((r) => (
-                      <button
-                        key={r.value}
-                        type="button"
-                        onClick={() => setValue('recipient_role', r.value, { shouldValidate: true })}
-                        className={clsx(
-                          'flex items-center gap-3 p-4 rounded-lg border-2 text-left transition-colors',
-                          selectedRole === r.value
-                            ? 'border-brand-500 bg-brand-50 text-brand-700'
-                            : 'border-gray-200 hover:border-gray-300 text-gray-600'
-                        )}
-                      >
-                        {r.icon}
-                        <span className="text-sm font-medium">{r.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               <CompanyNameField />
               <ProjectPicker />
 
@@ -352,30 +328,6 @@ export default function InvitePage() {
       {activeTab === 'qr' && (
         <div className="space-y-4">
           <div className="card p-6 space-y-5">
-            {showRoleSelector && (
-              <div>
-                <label className="label">Invite as</label>
-                <div className="grid grid-cols-2 gap-3">
-                  {roleOptions.map((r) => (
-                    <button
-                      key={r.value}
-                      type="button"
-                      onClick={() => setValue('recipient_role', r.value)}
-                      className={clsx(
-                        'flex items-center gap-3 p-4 rounded-lg border-2 text-left transition-colors',
-                        selectedRole === r.value
-                          ? 'border-brand-500 bg-brand-50 text-brand-700'
-                          : 'border-gray-200 hover:border-gray-300 text-gray-600'
-                      )}
-                    >
-                      {r.icon}
-                      <span className="text-sm font-medium">{r.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <CompanyNameField />
             <ProjectPicker />
 
@@ -398,9 +350,7 @@ export default function InvitePage() {
                   <QRCode value={qrInviteUrl} size={200} />
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-medium text-gray-700">
-                    Invite as {roleOptions.find((r) => r.value === selectedRole)?.label ?? selectedRole}
-                  </p>
+                  <p className="text-sm font-medium text-gray-700">{heading}</p>
                   <p className="text-xs text-gray-400 mt-1">Scan to create an account and join the platform</p>
                 </div>
                 <div className="flex gap-3">
@@ -436,7 +386,10 @@ export default function InvitePage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  {['Recipient', 'Role', 'Project(s)', 'Sent', 'Status'].map((h) => (
+                  {(isMemberInvite
+                    ? ['Recipient', 'Sent', 'Status']
+                    : ['Recipient', 'Project(s)', 'Sent', 'Status']
+                  ).map((h) => (
                     <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
                   ))}
                 </tr>
@@ -452,17 +405,18 @@ export default function InvitePage() {
                           <p className="text-xs text-gray-500 mt-0.5">{inv.recipient_company_name}</p>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{roleLabel(inv.recipient_role)}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {invProjects.length === 0 ? (
-                          <span className="text-xs text-gray-400 italic">Ecosystem only</span>
-                        ) : (
-                          <Link to={`${basePath}/projects/${invProjects[0].id}`} className="text-brand-600 hover:text-brand-700">
-                            {invProjects[0].name}
-                            {invProjects.length > 1 && ` +${invProjects.length - 1} more`}
-                          </Link>
-                        )}
-                      </td>
+                      {!isMemberInvite && (
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {invProjects.length === 0 ? (
+                            <span className="text-xs text-gray-400 italic">Ecosystem only</span>
+                          ) : (
+                            <Link to={`${basePath}/projects/${invProjects[0].id}`} className="text-brand-600 hover:text-brand-700">
+                              {invProjects[0].name}
+                              {invProjects.length > 1 && ` +${invProjects.length - 1} more`}
+                            </Link>
+                          )}
+                        </td>
+                      )}
                       <td className="px-6 py-4 text-sm text-gray-500">
                         {format(new Date(inv.created_at), 'MMM d, yyyy')}
                       </td>
