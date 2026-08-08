@@ -128,17 +128,17 @@ export function useDeleteQuestion() {
 
 // ─── Questionnaires ───────────────────────────────────────────────────────
 
-// companyOwnerId: pass the company owner's ID for team members so they see company questionnaires
-export function useQuestionnaires(createdBy: string | undefined, companyOwnerId?: string) {
-  const effectiveId = companyOwnerId || createdBy
+// RLS scopes rows to: global questionnaires, your own, or any questionnaire
+// created by someone else in your company (see migration 020) — no need to
+// filter by a specific creator id here.
+export function useQuestionnaires(userId: string | undefined) {
   return useQuery({
-    queryKey: ['questionnaires', effectiveId],
-    enabled: !!effectiveId,
+    queryKey: ['questionnaires', userId],
+    enabled: !!userId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('questionnaires')
         .select('*')
-        .or(`created_by.eq.${effectiveId!},is_global.eq.true`)
         .order('is_global', { ascending: false })
         .order('created_at', { ascending: false })
       if (error) throw error
