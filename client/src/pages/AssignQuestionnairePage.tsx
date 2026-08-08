@@ -12,11 +12,14 @@ export default function AssignQuestionnairePage() {
   const { projectId: routeProjectId } = useParams()
 
   const isOwner = profile?.role === 'owner'
+  // Legacy self-ref company_id doubles as "the admin's user id" — needed for questionnaires.created_by
   const companyOwnerId = (profile as any)?.company_id || profile?.id
+  // The real tenant id (companies.id), needed for company-wide project lookups
+  const companyId = profile?.new_company_id ?? (profile as any)?.company_id ?? null
 
   const { data: questionnaires = [] } = useQuestionnaires(profile?.id, companyOwnerId)
   const { data: ownerProjects = [] } = useProjects(isOwner ? profile?.id : undefined)
-  const { data: memberProjects = [] } = useCompanyProjects(!isOwner ? companyOwnerId : undefined)
+  const { data: memberProjects = [] } = useCompanyProjects(!isOwner ? (companyId ?? undefined) : undefined)
   const projects = isOwner ? ownerProjects : memberProjects
   const createAssignment = useCreateAssignment()
 
