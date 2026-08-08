@@ -13,6 +13,7 @@ import {
   Database,
   ClipboardList,
   Users,
+  Settings,
 } from 'lucide-react'
 
 interface NavItem {
@@ -30,6 +31,7 @@ const ROLE_NAV: Record<string, NavItem[]> = {
     { label: 'My Team', to: '/owner/my-team', icon: <Users size={18} /> },
     { label: 'Questionnaires', to: '/owner/questionnaires', icon: <FileText size={18} /> },
     { label: 'Question Bank', to: '/owner/question-bank', icon: <Database size={18} /> },
+    { label: 'Settings', to: '/owner/settings', icon: <Settings size={18} /> },
   ],
   gc: [
     { label: 'Dashboard', to: '/gc', icon: <LayoutDashboard size={18} /> },

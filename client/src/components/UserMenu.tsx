@@ -12,8 +12,8 @@ export function UserMenu() {
 
   const effectiveRole = profile?.company_type ?? profile?.role
   const basePath = effectiveRole === 'owner' ? '/owner' : effectiveRole === 'gc' ? '/gc' : '/trade'
-  // Owner has no contractor profile page yet — only GC/Trade fill one out
-  const hasProfilePage = effectiveRole === 'gc' || effectiveRole === 'trade'
+  const profilePath = effectiveRole === 'owner' ? `${basePath}/settings` : `${basePath}/profile`
+  const profileLabel = effectiveRole === 'owner' ? 'Settings' : 'My Profile'
 
   const initials =
     profile?.full_name
@@ -51,18 +51,16 @@ export function UserMenu() {
 
       {open && (
         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
-          {hasProfilePage && (
-            <button
-              onClick={() => {
-                setOpen(false)
-                navigate(`${basePath}/profile`)
-              }}
-              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 text-left"
-            >
-              <User size={14} />
-              My Profile
-            </button>
-          )}
+          <button
+            onClick={() => {
+              setOpen(false)
+              navigate(profilePath)
+            }}
+            className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 text-left"
+          >
+            <User size={14} />
+            {profileLabel}
+          </button>
           <button
             onClick={handleSignOut}
             className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 text-left"

@@ -30,6 +30,7 @@ import GCProfileViewPage from '@/pages/GCProfileViewPage'
 import MyProjectsPage from '@/pages/MyProjectsPage'
 import MyTeamPage from '@/pages/MyTeamPage'
 import MojoAdminCompaniesPage from '@/pages/MojoAdminCompaniesPage'
+import OwnerSettingsPage from '@/pages/OwnerSettingsPage'
 
 function RoleRedirect() {
   const { profile, loading } = useAuth()
@@ -110,6 +111,7 @@ export default function App() {
         <Route path="general-contractors/:contractorId" element={<GCProfileViewPage />} />
         <Route path="trades" element={<TradesPage />} />
         <Route path="my-team" element={<MyTeamPage />} />
+        <Route path="settings" element={<OwnerSettingsPage />} />
         <Route path="prequal/:id" element={<PrequalDetail />} />
         <Route path="questionnaires" element={<QuestionnairesPage />} />
         <Route path="questionnaires/new" element={<QuestionnaireBuilderPage />} />

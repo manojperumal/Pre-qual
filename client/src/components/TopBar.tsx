@@ -10,8 +10,7 @@ export function TopBar() {
 
   const effectiveRole = profile?.company_type ?? profile?.role
   const basePath = effectiveRole === 'owner' ? '/owner' : effectiveRole === 'gc' ? '/gc' : '/trade'
-  // Owner has no settings/profile destination yet — only GC/Trade have one
-  const hasSettingsPage = effectiveRole === 'gc' || effectiveRole === 'trade'
+  const settingsPath = effectiveRole === 'owner' ? `${basePath}/settings` : `${basePath}/profile`
 
   return (
     <header className="h-14 bg-[#111827] border-b border-white/10 flex items-center px-6 gap-4 flex-shrink-0">
@@ -29,15 +28,13 @@ export function TopBar() {
 
       {/* Icons */}
       <NotificationsMenu />
-      {hasSettingsPage && (
-        <button
-          onClick={() => navigate(`${basePath}/profile`)}
-          className="text-gray-400 hover:text-white transition-colors"
-          title="My Profile"
-        >
-          <Settings size={18} />
-        </button>
-      )}
+      <button
+        onClick={() => navigate(settingsPath)}
+        className="text-gray-400 hover:text-white transition-colors"
+        title="Settings"
+      >
+        <Settings size={18} />
+      </button>
 
       <UserMenu />
     </header>
