@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useOwnerTrades, useGCTrades } from '@/hooks/useProjects'
+import { useContractorProfileCompleteness } from '@/hooks/useContractorProfile'
 import { Wrench, UserPlus, FolderPlus, CheckCircle, Clock } from 'lucide-react'
 
 const STATUS_COLORS: Record<string, string> = {
@@ -28,6 +29,9 @@ export default function TradesPage() {
   const ownerTrades = useOwnerTrades(isOwner ? profile?.id : undefined)
   const gcTrades = useGCTrades(!isOwner ? profile?.id : undefined)
   const { data: rows = [], isLoading } = isOwner ? ownerTrades : gcTrades
+  const { data: completeness = new Map<string, boolean>() } = useContractorProfileCompleteness(
+    rows.map((r) => r.contractorId)
+  )
 
   const activeCount = new Set(rows.map((r) => r.contractorId)).size
   const awaitingReviewCount = new Set(
@@ -114,8 +118,10 @@ export default function TradesPage() {
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[row.submissionStatus] ?? 'bg-gray-100 text-gray-600'}`}>
                           {row.submissionStatus.replace(/_/g, ' ')}
                         </span>
-                      ) : (
+                      ) : completeness.get(row.contractorId) ? (
                         <span className="text-xs text-gray-400 italic">Not started</span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600">Profile incomplete</span>
                       )}
                     </td>
                     <td className="px-6 py-4">

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useOwnerGCs } from '@/hooks/useProjects'
+import { useContractorProfileCompleteness } from '@/hooks/useContractorProfile'
 import { HardHat, UserPlus, FolderPlus, User, CheckCircle, Clock } from 'lucide-react'
 
 const STATUS_COLORS: Record<string, string> = {
@@ -22,6 +23,9 @@ function cityState(city: string | null, state: string | null) {
 export default function GeneralContractorsPage() {
   const { profile } = useAuth()
   const { data: rows = [], isLoading } = useOwnerGCs(profile?.id)
+  const { data: completeness = new Map<string, boolean>() } = useContractorProfileCompleteness(
+    rows.map((r) => r.contractorId)
+  )
 
   const activeCount = new Set(rows.map((r) => r.contractorId)).size
   const awaitingReviewCount = new Set(
@@ -108,8 +112,10 @@ export default function GeneralContractorsPage() {
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[row.submissionStatus] ?? 'bg-gray-100 text-gray-600'}`}>
                           {row.submissionStatus.replace(/_/g, ' ')}
                         </span>
-                      ) : (
+                      ) : completeness.get(row.contractorId) ? (
                         <span className="text-xs text-gray-400 italic">Not started</span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600">Profile incomplete</span>
                       )}
                     </td>
                     <td className="px-6 py-4">
