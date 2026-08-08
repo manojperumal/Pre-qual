@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
+import { roleLabel } from '@/lib/roleLabels'
 import { HardHat } from 'lucide-react'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
@@ -9,8 +10,9 @@ const API_URL = import.meta.env.VITE_API_URL || ''
 interface InviteInfo {
   recipient_email: string
   recipient_role: string
+  recipient_company_name?: string | null
   project_id?: string
-  project_name?: string
+  projects?: { id: string; name: string }[]
   sender_name?: string
 }
 
@@ -101,12 +103,14 @@ export default function InviteAcceptPage() {
 
   if (!inviteInfo) return null
 
-  const roleLabel =
-    inviteInfo.recipient_role === 'gc'
-      ? 'General Contractor'
-      : inviteInfo.recipient_role === 'trade'
-        ? 'Trade Subcontractor'
-        : inviteInfo.recipient_role
+  // QR invites carry a placeholder email — the scanner must type their own
+  const isQrInvite = inviteInfo.recipient_email.endsWith('@placeholder.invalid')
+  const projects = inviteInfo.projects ?? []
+
+  const linkParams = new URLSearchParams({ invite: token ?? '' })
+  if (!isQrInvite) linkParams.set('email', inviteInfo.recipient_email)
+  linkParams.set('role', inviteInfo.recipient_role)
+  if (inviteInfo.recipient_company_name) linkParams.set('company', inviteInfo.recipient_company_name)
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-brand-900 px-4">
@@ -122,27 +126,30 @@ export default function InviteAcceptPage() {
               <span className="font-medium">{inviteInfo.sender_name}</span> has invited you
             </p>
           )}
-          {inviteInfo.project_name && (
+          {inviteInfo.recipient_company_name && (
             <p>
-              to join project <span className="font-medium">{inviteInfo.project_name}</span>
+              as <span className="font-medium">{inviteInfo.recipient_company_name}</span>
+            </p>
+          )}
+          {projects.length > 0 && (
+            <p>
+              to join {projects.length === 1 ? 'project' : 'projects'}{' '}
+              <span className="font-medium">{projects.map((p) => p.name).join(', ')}</span>
             </p>
           )}
           <p>
-            as a <span className="font-medium">{roleLabel}</span>
+            as a <span className="font-medium">{roleLabel(inviteInfo.recipient_role)}</span>
           </p>
+          {isQrInvite && (
+            <p className="text-brand-700 text-xs pt-1">You'll enter your own email on the next step.</p>
+          )}
         </div>
 
         <div className="space-y-3">
-          <Link
-            to={`/signup?invite=${token}&email=${encodeURIComponent(inviteInfo.recipient_email)}`}
-            className="btn-primary w-full text-center block"
-          >
+          <Link to={`/signup?${linkParams.toString()}`} className="btn-primary w-full text-center block">
             Create Account & Accept
           </Link>
-          <Link
-            to={`/login?invite=${token}&email=${encodeURIComponent(inviteInfo.recipient_email)}`}
-            className="btn-secondary w-full text-center block"
-          >
+          <Link to={`/login?${linkParams.toString()}`} className="btn-secondary w-full text-center block">
             Sign In & Accept
           </Link>
         </div>

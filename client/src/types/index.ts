@@ -133,7 +133,8 @@ export interface Invitation {
   id: string
   sender_id: string
   recipient_email: string
-  recipient_role: 'gc' | 'trade'
+  recipient_role: 'gc' | 'trade' | 'gc_member' | 'owner_member' | 'trade_member'
+  recipient_company_name?: string | null
   status: InvitationStatus
   prequalification_id: string | null
   project_id?: string

@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { Eye, EyeOff, Building2, HardHat } from 'lucide-react'
 import { UserRole } from '@/types'
 import { MojoLogo } from '@/components/MojoLogo'
+import { roleLabel } from '@/lib/roleLabels'
 import clsx from 'clsx'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
@@ -45,10 +46,14 @@ export default function SignUp() {
   const [searchParams] = useSearchParams()
   const inviteToken = searchParams.get('invite')
   const prefillEmail = searchParams.get('email') || ''
+  const inviteRole = searchParams.get('role') || ''
+  const prefillCompanyName = searchParams.get('company') || ''
 
-  // If arriving via invite link, the role will be set to 'trade' (or 'gc') by the invite
-  // and the role selector is hidden — they're not buying the product
   const isInvited = !!inviteToken
+  // "*_member" invites join the sender's existing company; plain "gc"/"trade" invites bring a new one
+  const isMemberInvite = isInvited && inviteRole.endsWith('_member')
+  const inviteBaseRole = (inviteRole.replace('_member', '') || 'trade') as 'owner' | 'gc' | 'trade'
+  const needsCompanyName = !isInvited || !isMemberInvite
 
   const [showPassword, setShowPassword] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
@@ -61,8 +66,11 @@ export default function SignUp() {
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    // Invited users default to 'trade'; direct signups default to 'owner'
-    defaultValues: { role: isInvited ? 'trade' : 'owner', email: prefillEmail, company_name: isInvited ? 'N/A' : '' },
+    defaultValues: {
+      role: isInvited ? inviteBaseRole : 'owner',
+      email: prefillEmail,
+      company_name: isInvited ? (isMemberInvite ? 'N/A' : prefillCompanyName) : '',
+    },
   })
 
   const selectedRole = watch('role')
@@ -75,8 +83,8 @@ export default function SignUp() {
       options: {
         data: {
           full_name: data.full_name,
-          // Invited users join an existing company via accept — don't spin up a throwaway one
-          company_name: isInvited ? undefined : data.company_name,
+          // Member invites join an existing company via accept — don't spin up a throwaway one
+          company_name: needsCompanyName ? data.company_name : undefined,
           role: data.role,
         },
       },
@@ -180,7 +188,7 @@ export default function SignUp() {
             {isInvited && (
               <div className="flex items-center gap-2 px-3 py-2 bg-brand-50 border border-brand-100 rounded-lg text-sm text-brand-700">
                 <HardHat size={16} />
-                Joining as an invited contractor
+                {isMemberInvite ? 'Joining your team' : `Joining as an invited ${roleLabel(inviteBaseRole)}`}
               </div>
             )}
 
@@ -190,11 +198,14 @@ export default function SignUp() {
               {errors.full_name && <p className="form-error">{errors.full_name.message}</p>}
             </div>
 
-            {!isInvited && (
+            {needsCompanyName && (
               <div>
                 <label className="label" htmlFor="company_name">Company Name</label>
                 <input id="company_name" type="text" className="input-field" placeholder="Acme Construction LLC" {...register('company_name')} />
                 {errors.company_name && <p className="form-error">{errors.company_name.message}</p>}
+                {isInvited && (
+                  <p className="mt-1 text-xs text-gray-400">Pre-filled from your invitation — edit if needed.</p>
+                )}
               </div>
             )}
 
