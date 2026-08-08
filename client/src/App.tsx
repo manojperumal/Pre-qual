@@ -133,6 +133,7 @@ export default function App() {
         <Route path="profile" element={<ContractorProfilePage />} />
         <Route path="my-projects" element={<MyProjectsPage />} />
         <Route path="my-team" element={<MyTeamPage />} />
+        <Route path="trades" element={<TradesPage />} />
         <Route path="projects/:projectId" element={<ProjectDetailPage />} />
         <Route path="projects/:projectId/submit" element={<ProjectSubmissionPage />} />
         <Route path="projects/:projectId/submissions/:submissionId" element={<SubmissionReviewPage />} />

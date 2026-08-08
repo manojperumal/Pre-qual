@@ -1,8 +1,7 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { useOwnerTrades } from '@/hooks/useProjects'
-import { format } from 'date-fns'
-import { Wrench, UserPlus, FolderPlus } from 'lucide-react'
+import { useOwnerTrades, useGCTrades } from '@/hooks/useProjects'
+import { Wrench, UserPlus, FolderPlus, CheckCircle, Clock } from 'lucide-react'
 
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
@@ -13,14 +12,27 @@ const STATUS_COLORS: Record<string, string> = {
   needs_more_info: 'bg-orange-100 text-orange-700',
 }
 
-function fmt(d: string | null) {
-  if (!d) return '—'
-  return format(new Date(d), 'MMM d, yyyy')
+const AWAITING_REVIEW_STATUSES = ['submitted', 'under_review']
+
+function cityState(city: string | null, state: string | null) {
+  if (!city && !state) return '—'
+  return [city, state].filter(Boolean).join(', ')
 }
 
 export default function TradesPage() {
   const { profile } = useAuth()
-  const { data: rows = [], isLoading } = useOwnerTrades(profile?.id)
+  const location = useLocation()
+  const basePath = '/' + location.pathname.split('/')[1]
+  const isOwner = basePath === '/owner'
+
+  const ownerTrades = useOwnerTrades(isOwner ? profile?.id : undefined)
+  const gcTrades = useGCTrades(!isOwner ? profile?.id : undefined)
+  const { data: rows = [], isLoading } = isOwner ? ownerTrades : gcTrades
+
+  const activeCount = new Set(rows.map((r) => r.contractorId)).size
+  const awaitingReviewCount = new Set(
+    rows.filter((r) => AWAITING_REVIEW_STATUSES.includes(r.submissionStatus ?? '')).map((r) => r.contractorId)
+  ).size
 
   return (
     <div className="space-y-6">
@@ -30,12 +42,33 @@ export default function TradesPage() {
           <p className="mt-1 text-sm text-gray-500">All trade contractors across your projects and their pre-qual status</p>
         </div>
         <Link
-          to="/owner/invite?role=trade&from=trades"
+          to={`${basePath}/invite?role=trade&from=trades`}
           className="btn-primary inline-flex items-center gap-2 text-sm py-2 px-4"
         >
           <UserPlus size={16} />
           Invite Trade
         </Link>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
+        <div className="card px-5 py-4 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-green-50 flex items-center justify-center flex-shrink-0">
+            <CheckCircle size={18} className="text-green-600" />
+          </div>
+          <div>
+            <p className="text-xs text-gray-500">Active Trades</p>
+            <p className="text-xl font-bold text-green-600">{activeCount}</p>
+          </div>
+        </div>
+        <div className="card px-5 py-4 flex items-center gap-3">
+          <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${awaitingReviewCount > 0 ? 'bg-amber-50' : 'bg-gray-50'}`}>
+            <Clock size={18} className={awaitingReviewCount > 0 ? 'text-amber-600' : 'text-gray-500'} />
+          </div>
+          <div>
+            <p className="text-xs text-gray-500">Awaiting Review Trades</p>
+            <p className={`text-xl font-bold ${awaitingReviewCount > 0 ? 'text-amber-600' : 'text-gray-500'}`}>{awaitingReviewCount}</p>
+          </div>
+        </div>
       </div>
 
       <div className="card overflow-hidden">
@@ -49,7 +82,7 @@ export default function TradesPage() {
             <p className="font-medium text-gray-700">No trade contractors yet</p>
             <p className="text-sm mt-1">Trades will appear here once they join a project</p>
             <Link
-              to="/owner/invite?role=trade&from=trades"
+              to={`${basePath}/invite?role=trade&from=trades`}
               className="btn-primary mt-4 inline-flex items-center gap-2 text-sm"
             >
               <UserPlus size={16} />
@@ -61,7 +94,7 @@ export default function TradesPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  {['Trade / Company', 'Project', 'General Contractor', 'Start Date', 'End Date', 'Pre-Qual Status', ''].map((h) => (
+                  {['Name', 'City/State', 'Status', 'Project', ...(isOwner ? ['GC'] : []), ''].map((h) => (
                     <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       {h}
                     </th>
@@ -75,26 +108,7 @@ export default function TradesPage() {
                       <p className="text-sm font-medium text-gray-900">{row.contractorName || row.contractorEmail || '—'}</p>
                       {row.companyName && <p className="text-xs text-gray-500 mt-0.5">{row.companyName}</p>}
                     </td>
-                    <td className="px-6 py-4">
-                      <Link
-                        to={`/owner/projects/${row.projectId}`}
-                        className="text-sm text-brand-600 hover:text-brand-700 font-medium"
-                      >
-                        {row.projectName}
-                      </Link>
-                    </td>
-                    <td className="px-6 py-4">
-                      {row.gcName ? (
-                        <div>
-                          <p className="text-sm text-gray-900">{row.gcName}</p>
-                          {row.gcCompany && <p className="text-xs text-gray-500 mt-0.5">{row.gcCompany}</p>}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-gray-400 italic">Direct invite</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{fmt(row.startDate)}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{fmt(row.endDate)}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{cityState(row.city, row.state)}</td>
                     <td className="px-6 py-4">
                       {row.submissionStatus ? (
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[row.submissionStatus] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -105,9 +119,24 @@ export default function TradesPage() {
                       )}
                     </td>
                     <td className="px-6 py-4">
+                      <Link
+                        to={`${basePath}/projects/${row.projectId}`}
+                        className="text-sm text-brand-600 hover:text-brand-700 font-medium"
+                      >
+                        {row.projectName}
+                      </Link>
+                    </td>
+                    {isOwner && (
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {row.gcCompanies.length > 0 ? row.gcCompanies.join(', ') : (
+                          <span className="text-xs text-gray-400 italic">Direct invite</span>
+                        )}
+                      </td>
+                    )}
+                    <td className="px-6 py-4">
                       {row.contractorEmail && (
                         <Link
-                          to={`/owner/invite?role=trade&email=${encodeURIComponent(row.contractorEmail)}&from=trades`}
+                          to={`${basePath}/invite?role=trade&email=${encodeURIComponent(row.contractorEmail)}&from=trades`}
                           className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 font-medium whitespace-nowrap"
                           title="Add to another project"
                         >

@@ -36,6 +36,7 @@ const ROLE_NAV: Record<string, NavItem[]> = {
     { label: 'My Profile', to: '/gc/profile', icon: <User size={18} /> },
     { label: 'My Projects', to: '/gc/my-projects', icon: <FolderOpen size={18} /> },
     { label: 'My Team', to: '/gc/my-team', icon: <Users size={18} /> },
+    { label: 'Trades', to: '/gc/trades', icon: <Wrench size={18} /> },
     { label: 'Questionnaires', to: '/gc/questionnaires', icon: <FileText size={18} /> },
     { label: 'My Assignments', to: '/gc/assignments', icon: <ClipboardList size={18} /> },
   ],
