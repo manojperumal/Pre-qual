@@ -4,6 +4,7 @@ import cors from 'cors'
 import invitationsRouter from './routes/invitations.js'
 import prequalificationsRouter from './routes/prequalifications.js'
 import questionnairesRouter from './routes/questionnaires.js'
+import adminRouter from './routes/admin.js'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 3001
@@ -41,6 +42,7 @@ app.use(express.json({ limit: '50mb' }))
 app.use('/api/invitations', invitationsRouter)
 app.use('/api/prequalifications', prequalificationsRouter)
 app.use('/api/questionnaires', questionnairesRouter)
+app.use('/api/admin', adminRouter)
 
 // Health check
 app.get('/api/health', (_req, res) => {

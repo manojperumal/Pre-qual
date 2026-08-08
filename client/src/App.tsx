@@ -29,6 +29,7 @@ import MyAssignmentsPage from '@/pages/MyAssignmentsPage'
 import GCProfileViewPage from '@/pages/GCProfileViewPage'
 import MyProjectsPage from '@/pages/MyProjectsPage'
 import MyTeamPage from '@/pages/MyTeamPage'
+import MojoAdminCompaniesPage from '@/pages/MojoAdminCompaniesPage'
 
 function RoleRedirect() {
   const { profile, loading } = useAuth()
@@ -43,10 +44,29 @@ function RoleRedirect() {
 
   if (!profile) return <Navigate to="/login" replace />
 
+  if (profile.is_mojo_admin) return <Navigate to="/mojo-admin" replace />
+
   const effectiveRole = profile.company_type ?? profile.role
-  if (profile.is_mojo_admin || effectiveRole === 'owner') return <Navigate to="/owner" replace />
+  if (effectiveRole === 'owner') return <Navigate to="/owner" replace />
   if (effectiveRole === 'gc') return <Navigate to="/gc" replace />
   return <Navigate to="/trade" replace />
+}
+
+function MojoAdminRoute({ children }: { children: React.ReactNode }) {
+  const { profile, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600" />
+      </div>
+    )
+  }
+
+  if (!profile) return <Navigate to="/login" replace />
+  if (!profile.is_mojo_admin) return <Navigate to="/" replace />
+
+  return <>{children}</>
 }
 
 export default function App() {
@@ -59,6 +79,16 @@ export default function App() {
 
       {/* Role redirect from root */}
       <Route path="/" element={<RoleRedirect />} />
+
+      {/* Mojo Admin — company switcher, no sidebar/company of its own */}
+      <Route
+        path="/mojo-admin"
+        element={
+          <MojoAdminRoute>
+            <MojoAdminCompaniesPage />
+          </MojoAdminRoute>
+        }
+      />
 
       {/* Owner routes */}
       <Route
