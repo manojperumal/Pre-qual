@@ -2,9 +2,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useProjects, useMyProjects, useTeamMembers, useCompanyProjects, useUpdateMemberRole, useOwnerGCs, useOwnerTrades } from '@/hooks/useProjects'
 import { useOwnerPendingSubmissions } from '@/hooks/useContractorProfile'
-import { useSentInvitations, useResendInvitation } from '@/hooks/usePrequals'
-import { FolderOpen, HardHat, Wrench, ClipboardList, AlertTriangle, ChevronRight, Plus, Users, RefreshCw } from 'lucide-react'
-import { roleLabel } from '@/lib/roleLabels'
+import { FolderOpen, HardHat, Wrench, ClipboardList, AlertTriangle, ChevronRight, Plus, Users } from 'lucide-react'
 import { format } from 'date-fns'
 
 const STATUS_COLORS: Record<string, string> = {
@@ -37,8 +35,6 @@ export default function OwnerDashboard() {
   const { data: pending = [], isLoading: pendingLoading } = useOwnerPendingSubmissions(companyId ?? profile?.id)
   const { data: teamMembers = [] } = useTeamMembers(!isTeamMember ? (companyId ?? undefined) : undefined)
   const updateMemberRole = useUpdateMemberRole()
-  const { data: invitations = [] } = useSentInvitations(companyId ?? profile?.id)
-  const resendInvitation = useResendInvitation()
 
   const uniqueGCs = new Set(gcs.map((r) => r.contractorId)).size
   const uniqueTrades = new Set(trades.map((r) => r.contractorId)).size
@@ -235,58 +231,6 @@ export default function OwnerDashboard() {
         </div>
       )}
 
-      {/* Sent invitations — admins only */}
-      {!isTeamMember && invitations.length > 0 && (
-        <div className="card overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-gray-900">Invitations Sent</h2>
-            <Link to="/owner/invite?role=gc" className="text-sm text-brand-600 hover:text-brand-700 font-medium inline-flex items-center gap-1">
-              + Invite General Contractor
-            </Link>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  {['Recipient', 'Role', 'Sent', 'Status', ''].map((h) => (
-                    <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {invitations.slice(0, 10).map((inv) => (
-                  <tr key={inv.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-900">{inv.recipient_email}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{roleLabel(inv.recipient_role)}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{format(new Date(inv.created_at), 'MMM d, yyyy')}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        inv.status === 'accepted' ? 'bg-green-100 text-green-700' :
-                        inv.status === 'expired' ? 'bg-gray-100 text-gray-500' :
-                        'bg-yellow-100 text-yellow-700'
-                      }`}>
-                        {inv.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {inv.status !== 'accepted' && (
-                        <button
-                          onClick={() => resendInvitation.mutate(inv.id)}
-                          disabled={resendInvitation.isPending}
-                          className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 font-medium disabled:opacity-50"
-                        >
-                          <RefreshCw size={12} className={resendInvitation.isPending ? 'animate-spin' : ''} />
-                          Resend
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
