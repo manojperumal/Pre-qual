@@ -235,8 +235,8 @@ export default function OwnerDashboard() {
         </div>
       )}
 
-      {/* Sent invitations */}
-      {invitations.length > 0 && (
+      {/* Sent invitations — admins only */}
+      {!isTeamMember && invitations.length > 0 && (
         <div className="card overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <h2 className="text-base font-semibold text-gray-900">Invitations Sent</h2>
