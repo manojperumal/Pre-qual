@@ -12,6 +12,7 @@ import {
   type Response,
 } from '@/hooks/useQuestionnaires'
 import { supabase } from '@/lib/supabase'
+import { groupByCategory, CATEGORY_COLORS } from '@/lib/questionCategories'
 
 const DOCUMENT_TYPE_OPTIONS = [
   { value: 'safety_manual', label: 'Safety Manual' },
@@ -327,20 +328,32 @@ export default function QuestionnaireResponsePage() {
         </div>
       )}
 
-      {/* Questions */}
-      <div className="space-y-5">
-        {qqList.map((qq, idx) => {
-          const q = qq.question
-          if (!q) return null
-          const a = answers[q.id] ?? {}
+      {/* Questions, grouped by category */}
+      {(() => {
+        const indexMap = new Map(qqList.map((qq, i) => [qq.id, i]))
+        const groups = groupByCategory(qqList, (qq) => qq.question?.category)
+        return (
+          <div className="space-y-8">
+            {groups.map((group) => (
+              <div key={group.category}>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className={`text-xs font-semibold px-2 py-1 rounded ${CATEGORY_COLORS[group.category]}`}>{group.label}</span>
+                  <span className="text-xs text-gray-400">{group.items.length} question{group.items.length !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="space-y-5">
+                  {group.items.map((qq) => {
+                    const q = qq.question
+                    if (!q) return null
+                    const idx = indexMap.get(qq.id) ?? 0
+                    const a = answers[q.id] ?? {}
 
-          return (
-            <div key={qq.id} className={`bg-white rounded-xl shadow-sm border p-5 ${a.aiSuggested ? 'border-brand-200' : 'border-gray-200'}`}>
-              <div className="flex items-start justify-between gap-2 mb-1">
-                <p className="text-sm font-semibold text-gray-800">
-                  {idx + 1}. {q.question_text}
-                  {qq.is_required && <span className="text-red-500 ml-1">*</span>}
-                </p>
+                    return (
+                      <div key={qq.id} className={`bg-white rounded-xl shadow-sm border p-5 ${a.aiSuggested ? 'border-brand-200' : 'border-gray-200'}`}>
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="text-sm font-semibold text-gray-800">
+                            {idx + 1}. {q.question_text}
+                            {qq.is_required && <span className="text-red-500 ml-1">*</span>}
+                          </p>
                 {a.aiSuggested && (
                   <span className="inline-flex items-center gap-1 text-xs text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full flex-shrink-0">
                     <Sparkles size={11} /> AI
@@ -485,17 +498,22 @@ export default function QuestionnaireResponsePage() {
                 </div>
               )}
 
-              {/* Mojo Feedback — shown for all types except radio_yes_no_comments (has its own inline) */}
-              {q.answer_type !== 'radio_yes_no_comments' && a.mojoFeedback && (
-                <div className="mt-3 flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                  <Info size={13} className="text-amber-500 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-amber-800">{a.mojoFeedback}</p>
+                        {/* Mojo Feedback — shown for all types except radio_yes_no_comments (has its own inline) */}
+                        {q.answer_type !== 'radio_yes_no_comments' && a.mojoFeedback && (
+                          <div className="mt-3 flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                            <Info size={13} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                            <p className="text-xs text-amber-800">{a.mojoFeedback}</p>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
 
       {/* Actions */}
       {!isReadOnly && (
