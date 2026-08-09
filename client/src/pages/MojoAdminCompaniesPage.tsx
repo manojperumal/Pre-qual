@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { startImpersonation } from '@/lib/impersonation'
 import { useAuth } from '@/hooks/useAuth'
 import { Company } from '@/types'
-import { Building2, HardHat, Wrench, Search, LogIn, LogOut, CreditCard } from 'lucide-react'
+import { Building2, HardHat, Wrench, Search, LogIn, LogOut, CreditCard, ShieldCheck } from 'lucide-react'
 import { MojoLogo } from '@/components/MojoLogo'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
@@ -111,16 +111,25 @@ export default function MojoAdminCompaniesPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="border-b border-gray-200 bg-white px-6 py-4 flex items-center justify-between">
         <MojoLogo size="md" subtitle="Mojo Admin" dark />
-        <button
-          onClick={async () => {
-            await signOut()
-            navigate('/login')
-          }}
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700"
-        >
-          <LogOut size={14} />
-          Sign Out
-        </button>
+        <div className="flex items-center gap-4">
+          <Link
+            to="/mojo-admin/questions"
+            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700"
+          >
+            <ShieldCheck size={14} />
+            Global Question Bank
+          </Link>
+          <button
+            onClick={async () => {
+              await signOut()
+              navigate('/login')
+            }}
+            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700"
+          >
+            <LogOut size={14} />
+            Sign Out
+          </button>
+        </div>
       </div>
 
       <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">

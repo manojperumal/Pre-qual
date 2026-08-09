@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { useQuestionBank, useCreateQuestion, useDeleteQuestion, Question, QuestionCategory, AnswerType } from '@/hooks/useQuestionnaires'
-import { Plus, Trash2, ChevronDown, ChevronUp, Search } from 'lucide-react'
+import { useQuestionBank, useCreateQuestion, useDeleteQuestion, useUpdateQuestionMojoReview, QuestionCategory, AnswerType } from '@/hooks/useQuestionnaires'
+import { Plus, Trash2, ChevronDown, ChevronUp, Search, ShieldCheck } from 'lucide-react'
 
 const CATEGORIES: { value: QuestionCategory; label: string }[] = [
   { value: 'company_info', label: 'Company Info' },
@@ -36,6 +36,8 @@ export default function QuestionBankPage() {
   const { data: questions = [], isLoading } = useQuestionBank(profile?.id)
   const createQuestion = useCreateQuestion()
   const deleteQuestion = useDeleteQuestion()
+  const updateMojoReview = useUpdateQuestionMojoReview()
+  const isAdmin = profile?.user_role === 'admin'
 
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState<QuestionCategory | 'all'>('all')
@@ -50,6 +52,7 @@ export default function QuestionBankPage() {
     hint: '',
     options: '',
     is_required: true,
+    requires_mojo_review: false,
   })
 
   const filtered = questions.filter((q) => {
@@ -74,9 +77,10 @@ export default function QuestionBankPage() {
         ? form.options.split('\n').map((s) => s.trim()).filter(Boolean)
         : undefined,
       is_required: form.is_required,
+      requires_mojo_review: form.requires_mojo_review,
       created_by: profile.id,
     })
-    setForm({ category: 'company_info', question_text: '', answer_type: 'radio_yes_no', hint: '', options: '', is_required: true })
+    setForm({ category: 'company_info', question_text: '', answer_type: 'radio_yes_no', hint: '', options: '', is_required: true, requires_mojo_review: false })
     setShowForm(false)
   }
 
@@ -129,6 +133,10 @@ export default function QuestionBankPage() {
             <input type="checkbox" id="is_required" checked={form.is_required} onChange={e => setForm(f => ({ ...f, is_required: e.target.checked }))} className="rounded border-gray-300" />
             <label htmlFor="is_required" className="text-sm text-gray-700">Required</label>
           </div>
+          <div className="flex items-center gap-2">
+            <input type="checkbox" id="requires_mojo_review" checked={form.requires_mojo_review} onChange={e => setForm(f => ({ ...f, requires_mojo_review: e.target.checked }))} className="rounded border-gray-300" />
+            <label htmlFor="requires_mojo_review" className="text-sm text-gray-700">Requires Mojo Review</label>
+          </div>
           <div className="flex gap-2 justify-end pt-2">
             <button onClick={() => setShowForm(false)} className="btn-secondary">Cancel</button>
             <button onClick={handleCreate} disabled={!form.question_text.trim() || createQuestion.isPending} className="btn-primary">
@@ -178,6 +186,12 @@ export default function QuestionBankPage() {
                           <p className="text-sm text-gray-900">{q.question_text}</p>
                           {q.is_global && <span className="text-xs bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded">Global</span>}
                           {q.is_required && <span className="text-xs text-gray-400">Required</span>}
+                          {q.requires_mojo_review && (
+                            <span className="inline-flex items-center gap-1 text-xs bg-brand-50 text-brand-700 px-1.5 py-0.5 rounded">
+                              <ShieldCheck size={11} />
+                              Mojo Review
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-3 mt-1">
                           <span className="text-xs text-gray-500">{ANSWER_TYPES.find(a => a.value === q.answer_type)?.label}</span>
@@ -191,6 +205,15 @@ export default function QuestionBankPage() {
                         {q.hint && (
                           <button onClick={() => setExpandedId(expandedId === q.id ? null : q.id)} className="p-1.5 text-gray-400 hover:text-gray-600 rounded">
                             {expandedId === q.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                          </button>
+                        )}
+                        {!q.is_global && isAdmin && (
+                          <button
+                            onClick={() => updateMojoReview.mutate({ id: q.id, requiresMojoReview: !q.requires_mojo_review })}
+                            className={`p-1.5 rounded ${q.requires_mojo_review ? 'text-brand-600 hover:text-brand-700' : 'text-gray-300 hover:text-brand-600'}`}
+                            title={q.requires_mojo_review ? 'Disable Mojo Review' : 'Require Mojo Review'}
+                          >
+                            <ShieldCheck size={14} />
                           </button>
                         )}
                         {!q.is_global && (

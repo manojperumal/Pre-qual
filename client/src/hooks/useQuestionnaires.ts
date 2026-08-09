@@ -17,6 +17,7 @@ export interface Question {
   hint: string | null
   is_global: boolean
   is_required: boolean
+  requires_mojo_review: boolean
   created_at: string
 }
 
@@ -114,6 +115,7 @@ export function useCreateQuestion() {
       options?: string[]
       hint?: string
       is_required?: boolean
+      requires_mojo_review?: boolean
       created_by: string
     }) => {
       const { data, error } = await supabase
@@ -133,6 +135,20 @@ export function useDeleteQuestion() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from('question_bank').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['question_bank'] }),
+  })
+}
+
+export function useUpdateQuestionMojoReview() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, requiresMojoReview }: { id: string; requiresMojoReview: boolean }) => {
+      const { error } = await supabase
+        .from('question_bank')
+        .update({ requires_mojo_review: requiresMojoReview })
+        .eq('id', id)
       if (error) throw error
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['question_bank'] }),
