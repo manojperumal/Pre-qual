@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { startImpersonation } from '@/lib/impersonation'
 import { useAuth } from '@/hooks/useAuth'
-import { Company } from '@/types'
-import { Building2, HardHat, Wrench, Search, LogIn, LogOut, CreditCard, ShieldCheck } from 'lucide-react'
+import { Company, Subscription } from '@/types'
+import { Building2, HardHat, Wrench, Search, LogIn, LogOut, CreditCard, ShieldCheck, CheckCircle } from 'lucide-react'
 import { MojoLogo } from '@/components/MojoLogo'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
@@ -33,10 +33,33 @@ function useCompanies() {
   })
 }
 
+// Bulk map of company_id -> active subscription, so the list can show
+// whether "Activate Subscription" actually took effect, not just a toast.
+function useActiveSubscriptions() {
+  return useQuery({
+    queryKey: ['mojo_admin_subscriptions'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('status', 'active')
+        .gt('current_period_end', new Date().toISOString())
+      if (error) throw error
+      const map = new Map<string, Subscription>()
+      for (const sub of (data as Subscription[]) ?? []) {
+        map.set(sub.company_id, sub)
+      }
+      return map
+    },
+  })
+}
+
 export default function MojoAdminCompaniesPage() {
   const navigate = useNavigate()
+  const qc = useQueryClient()
   const { signOut } = useAuth()
   const { data: companies = [], isLoading } = useCompanies()
+  const { data: subscriptions = new Map<string, Subscription>() } = useActiveSubscriptions()
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [impersonatingId, setImpersonatingId] = useState<string | null>(null)
@@ -100,6 +123,7 @@ export default function MojoAdminCompaniesPage() {
       const body = await res.json()
       if (!res.ok) throw new Error(body.error || 'Failed to activate subscription')
       setNotice(`Activated a 12-month annual subscription for ${company.name}.`)
+      qc.invalidateQueries({ queryKey: ['mojo_admin_subscriptions'] })
     } catch (err: any) {
       setError(err.message || 'Failed to activate subscription')
     } finally {
@@ -190,7 +214,7 @@ export default function MojoAdminCompaniesPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  {['Company', 'Type', 'Created', ''].map((h) => (
+                  {['Company', 'Type', 'Subscription', 'Created', ''].map((h) => (
                     <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
                   ))}
                 </tr>
@@ -204,6 +228,16 @@ export default function MojoAdminCompaniesPage() {
                         {TYPE_ICON[c.type]}
                         {TYPE_LABEL[c.type] ?? c.type}
                       </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {subscriptions.has(c.id) ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                          <CheckCircle size={11} />
+                          Active until {new Date(subscriptions.get(c.id)!.current_period_end).toLocaleDateString()}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">None</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500">
                       {new Date(c.created_at).toLocaleDateString()}
