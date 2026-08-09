@@ -1,6 +1,8 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { getCompanyLogoUrl } from '@/hooks/useCompany'
 import { MojoLogo } from './MojoLogo'
+import { Building2 } from 'lucide-react'
 import clsx from 'clsx'
 import {
   LayoutDashboard,
@@ -52,10 +54,11 @@ const ROLE_NAV: Record<string, NavItem[]> = {
 }
 
 export function Sidebar() {
-  const { profile, signOut } = useAuth()
+  const { profile, company, signOut } = useAuth()
   const navigate = useNavigate()
   const role = profile?.role ?? 'owner'
   const navItems = ROLE_NAV[role] ?? ROLE_NAV.owner
+  const companyLogoUrl = getCompanyLogoUrl(company?.logo_path)
 
   async function handleSignOut() {
     await signOut()
@@ -68,6 +71,20 @@ export function Sidebar() {
       <div className="px-5 py-5 border-b border-white/10">
         <MojoLogo size="md" subtitle="Pre-qualification" />
       </div>
+
+      {/* Company branding */}
+      {company && (
+        <div className="flex items-center gap-2.5 px-5 py-3 border-b border-white/10">
+          {companyLogoUrl ? (
+            <img src={companyLogoUrl} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+          ) : (
+            <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
+              <Building2 size={16} className="text-white/50" />
+            </div>
+          )}
+          <p className="text-sm text-white/80 font-medium truncate">{company.name}</p>
+        </div>
+      )}
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1">
