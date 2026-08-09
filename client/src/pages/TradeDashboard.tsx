@@ -124,11 +124,13 @@ export default function TradeDashboard() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {profile?.company?.logo_path && (
-            <img
-              src={getCompanyLogoUrl(profile.company.logo_path) ?? undefined}
-              alt=""
-              className="w-11 h-11 rounded-xl object-cover border border-gray-200 flex-shrink-0"
-            />
+            <div className="w-14 h-14 rounded-xl bg-white border border-gray-200 flex items-center justify-center p-1.5 flex-shrink-0">
+              <img
+                src={getCompanyLogoUrl(profile.company.logo_path) ?? undefined}
+                alt=""
+                className="max-w-full max-h-full object-contain"
+              />
+            </div>
           )}
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
