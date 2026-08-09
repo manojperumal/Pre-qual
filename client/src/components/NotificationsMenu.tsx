@@ -35,7 +35,7 @@ export function NotificationsMenu() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="relative text-gray-400 hover:text-white transition-colors"
+        className="relative text-white/60 hover:text-white transition-colors"
       >
         <Bell size={18} />
         {unreadCount > 0 && (

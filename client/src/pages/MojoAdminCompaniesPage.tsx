@@ -83,7 +83,7 @@ export default function MojoAdminCompaniesPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="border-b border-gray-200 bg-white px-6 py-4 flex items-center justify-between">
-        <MojoLogo size="md" subtitle="Mojo Admin" />
+        <MojoLogo size="md" subtitle="Mojo Admin" dark />
         <button
           onClick={async () => {
             await signOut()

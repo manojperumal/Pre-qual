@@ -44,9 +44,9 @@ export function UserMenu() {
         </div>
         <div className="hidden sm:block text-left">
           <p className="text-sm text-white font-medium leading-tight">{profile?.full_name || 'User'}</p>
-          <p className="text-xs text-gray-400 leading-tight">{roleLabel(profile?.role)}</p>
+          <p className="text-xs text-white/50 leading-tight">{roleLabel(profile?.role)}</p>
         </div>
-        <ChevronDown size={14} className="text-gray-400 hidden sm:block" />
+        <ChevronDown size={14} className="text-white/50 hidden sm:block" />
       </button>
 
       {open && (
