@@ -5,7 +5,7 @@ import { useContractorProfile, useProjectSubmission } from '@/hooks/useContracto
 import { useSentInvitations } from '@/hooks/usePrequals'
 import { getCompanyLogoUrl } from '@/hooks/useCompany'
 import { useMyAssignments } from '@/hooks/useQuestionnaires'
-import { FolderOpen, User, Send, UserPlus, CheckCircle, Clock, AlertCircle, ClipboardList, Users } from 'lucide-react'
+import { FolderOpen, User, Send, UserPlus, CheckCircle, Clock, AlertCircle, ClipboardList, Users, MapPin } from 'lucide-react'
 import { format } from 'date-fns'
 
 const SUBMISSION_COLORS: Record<string, string> = {
@@ -37,6 +37,12 @@ function ProjectCard({ project, userId }: { project: any; userId: string }) {
           </Link>
           {project.description && (
             <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{project.description}</p>
+          )}
+          {project.address && (
+            <p className="text-xs text-gray-400 mt-0.5 truncate inline-flex items-center gap-1">
+              <MapPin size={11} className="flex-shrink-0" />
+              {project.address}
+            </p>
           )}
         </div>
         <FolderOpen size={16} className="text-brand-400 flex-shrink-0 mt-0.5" />

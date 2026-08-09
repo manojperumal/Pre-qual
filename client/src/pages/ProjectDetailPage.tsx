@@ -5,7 +5,7 @@ import { useProjectMembers, useUpdateProject, useSetProjectPrimaryContact } from
 import { useProjects } from '@/hooks/useProjects'
 import { useProjectSubmissions } from '@/hooks/useContractorProfile'
 import { useProjectAssignments, AssignmentStatus } from '@/hooks/useQuestionnaires'
-import { Users, UserPlus, ChevronRight, Pencil, X, Check, Calendar, ClipboardList, Star } from 'lucide-react'
+import { Users, UserPlus, ChevronRight, Pencil, X, Check, Calendar, ClipboardList, Star, MapPin } from 'lucide-react'
 import { format } from 'date-fns'
 import { useForm } from 'react-hook-form'
 import { roleLabel } from '@/lib/roleLabels'
@@ -52,6 +52,7 @@ export default function ProjectDetailPage() {
     defaultValues: {
       name: project?.name ?? '',
       description: project?.description ?? '',
+      address: project?.address ?? '',
       start_date: project?.start_date ?? '',
       end_date: project?.end_date ?? '',
     },
@@ -63,6 +64,7 @@ export default function ProjectDetailPage() {
     reset({
       name: project.name,
       description: project.description ?? '',
+      address: project.address ?? '',
       start_date: project.start_date ?? '',
       end_date: project.end_date ?? '',
     })
@@ -75,6 +77,7 @@ export default function ProjectDetailPage() {
       id: projectId,
       name: data.name,
       description: data.description,
+      address: data.address,
       startDate: data.start_date,
       endDate: data.end_date,
     })
@@ -107,6 +110,10 @@ export default function ProjectDetailPage() {
             <label className="label">Description</label>
             <textarea rows={2} className="input-field resize-none" {...register('description')} />
           </div>
+          <div>
+            <label className="label">Project Location</label>
+            <input type="text" className="input-field" placeholder="123 Main St, Austin, TX 78701" {...register('address')} />
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="label">Start Date</label>
@@ -130,6 +137,12 @@ export default function ProjectDetailPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{project?.name ?? 'Project'}</h1>
             {project?.description && <p className="mt-1 text-sm text-gray-500">{project.description}</p>}
+            {project?.address && (
+              <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-gray-500">
+                <MapPin size={13} className="text-gray-400 flex-shrink-0" />
+                {project.address}
+              </p>
+            )}
             {(project?.start_date || project?.end_date) && (
               <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
                 <span className="inline-flex items-center gap-1.5">

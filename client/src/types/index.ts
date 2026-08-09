@@ -62,6 +62,7 @@ export interface Project {
   id: string
   name: string
   description?: string
+  address?: string | null
   owner_id: string
   start_date?: string | null
   end_date?: string | null

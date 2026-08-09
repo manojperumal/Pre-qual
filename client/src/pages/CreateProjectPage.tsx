@@ -9,6 +9,7 @@ import { ChevronRight } from 'lucide-react'
 const schema = z.object({
   name: z.string().min(1, 'Project name is required'),
   description: z.string().optional(),
+  address: z.string().optional(),
   start_date: z.string().optional(),
   end_date: z.string().optional(),
 })
@@ -34,6 +35,7 @@ export default function CreateProjectPage() {
       await createProject.mutateAsync({
         name: data.name,
         description: data.description,
+        address: data.address,
         startDate: data.start_date || undefined,
         endDate: data.end_date || undefined,
         ownerId: profile.id,
@@ -86,6 +88,17 @@ export default function CreateProjectPage() {
               className="input-field resize-none"
               placeholder="Brief description of the project..."
               {...register('description')}
+            />
+          </div>
+
+          <div>
+            <label className="label" htmlFor="address">Project Location</label>
+            <input
+              id="address"
+              type="text"
+              className="input-field"
+              placeholder="123 Main St, Austin, TX 78701"
+              {...register('address')}
             />
           </div>
 

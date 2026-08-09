@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useProjects, useMyProjects, useCompanyProjects } from '@/hooks/useProjects'
 import { useProjectSubmission } from '@/hooks/useContractorProfile'
-import { FolderOpen, Send, CheckCircle, Clock, AlertCircle } from 'lucide-react'
+import { FolderOpen, Send, CheckCircle, Clock, AlertCircle, MapPin } from 'lucide-react'
 import { format } from 'date-fns'
 
 const SUBMISSION_COLORS: Record<string, string> = {
@@ -34,6 +34,12 @@ function ProjectCard({ project, userId, basePath }: { project: any; userId: stri
           </Link>
           {project.description && (
             <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{project.description}</p>
+          )}
+          {project.address && (
+            <p className="text-xs text-gray-400 mt-0.5 truncate inline-flex items-center gap-1">
+              <MapPin size={11} className="flex-shrink-0" />
+              {project.address}
+            </p>
           )}
         </div>
         <FolderOpen size={16} className="text-brand-400 flex-shrink-0 mt-0.5" />

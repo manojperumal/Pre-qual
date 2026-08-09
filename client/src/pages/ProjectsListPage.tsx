@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useProjects } from '@/hooks/useProjects'
-import { FolderOpen, Plus } from 'lucide-react'
+import { FolderOpen, Plus, MapPin } from 'lucide-react'
 import { format } from 'date-fns'
 
 export default function ProjectsListPage() {
@@ -53,6 +53,12 @@ export default function ProjectsListPage() {
                     <h3 className="font-semibold text-gray-900 truncate">{project.name}</h3>
                     {project.description && (
                       <p className="text-sm text-gray-500 mt-1 line-clamp-2">{project.description}</p>
+                    )}
+                    {project.address && (
+                      <p className="text-xs text-gray-400 mt-1 truncate inline-flex items-center gap-1">
+                        <MapPin size={11} className="flex-shrink-0" />
+                        {project.address}
+                      </p>
                     )}
                   </div>
                   <FolderOpen size={18} className="text-brand-400 flex-shrink-0 ml-2 mt-0.5" />

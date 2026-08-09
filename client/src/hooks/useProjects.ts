@@ -97,12 +97,14 @@ export function useCreateProject() {
     mutationFn: async ({
       name,
       description,
+      address,
       startDate,
       endDate,
       ownerId,
     }: {
       name: string
       description?: string
+      address?: string
       startDate?: string
       endDate?: string
       ownerId: string
@@ -112,6 +114,7 @@ export function useCreateProject() {
         .insert({
           name,
           description,
+          address: address || null,
           start_date: startDate || null,
           end_date: endDate || null,
           owner_id: ownerId,
@@ -135,12 +138,14 @@ export function useUpdateProject() {
       id,
       name,
       description,
+      address,
       startDate,
       endDate,
     }: {
       id: string
       name: string
       description?: string
+      address?: string
       startDate?: string
       endDate?: string
     }) => {
@@ -149,6 +154,7 @@ export function useUpdateProject() {
         .update({
           name,
           description: description || null,
+          address: address || null,
           start_date: startDate || null,
           end_date: endDate || null,
         })
