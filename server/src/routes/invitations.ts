@@ -30,6 +30,8 @@ const sendSchema = z.object({
   recipient_role: z.enum(['gc', 'trade', 'gc_member', 'owner_member', 'trade_member']),
   recipient_company_name: z.string().trim().min(1).optional(),
   project_ids: z.array(z.string().uuid()).optional(),
+  /** Team-member invites only: whether the new user joins as an admin or contributor */
+  intended_user_role: z.enum(['admin', 'contributor']).optional(),
 })
 
 /**
@@ -69,7 +71,7 @@ router.post('/send', requireAuth, async (req: Request, res: Response): Promise<v
     return
   }
 
-  const { recipient_email, recipient_role, recipient_company_name, project_ids } = parsed.data
+  const { recipient_email, recipient_role, recipient_company_name, project_ids, intended_user_role } = parsed.data
   const senderId = req.userId!
 
   // Generate a secure token
@@ -104,6 +106,7 @@ router.post('/send', requireAuth, async (req: Request, res: Response): Promise<v
       recipient_role,
       recipient_company_name: recipient_company_name ?? null,
       project_id: project_ids?.[0] ?? null,
+      intended_user_role: intended_user_role ?? 'contributor',
       token,
       expires_at: expiresAt,
       status: 'pending',
@@ -421,6 +424,7 @@ router.post('/accept', requireAuth, async (req: Request, res: Response): Promise
   if (memberRoleMap[invitation.recipient_role]) {
     const sender = invitation.sender as { id?: string; company_id?: string; new_company_id?: string } | null
     const companyType = memberRoleMap[invitation.recipient_role]
+    const intendedUserRole = invitation.intended_user_role === 'admin' ? 'admin' : 'contributor'
     // Legacy self-ref company_id fallback: sender.company_id || sender.id
     const legacyCompanyId = sender?.company_id || sender?.id
     const newCompanyId = sender?.new_company_id
@@ -432,11 +436,11 @@ router.post('/accept', requireAuth, async (req: Request, res: Response): Promise
           // Legacy columns — keep populated during transition
           company_id: legacyCompanyId,
           role: companyType,
-          member_role: 'contributor',
+          member_role: intendedUserRole,
           // New columns
           new_company_id: newCompanyId ?? null,
           company_type: companyType,
-          user_role: 'contributor',
+          user_role: intendedUserRole,
         })
         .eq('id', req.userId!)
     }
