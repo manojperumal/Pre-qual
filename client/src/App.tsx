@@ -29,6 +29,8 @@ import MyAssignmentsPage from '@/pages/MyAssignmentsPage'
 import GCProfileViewPage from '@/pages/GCProfileViewPage'
 import MyProjectsPage from '@/pages/MyProjectsPage'
 import MyTeamPage from '@/pages/MyTeamPage'
+import { MojoAdminLayout } from '@/components/MojoAdminLayout'
+import MojoAdminDashboardPage from '@/pages/MojoAdminDashboardPage'
 import MojoAdminCompaniesPage from '@/pages/MojoAdminCompaniesPage'
 import MojoAdminQuestionBankPage from '@/pages/MojoAdminQuestionBankPage'
 import MojoAdminReviewQueuePage from '@/pages/MojoAdminReviewQueuePage'
@@ -83,31 +85,20 @@ export default function App() {
       {/* Role redirect from root */}
       <Route path="/" element={<RoleRedirect />} />
 
-      {/* Mojo Admin — company switcher, no sidebar/company of its own */}
+      {/* Mojo Admin — its own sidebar/layout, no company of its own */}
       <Route
         path="/mojo-admin"
         element={
           <MojoAdminRoute>
-            <MojoAdminCompaniesPage />
+            <MojoAdminLayout />
           </MojoAdminRoute>
         }
-      />
-      <Route
-        path="/mojo-admin/questions"
-        element={
-          <MojoAdminRoute>
-            <MojoAdminQuestionBankPage />
-          </MojoAdminRoute>
-        }
-      />
-      <Route
-        path="/mojo-admin/review-queue"
-        element={
-          <MojoAdminRoute>
-            <MojoAdminReviewQueuePage />
-          </MojoAdminRoute>
-        }
-      />
+      >
+        <Route index element={<MojoAdminDashboardPage />} />
+        <Route path="companies" element={<MojoAdminCompaniesPage />} />
+        <Route path="questions" element={<MojoAdminQuestionBankPage />} />
+        <Route path="review-queue" element={<MojoAdminReviewQueuePage />} />
+      </Route>
 
       {/* Owner routes */}
       <Route

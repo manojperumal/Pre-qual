@@ -1,12 +1,10 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { startImpersonation } from '@/lib/impersonation'
-import { useAuth } from '@/hooks/useAuth'
 import { Company, Subscription } from '@/types'
-import { Building2, HardHat, Wrench, Search, LogIn, LogOut, CreditCard, ShieldCheck, CheckCircle } from 'lucide-react'
-import { MojoLogo } from '@/components/MojoLogo'
+import { Building2, HardHat, Wrench, Search, LogIn, CreditCard, CheckCircle } from 'lucide-react'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
@@ -57,7 +55,6 @@ function useActiveSubscriptions() {
 export default function MojoAdminCompaniesPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const { signOut } = useAuth()
   const { data: companies = [], isLoading } = useCompanies()
   const { data: subscriptions = new Map<string, Subscription>() } = useActiveSubscriptions()
   const [search, setSearch] = useState('')
@@ -132,146 +129,114 @@ export default function MojoAdminCompaniesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="border-b border-gray-200 bg-white px-6 py-4 flex items-center justify-between">
-        <MojoLogo size="md" subtitle="Mojo Admin" dark />
-        <div className="flex items-center gap-4">
-          <Link
-            to="/mojo-admin/questions"
-            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700"
-          >
-            <ShieldCheck size={14} />
-            Global Question Bank
-          </Link>
-          <Link
-            to="/mojo-admin/review-queue"
-            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700"
-          >
-            <ShieldCheck size={14} />
-            Review Queue
-          </Link>
-          <button
-            onClick={async () => {
-              await signOut()
-              navigate('/login')
-            }}
-            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700"
-          >
-            <LogOut size={14} />
-            Sign Out
-          </button>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Companies</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          View any company's account exactly as their admin sees it. Actions you take will be attributed to that company's admin.
+        </p>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Companies</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            View any company's account exactly as their admin sees it. Actions you take will be attributed to that company's admin.
-          </p>
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">{error}</div>
+      )}
+      {notice && (
+        <div className="p-3 bg-green-50 border border-green-200 rounded-md text-green-700 text-sm">{notice}</div>
+      )}
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search companies..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="input-field pl-9"
+          />
         </div>
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          className="input-field sm:w-56"
+        >
+          <option value="all">All types</option>
+          <option value="owner">Owners</option>
+          <option value="gc">General Contractors</option>
+          <option value="trade">Trades</option>
+        </select>
+      </div>
 
-        {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">{error}</div>
-        )}
-        {notice && (
-          <div className="p-3 bg-green-50 border border-green-200 rounded-md text-green-700 text-sm">{notice}</div>
-        )}
-
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search companies..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="input-field pl-9"
-            />
-          </div>
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="input-field sm:w-56"
-          >
-            <option value="all">All types</option>
-            <option value="owner">Owners</option>
-            <option value="gc">General Contractors</option>
-            <option value="trade">Trades</option>
-          </select>
+      {isLoading ? (
+        <div className="flex justify-center items-center py-16">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" />
         </div>
-
-        {isLoading ? (
-          <div className="flex justify-center items-center py-16">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" />
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="card p-12 text-center text-gray-500">
-            <p className="font-medium">No companies found</p>
-          </div>
-        ) : (
-          <div className="card overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  {['Company', 'Type', 'Subscription', 'Created', ''].map((h) => (
-                    <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filtered.map((c) => (
-                  <tr key={c.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{c.name}</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center gap-1.5 text-xs text-gray-600">
-                        {TYPE_ICON[c.type]}
-                        {TYPE_LABEL[c.type] ?? c.type}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {subscriptions.has(c.id) ? (
-                        <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-                          <CheckCircle size={11} />
-                          Active until {new Date(subscriptions.get(c.id)!.current_period_end).toLocaleDateString()}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-400">None</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {new Date(c.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => handleViewAs(c)}
-                          disabled={impersonatingId === c.id}
-                          className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 font-medium disabled:opacity-50"
-                        >
-                          <LogIn size={12} />
-                          {impersonatingId === c.id ? 'Loading…' : 'View as Admin'}
-                        </button>
-                        {c.type !== 'owner' && (
-                          <button
-                            onClick={() => handleActivateSubscription(c)}
-                            disabled={activatingId === c.id}
-                            className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 font-medium disabled:opacity-50"
-                            title="Manually activate a 12-month platform-wide subscription"
-                          >
-                            <CreditCard size={12} />
-                            {activatingId === c.id ? 'Activating…' : 'Activate Subscription'}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+      ) : filtered.length === 0 ? (
+        <div className="card p-12 text-center text-gray-500">
+          <p className="font-medium">No companies found</p>
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                {['Company', 'Type', 'Subscription', 'Created', ''].map((h) => (
+                  <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {filtered.map((c) => (
+                <tr key={c.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{c.name}</td>
+                  <td className="px-6 py-4">
+                    <span className="inline-flex items-center gap-1.5 text-xs text-gray-600">
+                      {TYPE_ICON[c.type]}
+                      {TYPE_LABEL[c.type] ?? c.type}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    {subscriptions.has(c.id) ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                        <CheckCircle size={11} />
+                        Active until {new Date(subscriptions.get(c.id)!.current_period_end).toLocaleDateString()}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400">None</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-500">
+                    {new Date(c.created_at).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => handleViewAs(c)}
+                        disabled={impersonatingId === c.id}
+                        className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 font-medium disabled:opacity-50"
+                      >
+                        <LogIn size={12} />
+                        {impersonatingId === c.id ? 'Loading…' : 'View as Admin'}
+                      </button>
+                      {c.type !== 'owner' && (
+                        <button
+                          onClick={() => handleActivateSubscription(c)}
+                          disabled={activatingId === c.id}
+                          className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 font-medium disabled:opacity-50"
+                          title="Manually activate a 12-month platform-wide subscription"
+                        >
+                          <CreditCard size={12} />
+                          {activatingId === c.id ? 'Activating…' : 'Activate Subscription'}
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
