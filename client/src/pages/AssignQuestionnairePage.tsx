@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useQuestionnaires, useCreateAssignment, useCreateAssignmentRule } from '@/hooks/useQuestionnaires'
@@ -11,6 +11,8 @@ export default function AssignQuestionnairePage() {
   const { profile } = useAuth()
   const navigate = useNavigate()
   const { projectId: routeProjectId } = useParams()
+  const [searchParams] = useSearchParams()
+  const preselectedQuestionnaireId = searchParams.get('questionnaireId') ?? ''
 
   const isOwner = profile?.role === 'owner'
   // The real tenant id (companies.id), needed for company-wide project lookups
@@ -36,7 +38,7 @@ export default function AssignQuestionnairePage() {
     return Array.from(seen, ([id, name]) => ({ id, name }))
   }, [ecosystemRows])
 
-  const [questionnaireId, setQuestionnaireId] = useState('')
+  const [questionnaireId, setQuestionnaireId] = useState(preselectedQuestionnaireId)
   const [scope, setScope] = useState<Scope>('project_all')
   const [projectId, setProjectId] = useState(routeProjectId ?? '')
   const [tieToProject, setTieToProject] = useState(!!routeProjectId)
