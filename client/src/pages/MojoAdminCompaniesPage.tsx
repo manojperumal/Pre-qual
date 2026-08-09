@@ -119,6 +119,13 @@ export default function MojoAdminCompaniesPage() {
             <ShieldCheck size={14} />
             Global Question Bank
           </Link>
+          <Link
+            to="/mojo-admin/review-queue"
+            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700"
+          >
+            <ShieldCheck size={14} />
+            Review Queue
+          </Link>
           <button
             onClick={async () => {
               await signOut()

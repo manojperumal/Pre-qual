@@ -31,6 +31,7 @@ import MyProjectsPage from '@/pages/MyProjectsPage'
 import MyTeamPage from '@/pages/MyTeamPage'
 import MojoAdminCompaniesPage from '@/pages/MojoAdminCompaniesPage'
 import MojoAdminQuestionBankPage from '@/pages/MojoAdminQuestionBankPage'
+import MojoAdminReviewQueuePage from '@/pages/MojoAdminReviewQueuePage'
 import OwnerSettingsPage from '@/pages/OwnerSettingsPage'
 
 function RoleRedirect() {
@@ -96,6 +97,14 @@ export default function App() {
         element={
           <MojoAdminRoute>
             <MojoAdminQuestionBankPage />
+          </MojoAdminRoute>
+        }
+      />
+      <Route
+        path="/mojo-admin/review-queue"
+        element={
+          <MojoAdminRoute>
+            <MojoAdminReviewQueuePage />
           </MojoAdminRoute>
         }
       />

@@ -83,9 +83,23 @@ export interface Response {
   document_name: string | null
   company_comments: string | null
   mojo_feedback: string | null
+  mojo_reviewed_at: string | null
+  mojo_reviewed_by: string | null
   ai_suggested: boolean
   created_at: string
   updated_at: string
+}
+
+export interface FlaggedResponse extends Response {
+  question: { question_text: string; category: QuestionCategory; requires_mojo_review: boolean }
+  assignment: {
+    id: string
+    status: AssignmentStatus
+    project: { name: string } | null
+    company: { name: string } | null
+    assignee: { full_name: string | null; email: string | null } | null
+    questionnaire: { name: string } | null
+  }
 }
 
 // ─── Question Bank ────────────────────────────────────────────────────────
@@ -457,6 +471,54 @@ export function useAssignmentResponses(assignmentId: string | undefined) {
       if (error) throw error
       return data as Response[]
     },
+  })
+}
+
+// ─── Mojo review queue ──────────────────────────────────────────────────
+
+export function useFlaggedResponses() {
+  return useQuery({
+    queryKey: ['flagged_responses'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('questionnaire_responses')
+        .select(
+          '*, question:question_bank!inner(question_text, category, requires_mojo_review), assignment:questionnaire_assignments(id, status, project:projects(name), company:companies(name), assignee:profiles!assignee_id(full_name, email), questionnaire:questionnaires(name))'
+        )
+        .eq('question.requires_mojo_review', true)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return data as unknown as FlaggedResponse[]
+    },
+  })
+}
+
+export function useMarkResponseMojoReviewed() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      id,
+      reviewedBy,
+      feedback,
+      reviewed,
+    }: {
+      id: string
+      reviewedBy: string
+      feedback?: string
+      /** false re-opens a previously reviewed response */
+      reviewed: boolean
+    }) => {
+      const { error } = await supabase
+        .from('questionnaire_responses')
+        .update({
+          mojo_reviewed_at: reviewed ? new Date().toISOString() : null,
+          mojo_reviewed_by: reviewed ? reviewedBy : null,
+          ...(feedback !== undefined ? { mojo_feedback: feedback || null } : {}),
+        })
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['flagged_responses'] }),
   })
 }
 
