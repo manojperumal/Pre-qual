@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { startImpersonation } from '@/lib/impersonation'
@@ -188,7 +188,11 @@ export default function MojoAdminCompaniesPage() {
             <tbody className="divide-y divide-gray-200">
               {filtered.map((c) => (
                 <tr key={c.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{c.name}</td>
+                  <td className="px-6 py-4 text-sm font-medium">
+                    <Link to={`/mojo-admin/companies/${c.id}`} className="text-gray-900 hover:text-brand-600">
+                      {c.name}
+                    </Link>
+                  </td>
                   <td className="px-6 py-4">
                     <span className="inline-flex items-center gap-1.5 text-xs text-gray-600">
                       {TYPE_ICON[c.type]}

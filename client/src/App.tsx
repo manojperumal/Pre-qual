@@ -32,6 +32,7 @@ import MyTeamPage from '@/pages/MyTeamPage'
 import { MojoAdminLayout } from '@/components/MojoAdminLayout'
 import MojoAdminDashboardPage from '@/pages/MojoAdminDashboardPage'
 import MojoAdminCompaniesPage from '@/pages/MojoAdminCompaniesPage'
+import MojoAdminCompanyDetailPage from '@/pages/MojoAdminCompanyDetailPage'
 import MojoAdminQuestionBankPage from '@/pages/MojoAdminQuestionBankPage'
 import MojoAdminReviewQueuePage from '@/pages/MojoAdminReviewQueuePage'
 import OwnerSettingsPage from '@/pages/OwnerSettingsPage'
@@ -96,6 +97,7 @@ export default function App() {
       >
         <Route index element={<MojoAdminDashboardPage />} />
         <Route path="companies" element={<MojoAdminCompaniesPage />} />
+        <Route path="companies/:companyId" element={<MojoAdminCompanyDetailPage />} />
         <Route path="questions" element={<MojoAdminQuestionBankPage />} />
         <Route path="review-queue" element={<MojoAdminReviewQueuePage />} />
       </Route>
