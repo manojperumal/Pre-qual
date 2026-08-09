@@ -6,7 +6,11 @@ if (!secretKey) {
   console.warn('[server] Missing STRIPE_SECRET_KEY — billing checkout will fail until it is set')
 }
 
-export const stripe = new Stripe(secretKey, {
+// The Stripe SDK throws at construction time if given an empty key, which
+// would crash the whole server on boot before STRIPE_SECRET_KEY is
+// configured. Fall back to a placeholder so the app starts; any actual
+// checkout/webhook call will fail with a clear Stripe auth error instead.
+export const stripe = new Stripe(secretKey || 'sk_test_not_configured', {
   apiVersion: '2025-02-24.acacia',
 })
 
