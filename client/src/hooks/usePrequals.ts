@@ -185,6 +185,7 @@ export function useSendInvitation() {
       recipient_role: 'gc' | 'trade' | 'gc_member' | 'owner_member' | 'trade_member'
       recipient_company_name?: string
       project_ids?: string[]
+      intended_user_role?: 'admin' | 'contributor'
     }) => {
       const { data: sessionData } = await supabase.auth.getSession()
       const token = sessionData.session?.access_token

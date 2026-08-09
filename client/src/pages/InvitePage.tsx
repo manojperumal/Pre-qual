@@ -16,6 +16,7 @@ const schema = z.object({
   recipient_role: z.enum(['gc', 'trade', 'gc_member', 'owner_member', 'trade_member'] as const),
   recipient_company_name: z.string().optional(),
   project_ids: z.array(z.string()).optional(),
+  intended_user_role: z.enum(['admin', 'contributor']).default('contributor'),
 })
 
 type FormData = z.infer<typeof schema>
@@ -77,10 +78,12 @@ export default function InvitePage() {
       recipient_email: defaultEmail,
       recipient_company_name: '',
       project_ids: routeProjectId ? [routeProjectId] : [],
+      intended_user_role: 'contributor',
     },
   })
 
   const selectedProjectIds = watch('project_ids') ?? []
+  const selectedUserRole = watch('intended_user_role')
 
   function toggleProject(id: string) {
     const current = new Set(selectedProjectIds)
@@ -98,6 +101,7 @@ export default function InvitePage() {
         recipient_role: recipientRole,
         recipient_company_name: isNewCompanyInvite ? data.recipient_company_name : undefined,
         project_ids: projectIds,
+        intended_user_role: isMemberInvite ? data.intended_user_role : undefined,
       })
       // Also set the QR for this invite
       const token = (result as any)?.invitation?.token || (result as any)?.token
@@ -106,7 +110,7 @@ export default function InvitePage() {
       }
       setSentEmail(data.recipient_email)
       setEmailSent(true)
-      reset({ recipient_role: recipientRole, recipient_email: '', recipient_company_name: '', project_ids: data.project_ids })
+      reset({ recipient_role: recipientRole, recipient_email: '', recipient_company_name: '', project_ids: data.project_ids, intended_user_role: data.intended_user_role })
     } catch (err) {
       console.error('Failed to send invitation', err)
     }
@@ -121,6 +125,7 @@ export default function InvitePage() {
         recipient_role: recipientRole,
         recipient_company_name: isNewCompanyInvite ? data.recipient_company_name : undefined,
         project_ids: projectIds,
+        intended_user_role: isMemberInvite ? data.intended_user_role : undefined,
       })
       const token = (result as any)?.invitation?.token || (result as any)?.token
       if (token) {
@@ -189,6 +194,34 @@ export default function InvitePage() {
         <p className="mt-1 text-xs text-gray-400">
           Leave unchecked to add them to your ecosystem without connecting a project yet.
         </p>
+      </div>
+    )
+  }
+
+  function RoleAtCompanyField() {
+    if (!isMemberInvite) return null
+    return (
+      <div>
+        <label className="label">Role in Your Company</label>
+        <div className="grid grid-cols-2 gap-3">
+          {(['admin', 'contributor'] as const).map((r) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => setValue('intended_user_role', r)}
+              className={`flex flex-col items-start gap-1 p-3 rounded-lg border-2 text-left transition-colors ${
+                selectedUserRole === r
+                  ? 'border-brand-500 bg-brand-50 text-brand-700'
+                  : 'border-gray-200 hover:border-gray-300 text-gray-600'
+              }`}
+            >
+              <span className="text-sm font-medium">{r === 'admin' ? 'Admin' : 'Contributor'}</span>
+              <span className="text-xs text-gray-500">
+                {r === 'admin' ? 'Full access to all projects and company settings' : 'Access limited to assigned projects'}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
     )
   }
@@ -294,6 +327,7 @@ export default function InvitePage() {
           <div className="card p-6">
             <form onSubmit={handleSubmit(onSubmitEmail)} className="space-y-5">
               <CompanyNameField />
+              <RoleAtCompanyField />
               <ProjectPicker />
 
               <div>
@@ -329,6 +363,7 @@ export default function InvitePage() {
         <div className="space-y-4">
           <div className="card p-6 space-y-5">
             <CompanyNameField />
+            <RoleAtCompanyField />
             <ProjectPicker />
 
             {!qrInviteUrl ? (
