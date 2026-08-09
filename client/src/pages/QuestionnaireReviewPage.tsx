@@ -12,6 +12,7 @@ import {
   type Response,
 } from '@/hooks/useQuestionnaires'
 import { supabase } from '@/lib/supabase'
+import { groupByCategory, CATEGORY_COLORS } from '@/lib/questionCategories'
 
 const STATUS_STYLES: Record<AssignmentStatus, string> = {
   pending: 'bg-gray-100 text-gray-600',
@@ -131,19 +132,30 @@ export default function QuestionnaireReviewPage() {
         </span>
       </div>
 
-      {/* Responses */}
-      <div className="space-y-4 mb-8">
-        {qqList.map((qq, idx) => {
-          const q = qq.question
-          if (!q) return null
-          const r = responseMap[q.id]
+      {/* Responses, grouped by category */}
+      {(() => {
+        const indexMap = new Map(qqList.map((qq, i) => [qq.id, i]))
+        const groups = groupByCategory(qqList, (qq) => qq.question?.category)
+        return (
+          <div className="space-y-6 mb-8">
+            {groups.map((group) => (
+              <div key={group.category}>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className={`text-xs font-semibold px-2 py-1 rounded ${CATEGORY_COLORS[group.category]}`}>{group.label}</span>
+                  <span className="text-xs text-gray-400">{group.items.length} question{group.items.length !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="space-y-4">
+                  {group.items.map((qq) => {
+                    const q = qq.question
+                    if (!q) return null
+                    const idx = indexMap.get(qq.id) ?? 0
+                    const r = responseMap[q.id]
 
-          return (
-            <div key={qq.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">{q.category}</p>
-              <p className="text-sm font-semibold text-gray-800 mb-3">
-                {idx + 1}. {q.question_text}
-              </p>
+                    return (
+                      <div key={qq.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                        <p className="text-sm font-semibold text-gray-800 mb-3">
+                          {idx + 1}. {q.question_text}
+                        </p>
 
               {!r ? (
                 <p className="text-sm text-gray-400 italic">No answer provided</p>
@@ -189,13 +201,18 @@ export default function QuestionnaireReviewPage() {
                 ) : (
                   <p className="text-sm text-gray-400 italic">No document uploaded</p>
                 )
-              ) : (
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{r.answer_text || <span className="italic text-gray-400">—</span>}</p>
-              )}
-            </div>
-          )
-        })}
-      </div>
+                        ) : (
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap">{r.answer_text || <span className="italic text-gray-400">—</span>}</p>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
 
       {/* Reviewer notes + actions */}
       {canAct && (
