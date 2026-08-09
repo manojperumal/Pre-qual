@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useContractorProfile, useUpsertContractorProfile } from '@/hooks/useContractorProfile'
 import { useUpdateCompany } from '@/hooks/useCompany'
 import { CompanyLogoUpload } from '@/components/CompanyLogoUpload'
+import { BillingSettingsCard } from '@/components/BillingSettingsCard'
 import { ContractorProfile } from '@/types'
 import { CheckCircle } from 'lucide-react'
 
@@ -429,6 +430,15 @@ export default function ContractorProfilePage() {
             </button>
           </div>
         </form>
+      )}
+
+      {effectiveRole === 'gc' && (
+        <BillingSettingsCard
+          companyId={profile?.new_company_id}
+          billingMode={company?.billing_mode}
+          isAdmin={profile?.user_role === 'admin'}
+          inviteeLabel="Trades"
+        />
       )}
     </div>
   )

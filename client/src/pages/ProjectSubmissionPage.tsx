@@ -7,8 +7,9 @@ import {
   useUpsertSubmission,
 } from '@/hooks/useContractorProfile'
 import { supabase } from '@/lib/supabase'
+import { useGoverningBillingCompany, useCompanySubscription, useProjectSubmissionPayment } from '@/hooks/useBilling'
 import { SubmissionDocument } from '@/types'
-import { Upload, AlertTriangle, CheckCircle } from 'lucide-react'
+import { Upload, AlertTriangle, CheckCircle, CreditCard } from 'lucide-react'
 import { format } from 'date-fns'
 
 const DOC_TYPES: { key: SubmissionDocument['doc_type']; label: string; ptpOnly?: boolean }[] = [
@@ -57,9 +58,19 @@ export default function ProjectSubmissionPage() {
   const { data: submission, isLoading: subLoading } = useProjectSubmission(projectId, profile?.id)
   const upsert = useUpsertSubmission()
 
+  const companyId = profile?.new_company_id ?? null
+  const { data: governingCompany } = useGoverningBillingCompany(projectId, companyId)
+  const { data: activeSubscription } = useCompanySubscription(companyId)
+  const { data: submissionPayment } = useProjectSubmissionPayment(projectId, companyId)
+
+  const paymentRequired = governingCompany?.billing_mode === 'platform_only'
+  const hasPaid = !!activeSubscription || submissionPayment?.status === 'paid'
+  const blockedByPayment = paymentRequired && !hasPaid
+
   const [uploading, setUploading] = useState<string | null>(null)
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, string>>({})
   const [saved, setSaved] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const dashPath = profile?.role === 'gc' ? '/gc' : '/trade'
   const profilePath = profile?.role === 'gc' ? '/gc/profile' : '/trade/profile'
@@ -81,16 +92,21 @@ export default function ProjectSubmissionPage() {
   }
 
   async function handleSubmit() {
-    if (!projectId || !profile?.id || !contractorProfile) return
-    await upsert.mutateAsync({
-      project_id: projectId,
-      contractor_id: profile.id,
-      status: 'submitted',
-      snapshot: contractorProfile as unknown as Record<string, unknown>,
-      flagged_no_ptp: !contractorProfile.has_ptp_program,
-      flagged_high_emr: contractorProfile.emr_value != null && contractorProfile.emr_value > 1.0,
-    })
-    navigate(dashPath)
+    if (!projectId || !profile?.id || !contractorProfile || blockedByPayment) return
+    setSubmitError(null)
+    try {
+      await upsert.mutateAsync({
+        project_id: projectId,
+        contractor_id: profile.id,
+        status: 'submitted',
+        snapshot: contractorProfile as unknown as Record<string, unknown>,
+        flagged_no_ptp: !contractorProfile.has_ptp_program,
+        flagged_high_emr: contractorProfile.emr_value != null && contractorProfile.emr_value > 1.0,
+      })
+      navigate(dashPath)
+    } catch (err: any) {
+      setSubmitError(err?.message || 'Payment required before this can be submitted.')
+    }
   }
 
   async function handleUpload(docType: SubmissionDocument['doc_type'], file: File) {
@@ -146,6 +162,28 @@ export default function ProjectSubmissionPage() {
               Updated {format(new Date(submission.updated_at), 'MMM d, yyyy')}
             </span>
           )}
+        </div>
+      )}
+
+      {/* Payment required warning */}
+      {blockedByPayment && (
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+          <CreditCard size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-amber-800">
+            <p className="font-medium">Payment required before you can submit</p>
+            <p>
+              {governingCompany?.name ?? 'This project'} requires payment for pre-qualification processing —
+              a one-time fee for this project, or a platform-wide annual subscription. Online payment isn't
+              enabled yet; Mojo will reach out to arrange it.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {submitError && (
+        <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+          <AlertTriangle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-800">{submitError}</p>
         </div>
       )}
 
@@ -275,8 +313,9 @@ export default function ProjectSubmissionPage() {
         </button>
         <button
           onClick={handleSubmit}
-          disabled={!isProfileComplete || upsert.isPending || submission?.status === 'submitted' || submission?.status === 'approved'}
+          disabled={!isProfileComplete || upsert.isPending || blockedByPayment || submission?.status === 'submitted' || submission?.status === 'approved'}
           className="btn-primary"
+          title={blockedByPayment ? 'Payment required before submitting' : undefined}
         >
           {upsert.isPending ? 'Submitting...' : 'Submit for Review'}
         </button>

@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { startImpersonation } from '@/lib/impersonation'
 import { useAuth } from '@/hooks/useAuth'
 import { Company } from '@/types'
-import { Building2, HardHat, Wrench, Search, LogIn, LogOut } from 'lucide-react'
+import { Building2, HardHat, Wrench, Search, LogIn, LogOut, CreditCard } from 'lucide-react'
 import { MojoLogo } from '@/components/MojoLogo'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
@@ -40,7 +40,9 @@ export default function MojoAdminCompaniesPage() {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [impersonatingId, setImpersonatingId] = useState<string | null>(null)
+  const [activatingId, setActivatingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
   const filtered = companies.filter((c) => {
     if (typeFilter !== 'all' && c.type !== typeFilter) return false
@@ -80,6 +82,31 @@ export default function MojoAdminCompaniesPage() {
     }
   }
 
+  async function handleActivateSubscription(company: Company) {
+    setError(null)
+    setNotice(null)
+    setActivatingId(company.id)
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      const res = await fetch(`${API_URL}/api/admin/billing/activate-subscription`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ company_id: company.id }),
+      })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error || 'Failed to activate subscription')
+      setNotice(`Activated a 12-month annual subscription for ${company.name}.`)
+    } catch (err: any) {
+      setError(err.message || 'Failed to activate subscription')
+    } finally {
+      setActivatingId(null)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="border-b border-gray-200 bg-white px-6 py-4 flex items-center justify-between">
@@ -106,6 +133,9 @@ export default function MojoAdminCompaniesPage() {
 
         {error && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">{error}</div>
+        )}
+        {notice && (
+          <div className="p-3 bg-green-50 border border-green-200 rounded-md text-green-700 text-sm">{notice}</div>
         )}
 
         <div className="flex flex-col sm:flex-row gap-3">
@@ -163,14 +193,27 @@ export default function MojoAdminCompaniesPage() {
                       {new Date(c.created_at).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4">
-                      <button
-                        onClick={() => handleViewAs(c)}
-                        disabled={impersonatingId === c.id}
-                        className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 font-medium disabled:opacity-50"
-                      >
-                        <LogIn size={12} />
-                        {impersonatingId === c.id ? 'Loading…' : 'View as Admin'}
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => handleViewAs(c)}
+                          disabled={impersonatingId === c.id}
+                          className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 font-medium disabled:opacity-50"
+                        >
+                          <LogIn size={12} />
+                          {impersonatingId === c.id ? 'Loading…' : 'View as Admin'}
+                        </button>
+                        {c.type !== 'owner' && (
+                          <button
+                            onClick={() => handleActivateSubscription(c)}
+                            disabled={activatingId === c.id}
+                            className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 font-medium disabled:opacity-50"
+                            title="Manually activate a 12-month platform-wide subscription"
+                          >
+                            <CreditCard size={12} />
+                            {activatingId === c.id ? 'Activating…' : 'Activate Subscription'}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

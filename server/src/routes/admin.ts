@@ -80,4 +80,90 @@ router.post('/impersonate', requireAuth, async (req: Request, res: Response): Pr
   })
 })
 
+/**
+ * POST /api/admin/billing/mark-project-paid
+ * Mojo-admin only. Manually records a project's one-time processing fee
+ * as paid — for handling payment outside Stripe (check, wire, etc.) until
+ * real Checkout is wired up.
+ */
+const markProjectPaidSchema = z.object({
+  project_id: z.string().uuid(),
+  company_id: z.string().uuid(),
+  amount_cents: z.number().int().nonnegative().default(0),
+})
+
+router.post('/billing/mark-project-paid', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  if (!(await requireMojoAdmin(req.userId!))) {
+    res.status(403).json({ error: 'Mojo admin access required' })
+    return
+  }
+
+  const parsed = markProjectPaidSchema.safeParse(req.body)
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid request body', details: parsed.error.flatten() })
+    return
+  }
+
+  const { project_id, company_id, amount_cents } = parsed.data
+
+  const { error } = await supabaseAdmin
+    .from('project_submission_payments')
+    .upsert(
+      { project_id, company_id, amount_cents, status: 'paid', paid_at: new Date().toISOString() },
+      { onConflict: 'project_id,company_id' }
+    )
+
+  if (error) {
+    console.error('[admin] mark-project-paid error:', error)
+    res.status(500).json({ error: 'Failed to record payment' })
+    return
+  }
+
+  res.json({ success: true })
+})
+
+/**
+ * POST /api/admin/billing/activate-subscription
+ * Mojo-admin only. Manually activates a company's platform-wide annual
+ * subscription — for handling payment outside Stripe until real
+ * subscriptions are wired up.
+ */
+const activateSubscriptionSchema = z.object({
+  company_id: z.string().uuid(),
+  months: z.number().int().positive().default(12),
+})
+
+router.post('/billing/activate-subscription', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  if (!(await requireMojoAdmin(req.userId!))) {
+    res.status(403).json({ error: 'Mojo admin access required' })
+    return
+  }
+
+  const parsed = activateSubscriptionSchema.safeParse(req.body)
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid request body', details: parsed.error.flatten() })
+    return
+  }
+
+  const { company_id, months } = parsed.data
+  const periodEnd = new Date()
+  periodEnd.setMonth(periodEnd.getMonth() + months)
+
+  const { error } = await supabaseAdmin.from('subscriptions').insert({
+    company_id,
+    plan: 'annual',
+    status: 'active',
+    current_period_start: new Date().toISOString(),
+    current_period_end: periodEnd.toISOString(),
+  })
+
+  if (error) {
+    console.error('[admin] activate-subscription error:', error)
+    res.status(500).json({ error: 'Failed to activate subscription' })
+    return
+  }
+
+  res.json({ success: true })
+})
+
 export default router

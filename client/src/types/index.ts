@@ -1,6 +1,7 @@
 export type UserRole = 'owner' | 'gc' | 'trade'
 export type CompanyType = 'owner' | 'gc' | 'trade'
 export type UserRoleWithinCompany = 'admin' | 'contributor'
+export type BillingMode = 'pays_all' | 'platform_only'
 
 export interface Company {
   id: string
@@ -13,8 +14,32 @@ export interface Company {
   phone: string | null
   website: string | null
   logo_path: string | null
+  billing_mode: BillingMode
   created_at: string
   updated_at: string
+}
+
+export interface Subscription {
+  id: string
+  company_id: string
+  plan: 'annual'
+  status: 'active' | 'past_due' | 'canceled'
+  current_period_start: string
+  current_period_end: string
+  stripe_subscription_id: string | null
+  created_at: string
+}
+
+export interface ProjectSubmissionPayment {
+  id: string
+  project_id: string
+  company_id: string
+  amount_cents: number
+  currency: string
+  status: 'pending' | 'paid' | 'failed' | 'refunded'
+  stripe_payment_intent_id: string | null
+  created_at: string
+  paid_at: string | null
 }
 
 export interface CompanyDocument {
