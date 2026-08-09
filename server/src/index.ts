@@ -5,6 +5,8 @@ import invitationsRouter from './routes/invitations.js'
 import prequalificationsRouter from './routes/prequalifications.js'
 import questionnairesRouter from './routes/questionnaires.js'
 import adminRouter from './routes/admin.js'
+import checkoutRouter from './routes/checkout.js'
+import stripeWebhookRouter from './routes/stripeWebhook.js'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 3001
@@ -35,6 +37,10 @@ app.use(
   })
 )
 
+// Stripe webhook needs the raw body to verify signatures — must be mounted
+// before express.json() parses (and consumes) the request body.
+app.use('/api/stripe/webhook', stripeWebhookRouter)
+
 app.use(express.json({ limit: '50mb' }))
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
@@ -43,6 +49,7 @@ app.use('/api/invitations', invitationsRouter)
 app.use('/api/prequalifications', prequalificationsRouter)
 app.use('/api/questionnaires', questionnairesRouter)
 app.use('/api/admin', adminRouter)
+app.use('/api/checkout', checkoutRouter)
 
 // Health check
 app.get('/api/health', (_req, res) => {

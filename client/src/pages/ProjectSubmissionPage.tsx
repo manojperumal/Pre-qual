@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import {
   useContractorProfile,
@@ -7,7 +8,13 @@ import {
   useUpsertSubmission,
 } from '@/hooks/useContractorProfile'
 import { supabase } from '@/lib/supabase'
-import { useGoverningBillingCompany, useCompanySubscription, useProjectSubmissionPayment } from '@/hooks/useBilling'
+import {
+  useGoverningBillingCompany,
+  useCompanySubscription,
+  useProjectSubmissionPayment,
+  useCreateProjectCheckout,
+  useCreateSubscriptionCheckout,
+} from '@/hooks/useBilling'
 import { SubmissionDocument } from '@/types'
 import { Upload, AlertTriangle, CheckCircle, CreditCard } from 'lucide-react'
 import { format } from 'date-fns'
@@ -53,6 +60,8 @@ export default function ProjectSubmissionPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const { profile } = useAuth()
   const navigate = useNavigate()
+  const qc = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const { data: contractorProfile, isLoading: profileLoading } = useContractorProfile(profile?.id)
   const { data: submission, isLoading: subLoading } = useProjectSubmission(projectId, profile?.id)
@@ -62,6 +71,8 @@ export default function ProjectSubmissionPage() {
   const { data: governingCompany } = useGoverningBillingCompany(projectId, companyId)
   const { data: activeSubscription } = useCompanySubscription(companyId)
   const { data: submissionPayment } = useProjectSubmissionPayment(projectId, companyId)
+  const createProjectCheckout = useCreateProjectCheckout()
+  const createSubscriptionCheckout = useCreateSubscriptionCheckout()
 
   const paymentRequired = governingCompany?.billing_mode === 'platform_only'
   const hasPaid = !!activeSubscription || submissionPayment?.status === 'paid'
@@ -71,6 +82,23 @@ export default function ProjectSubmissionPage() {
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, string>>({})
   const [saved, setSaved] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [paymentNotice, setPaymentNotice] = useState<string | null>(null)
+
+  // Coming back from Stripe Checkout
+  useEffect(() => {
+    const paymentResult = searchParams.get('payment')
+    if (!paymentResult) return
+    if (paymentResult === 'success') {
+      setPaymentNotice('Payment received — it may take a few seconds to reflect below.')
+      qc.invalidateQueries({ queryKey: ['submission_payment'] })
+      qc.invalidateQueries({ queryKey: ['subscription'] })
+    } else if (paymentResult === 'cancelled') {
+      setPaymentNotice('Checkout was cancelled — no charge was made.')
+    }
+    searchParams.delete('payment')
+    setSearchParams(searchParams, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const dashPath = profile?.role === 'gc' ? '/gc' : '/trade'
   const profilePath = profile?.role === 'gc' ? '/gc/profile' : '/trade/profile'
@@ -165,17 +193,47 @@ export default function ProjectSubmissionPage() {
         </div>
       )}
 
+      {paymentNotice && (
+        <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800">
+          <CheckCircle size={16} />
+          {paymentNotice}
+        </div>
+      )}
+
       {/* Payment required warning */}
       {blockedByPayment && (
         <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
           <CreditCard size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-amber-800">
+          <div className="text-sm text-amber-800 flex-1">
             <p className="font-medium">Payment required before you can submit</p>
             <p>
               {governingCompany?.name ?? 'This project'} requires payment for pre-qualification processing —
-              a one-time fee for this project, or a platform-wide annual subscription. Online payment isn't
-              enabled yet; Mojo will reach out to arrange it.
+              a one-time fee for this project, or a platform-wide annual subscription covering every project.
             </p>
+            {createProjectCheckout.isError && (
+              <p className="text-red-600 mt-1">{(createProjectCheckout.error as Error).message}</p>
+            )}
+            {createSubscriptionCheckout.isError && (
+              <p className="text-red-600 mt-1">{(createSubscriptionCheckout.error as Error).message}</p>
+            )}
+            <div className="flex gap-2 mt-3">
+              <button
+                type="button"
+                onClick={() => projectId && createProjectCheckout.mutate(projectId)}
+                disabled={createProjectCheckout.isPending || createSubscriptionCheckout.isPending}
+                className="btn-primary text-xs py-1.5 px-3"
+              >
+                {createProjectCheckout.isPending ? 'Redirecting…' : 'Pay $150 for this project'}
+              </button>
+              <button
+                type="button"
+                onClick={() => createSubscriptionCheckout.mutate()}
+                disabled={createProjectCheckout.isPending || createSubscriptionCheckout.isPending}
+                className="btn-secondary text-xs py-1.5 px-3"
+              >
+                {createSubscriptionCheckout.isPending ? 'Redirecting…' : 'Subscribe annually — $450/yr'}
+              </button>
+            </div>
           </div>
         </div>
       )}

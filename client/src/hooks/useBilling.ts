@@ -2,6 +2,44 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { BillingMode, Subscription, ProjectSubmissionPayment } from '@/types'
 
+const API_URL = import.meta.env.VITE_API_URL || ''
+
+async function postCheckout(path: string, body: Record<string, unknown>): Promise<string> {
+  const { data: sessionData } = await supabase.auth.getSession()
+  const token = sessionData.session?.access_token
+  const res = await fetch(`${API_URL}/api/checkout/${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  })
+  const result = await res.json()
+  if (!res.ok) throw new Error(result.error || 'Failed to start checkout')
+  return result.url as string
+}
+
+// Redirects the browser to Stripe Checkout for the one-time per-project fee.
+export function useCreateProjectCheckout() {
+  return useMutation({
+    mutationFn: async (projectId: string) => postCheckout('project', { project_id: projectId, return_url: window.location.href }),
+    onSuccess: (url) => {
+      window.location.href = url
+    },
+  })
+}
+
+// Redirects the browser to Stripe Checkout for the platform-wide annual subscription.
+export function useCreateSubscriptionCheckout() {
+  return useMutation({
+    mutationFn: async () => postCheckout('subscription', { return_url: window.location.href }),
+    onSuccess: (url) => {
+      window.location.href = url
+    },
+  })
+}
+
 export function useUpdateBillingMode() {
   const qc = useQueryClient()
   return useMutation({
