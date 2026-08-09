@@ -186,7 +186,7 @@ export default function QuestionnaireResponsePage() {
     setSubmitting(true)
     try {
       await saveProgress()
-      await updateStatus.mutateAsync({ id: assignmentId, status: 'submitted' })
+      await updateStatus.mutateAsync({ id: assignmentId, status: 'submitted', assigneeId: profile.id })
       navigate(`${basePath}`)
     } finally {
       setSubmitting(false)

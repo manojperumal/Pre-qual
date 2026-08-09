@@ -27,6 +27,12 @@ import QuestionnaireResponsePage from '@/pages/QuestionnaireResponsePage'
 import QuestionnaireReviewPage from '@/pages/QuestionnaireReviewPage'
 import MyAssignmentsPage from '@/pages/MyAssignmentsPage'
 import GCProfileViewPage from '@/pages/GCProfileViewPage'
+import MyProjectsPage from '@/pages/MyProjectsPage'
+import MyTeamPage from '@/pages/MyTeamPage'
+import MojoAdminCompaniesPage from '@/pages/MojoAdminCompaniesPage'
+import MojoAdminQuestionBankPage from '@/pages/MojoAdminQuestionBankPage'
+import MojoAdminReviewQueuePage from '@/pages/MojoAdminReviewQueuePage'
+import OwnerSettingsPage from '@/pages/OwnerSettingsPage'
 
 function RoleRedirect() {
   const { profile, loading } = useAuth()
@@ -41,9 +47,29 @@ function RoleRedirect() {
 
   if (!profile) return <Navigate to="/login" replace />
 
-  if (profile.role === 'owner') return <Navigate to="/owner" replace />
-  if (profile.role === 'gc') return <Navigate to="/gc" replace />
+  if (profile.is_mojo_admin) return <Navigate to="/mojo-admin" replace />
+
+  const effectiveRole = profile.company_type ?? profile.role
+  if (effectiveRole === 'owner') return <Navigate to="/owner" replace />
+  if (effectiveRole === 'gc') return <Navigate to="/gc" replace />
   return <Navigate to="/trade" replace />
+}
+
+function MojoAdminRoute({ children }: { children: React.ReactNode }) {
+  const { profile, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600" />
+      </div>
+    )
+  }
+
+  if (!profile) return <Navigate to="/login" replace />
+  if (!profile.is_mojo_admin) return <Navigate to="/" replace />
+
+  return <>{children}</>
 }
 
 export default function App() {
@@ -56,6 +82,32 @@ export default function App() {
 
       {/* Role redirect from root */}
       <Route path="/" element={<RoleRedirect />} />
+
+      {/* Mojo Admin — company switcher, no sidebar/company of its own */}
+      <Route
+        path="/mojo-admin"
+        element={
+          <MojoAdminRoute>
+            <MojoAdminCompaniesPage />
+          </MojoAdminRoute>
+        }
+      />
+      <Route
+        path="/mojo-admin/questions"
+        element={
+          <MojoAdminRoute>
+            <MojoAdminQuestionBankPage />
+          </MojoAdminRoute>
+        }
+      />
+      <Route
+        path="/mojo-admin/review-queue"
+        element={
+          <MojoAdminRoute>
+            <MojoAdminReviewQueuePage />
+          </MojoAdminRoute>
+        }
+      />
 
       {/* Owner routes */}
       <Route
@@ -76,6 +128,8 @@ export default function App() {
         <Route path="general-contractors" element={<GeneralContractorsPage />} />
         <Route path="general-contractors/:contractorId" element={<GCProfileViewPage />} />
         <Route path="trades" element={<TradesPage />} />
+        <Route path="my-team" element={<MyTeamPage />} />
+        <Route path="settings" element={<OwnerSettingsPage />} />
         <Route path="prequal/:id" element={<PrequalDetail />} />
         <Route path="questionnaires" element={<QuestionnairesPage />} />
         <Route path="questionnaires/new" element={<QuestionnaireBuilderPage />} />
@@ -97,6 +151,9 @@ export default function App() {
         <Route index element={<GCDashboard />} />
         <Route path="invite" element={<InvitePage />} />
         <Route path="profile" element={<ContractorProfilePage />} />
+        <Route path="my-projects" element={<MyProjectsPage />} />
+        <Route path="my-team" element={<MyTeamPage />} />
+        <Route path="trades" element={<TradesPage />} />
         <Route path="projects/:projectId" element={<ProjectDetailPage />} />
         <Route path="projects/:projectId/submit" element={<ProjectSubmissionPage />} />
         <Route path="projects/:projectId/submissions/:submissionId" element={<SubmissionReviewPage />} />
@@ -124,6 +181,8 @@ export default function App() {
         <Route index element={<TradeDashboard />} />
         <Route path="invite" element={<InvitePage />} />
         <Route path="profile" element={<ContractorProfilePage />} />
+        <Route path="my-projects" element={<MyProjectsPage />} />
+        <Route path="my-team" element={<MyTeamPage />} />
         <Route path="projects/:projectId" element={<ProjectDetailPage />} />
         <Route path="projects/:projectId/submit" element={<ProjectSubmissionPage />} />
         <Route path="prequal/new" element={<PrequalForm />} />

@@ -134,6 +134,10 @@ export function useDeleteDoc() {
   })
 }
 
+export interface SentInvitation extends Invitation {
+  invitation_projects: { project: { id: string; name: string } }[]
+}
+
 export function useSentInvitations(senderId: string | undefined) {
   return useQuery({
     queryKey: ['invitations', 'sent', senderId],
@@ -141,11 +145,11 @@ export function useSentInvitations(senderId: string | undefined) {
       if (!senderId) return []
       const { data, error } = await supabase
         .from('invitations')
-        .select('*')
+        .select('*, invitation_projects(project:projects(id, name))')
         .eq('sender_id', senderId)
         .order('created_at', { ascending: false })
       if (error) throw error
-      return data as Invitation[]
+      return data as SentInvitation[]
     },
     enabled: !!senderId,
   })
@@ -179,7 +183,8 @@ export function useSendInvitation() {
     mutationFn: async (invitation: {
       recipient_email: string
       recipient_role: 'gc' | 'trade' | 'gc_member' | 'owner_member' | 'trade_member'
-      project_id?: string
+      recipient_company_name?: string
+      project_ids?: string[]
     }) => {
       const { data: sessionData } = await supabase.auth.getSession()
       const token = sessionData.session?.access_token

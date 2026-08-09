@@ -18,6 +18,28 @@ export function useContractorProfile(userId: string | undefined) {
   })
 }
 
+// Bulk profile-completeness lookup for list pages (GC/Trades rosters).
+// Maps user_id -> whether their contractor profile has the minimum fields filled in.
+export function useContractorProfileCompleteness(userIds: string[]) {
+  const key = [...new Set(userIds)].sort().join(',')
+  return useQuery({
+    queryKey: ['contractor_profile_completeness', key],
+    enabled: userIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('contractor_profiles')
+        .select('user_id, company_name, gl_carrier')
+        .in('user_id', [...new Set(userIds)])
+      if (error) throw error
+      const map = new Map<string, boolean>()
+      for (const row of data ?? []) {
+        map.set(row.user_id, !!(row.company_name && row.gl_carrier))
+      }
+      return map
+    },
+  })
+}
+
 export function useUpsertContractorProfile() {
   const qc = useQueryClient()
   return useMutation({

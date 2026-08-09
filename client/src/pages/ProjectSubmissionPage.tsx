@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import {
   useContractorProfile,
@@ -7,8 +8,15 @@ import {
   useUpsertSubmission,
 } from '@/hooks/useContractorProfile'
 import { supabase } from '@/lib/supabase'
+import {
+  useGoverningBillingCompany,
+  useCompanySubscription,
+  useProjectSubmissionPayment,
+  useCreateProjectCheckout,
+  useCreateSubscriptionCheckout,
+} from '@/hooks/useBilling'
 import { SubmissionDocument } from '@/types'
-import { Upload, AlertTriangle, CheckCircle } from 'lucide-react'
+import { Upload, AlertTriangle, CheckCircle, CreditCard } from 'lucide-react'
 import { format } from 'date-fns'
 
 const DOC_TYPES: { key: SubmissionDocument['doc_type']; label: string; ptpOnly?: boolean }[] = [
@@ -52,14 +60,45 @@ export default function ProjectSubmissionPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const { profile } = useAuth()
   const navigate = useNavigate()
+  const qc = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const { data: contractorProfile, isLoading: profileLoading } = useContractorProfile(profile?.id)
   const { data: submission, isLoading: subLoading } = useProjectSubmission(projectId, profile?.id)
   const upsert = useUpsertSubmission()
 
+  const companyId = profile?.new_company_id ?? null
+  const { data: governingCompany } = useGoverningBillingCompany(projectId, companyId)
+  const { data: activeSubscription } = useCompanySubscription(companyId)
+  const { data: submissionPayment } = useProjectSubmissionPayment(projectId, companyId)
+  const createProjectCheckout = useCreateProjectCheckout()
+  const createSubscriptionCheckout = useCreateSubscriptionCheckout()
+
+  const paymentRequired = governingCompany?.billing_mode === 'platform_only'
+  const hasPaid = !!activeSubscription || submissionPayment?.status === 'paid'
+  const blockedByPayment = paymentRequired && !hasPaid
+
   const [uploading, setUploading] = useState<string | null>(null)
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, string>>({})
   const [saved, setSaved] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [paymentNotice, setPaymentNotice] = useState<string | null>(null)
+
+  // Coming back from Stripe Checkout
+  useEffect(() => {
+    const paymentResult = searchParams.get('payment')
+    if (!paymentResult) return
+    if (paymentResult === 'success') {
+      setPaymentNotice('Payment received — it may take a few seconds to reflect below.')
+      qc.invalidateQueries({ queryKey: ['submission_payment'] })
+      qc.invalidateQueries({ queryKey: ['subscription'] })
+    } else if (paymentResult === 'cancelled') {
+      setPaymentNotice('Checkout was cancelled — no charge was made.')
+    }
+    searchParams.delete('payment')
+    setSearchParams(searchParams, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const dashPath = profile?.role === 'gc' ? '/gc' : '/trade'
   const profilePath = profile?.role === 'gc' ? '/gc/profile' : '/trade/profile'
@@ -81,16 +120,21 @@ export default function ProjectSubmissionPage() {
   }
 
   async function handleSubmit() {
-    if (!projectId || !profile?.id || !contractorProfile) return
-    await upsert.mutateAsync({
-      project_id: projectId,
-      contractor_id: profile.id,
-      status: 'submitted',
-      snapshot: contractorProfile as unknown as Record<string, unknown>,
-      flagged_no_ptp: !contractorProfile.has_ptp_program,
-      flagged_high_emr: contractorProfile.emr_value != null && contractorProfile.emr_value > 1.0,
-    })
-    navigate(dashPath)
+    if (!projectId || !profile?.id || !contractorProfile || blockedByPayment) return
+    setSubmitError(null)
+    try {
+      await upsert.mutateAsync({
+        project_id: projectId,
+        contractor_id: profile.id,
+        status: 'submitted',
+        snapshot: contractorProfile as unknown as Record<string, unknown>,
+        flagged_no_ptp: !contractorProfile.has_ptp_program,
+        flagged_high_emr: contractorProfile.emr_value != null && contractorProfile.emr_value > 1.0,
+      })
+      navigate(dashPath)
+    } catch (err: any) {
+      setSubmitError(err?.message || 'Payment required before this can be submitted.')
+    }
   }
 
   async function handleUpload(docType: SubmissionDocument['doc_type'], file: File) {
@@ -146,6 +190,58 @@ export default function ProjectSubmissionPage() {
               Updated {format(new Date(submission.updated_at), 'MMM d, yyyy')}
             </span>
           )}
+        </div>
+      )}
+
+      {paymentNotice && (
+        <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800">
+          <CheckCircle size={16} />
+          {paymentNotice}
+        </div>
+      )}
+
+      {/* Payment required warning */}
+      {blockedByPayment && (
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+          <CreditCard size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-amber-800 flex-1">
+            <p className="font-medium">Payment required before you can submit</p>
+            <p>
+              {governingCompany?.name ?? 'This project'} requires payment for pre-qualification processing —
+              a one-time fee for this project, or a platform-wide annual subscription covering every project.
+            </p>
+            {createProjectCheckout.isError && (
+              <p className="text-red-600 mt-1">{(createProjectCheckout.error as Error).message}</p>
+            )}
+            {createSubscriptionCheckout.isError && (
+              <p className="text-red-600 mt-1">{(createSubscriptionCheckout.error as Error).message}</p>
+            )}
+            <div className="flex gap-2 mt-3">
+              <button
+                type="button"
+                onClick={() => projectId && createProjectCheckout.mutate(projectId)}
+                disabled={createProjectCheckout.isPending || createSubscriptionCheckout.isPending}
+                className="btn-primary text-xs py-1.5 px-3"
+              >
+                {createProjectCheckout.isPending ? 'Redirecting…' : 'Pay $150 for this project'}
+              </button>
+              <button
+                type="button"
+                onClick={() => createSubscriptionCheckout.mutate()}
+                disabled={createProjectCheckout.isPending || createSubscriptionCheckout.isPending}
+                className="btn-secondary text-xs py-1.5 px-3"
+              >
+                {createSubscriptionCheckout.isPending ? 'Redirecting…' : 'Subscribe annually — $450/yr'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {submitError && (
+        <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+          <AlertTriangle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-800">{submitError}</p>
         </div>
       )}
 
@@ -275,8 +371,9 @@ export default function ProjectSubmissionPage() {
         </button>
         <button
           onClick={handleSubmit}
-          disabled={!isProfileComplete || upsert.isPending || submission?.status === 'submitted' || submission?.status === 'approved'}
+          disabled={!isProfileComplete || upsert.isPending || blockedByPayment || submission?.status === 'submitted' || submission?.status === 'approved'}
           className="btn-primary"
+          title={blockedByPayment ? 'Payment required before submitting' : undefined}
         >
           {upsert.isPending ? 'Submitting...' : 'Submit for Review'}
         </button>

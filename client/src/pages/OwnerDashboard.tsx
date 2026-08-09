@@ -2,9 +2,8 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useProjects, useMyProjects, useTeamMembers, useCompanyProjects, useUpdateMemberRole, useOwnerGCs, useOwnerTrades } from '@/hooks/useProjects'
 import { useOwnerPendingSubmissions } from '@/hooks/useContractorProfile'
-import { useSentInvitations, useResendInvitation } from '@/hooks/usePrequals'
-import { FolderOpen, HardHat, Wrench, ClipboardList, AlertTriangle, ChevronRight, Plus, Users, RefreshCw } from 'lucide-react'
-import { roleLabel } from '@/lib/roleLabels'
+import { getCompanyLogoUrl } from '@/hooks/useCompany'
+import { FolderOpen, HardHat, Wrench, ClipboardList, AlertTriangle, ChevronRight, Plus, Users } from 'lucide-react'
 import { format } from 'date-fns'
 
 const STATUS_COLORS: Record<string, string> = {
@@ -18,12 +17,12 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function OwnerDashboard() {
   const { profile } = useAuth()
-  const isTeamMember = !!(profile as any)?.company_id
-  const memberRole: 'admin' | 'contributor' = (profile as any)?.member_role ?? 'admin'
-  const companyOwnerId = (profile as any)?.company_id || profile?.id
+  const companyId = profile?.new_company_id ?? (profile as any)?.company_id ?? null
+  const isTeamMember = profile?.user_role === 'contributor'
+  const memberRole: 'admin' | 'contributor' = profile?.user_role ?? 'admin'
 
   const { data: companyProjects = [], isLoading: companyLoading } = useCompanyProjects(
-    isTeamMember && memberRole === 'admin' ? companyOwnerId : undefined
+    isTeamMember && memberRole === 'admin' ? companyId : undefined
   )
   const { data: memberProjects = [], isLoading: memberProjectsLoading } = useMyProjects(
     (isTeamMember && memberRole === 'contributor') ? profile?.id : undefined
@@ -32,13 +31,11 @@ export default function OwnerDashboard() {
   const projects = isTeamMember ? (memberRole === 'admin' ? companyProjects : memberProjects) : allProjects
   const projectsLoading = isTeamMember ? (memberRole === 'admin' ? companyLoading : memberProjectsLoading) : allProjectsLoading
 
-  const { data: gcs = [] } = useOwnerGCs(companyOwnerId)
-  const { data: trades = [] } = useOwnerTrades(companyOwnerId)
-  const { data: pending = [], isLoading: pendingLoading } = useOwnerPendingSubmissions(companyOwnerId)
-  const { data: teamMembers = [] } = useTeamMembers(isTeamMember ? undefined : profile?.id)
+  const { data: gcs = [] } = useOwnerGCs(companyId ?? profile?.id)
+  const { data: trades = [] } = useOwnerTrades(companyId ?? profile?.id)
+  const { data: pending = [], isLoading: pendingLoading } = useOwnerPendingSubmissions(companyId ?? profile?.id)
+  const { data: teamMembers = [] } = useTeamMembers(!isTeamMember ? (companyId ?? undefined) : undefined)
   const updateMemberRole = useUpdateMemberRole()
-  const { data: invitations = [] } = useSentInvitations(companyOwnerId)
-  const resendInvitation = useResendInvitation()
 
   const uniqueGCs = new Set(gcs.map((r) => r.contractorId)).size
   const uniqueTrades = new Set(trades.map((r) => r.contractorId)).size
@@ -53,9 +50,22 @@ export default function OwnerDashboard() {
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-500">Welcome back, {profile?.full_name || 'Owner'}</p>
+        <div className="flex items-center gap-3">
+          {profile?.company?.logo_path && (
+            <div className="w-14 h-14 rounded-xl bg-white border border-gray-200 flex items-center justify-center p-1.5 flex-shrink-0">
+              <img
+                src={getCompanyLogoUrl(profile.company.logo_path) ?? undefined}
+                alt=""
+                className="max-w-full max-h-full object-contain"
+              />
+            </div>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Welcome back, {profile?.full_name || 'Owner'} {profile?.company?.name ? `· ${profile.company.name}` : ''}
+            </p>
+          </div>
         </div>
         <div className="flex gap-2">
           {!isTeamMember && (
@@ -218,7 +228,7 @@ export default function OwnerDashboard() {
                     <td className="px-6 py-4 text-sm text-gray-600">{m.email}</td>
                     <td className="px-6 py-4">
                       <select
-                        value={m.member_role ?? 'contributor'}
+                        value={m.user_role ?? m.member_role ?? 'contributor'}
                         onChange={e => updateMemberRole.mutate({ userId: m.id, memberRole: e.target.value as 'admin' | 'contributor' })}
                         className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand-500"
                       >
@@ -235,58 +245,6 @@ export default function OwnerDashboard() {
         </div>
       )}
 
-      {/* Sent invitations */}
-      {invitations.length > 0 && (
-        <div className="card overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-gray-900">Invitations Sent</h2>
-            <Link to="/owner/invite?role=gc" className="text-sm text-brand-600 hover:text-brand-700 font-medium inline-flex items-center gap-1">
-              + Invite General Contractor
-            </Link>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  {['Recipient', 'Role', 'Sent', 'Status', ''].map((h) => (
-                    <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {invitations.slice(0, 10).map((inv) => (
-                  <tr key={inv.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-900">{inv.recipient_email}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{roleLabel(inv.recipient_role)}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{format(new Date(inv.created_at), 'MMM d, yyyy')}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        inv.status === 'accepted' ? 'bg-green-100 text-green-700' :
-                        inv.status === 'expired' ? 'bg-gray-100 text-gray-500' :
-                        'bg-yellow-100 text-yellow-700'
-                      }`}>
-                        {inv.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {inv.status !== 'accepted' && (
-                        <button
-                          onClick={() => resendInvitation.mutate(inv.id)}
-                          disabled={resendInvitation.isPending}
-                          className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 font-medium disabled:opacity-50"
-                        >
-                          <RefreshCw size={12} className={resendInvitation.isPending ? 'animate-spin' : ''} />
-                          Resend
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

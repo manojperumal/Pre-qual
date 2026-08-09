@@ -17,6 +17,7 @@ export interface Question {
   hint: string | null
   is_global: boolean
   is_required: boolean
+  requires_mojo_review: boolean
   created_at: string
 }
 
@@ -43,8 +44,11 @@ export interface QuestionnaireQuestion {
 export interface Assignment {
   id: string
   questionnaire_id: string
-  project_id: string
-  assignee_id: string
+  project_id: string | null
+  company_id: string | null
+  rule_id: string | null
+  is_exempt: boolean
+  assignee_id: string | null
   assigned_by: string
   due_date: string | null
   status: AssignmentStatus
@@ -55,8 +59,18 @@ export interface Assignment {
   updated_at: string
   questionnaire?: Questionnaire
   project?: { id: string; name: string }
+  company?: { id: string; name: string }
   assignee?: { full_name: string | null; company_name: string | null; email: string | null; role: string }
   assigner?: { full_name: string | null; company_name: string | null }
+}
+
+export interface AssignmentRule {
+  id: string
+  questionnaire_id: string
+  project_id: string
+  assigned_by: string
+  due_date: string | null
+  created_at: string
 }
 
 export interface Response {
@@ -69,9 +83,23 @@ export interface Response {
   document_name: string | null
   company_comments: string | null
   mojo_feedback: string | null
+  mojo_reviewed_at: string | null
+  mojo_reviewed_by: string | null
   ai_suggested: boolean
   created_at: string
   updated_at: string
+}
+
+export interface FlaggedResponse extends Response {
+  question: { question_text: string; category: QuestionCategory; requires_mojo_review: boolean }
+  assignment: {
+    id: string
+    status: AssignmentStatus
+    project: { name: string } | null
+    company: { name: string } | null
+    assignee: { full_name: string | null; email: string | null } | null
+    questionnaire: { name: string } | null
+  }
 }
 
 // ─── Question Bank ────────────────────────────────────────────────────────
@@ -101,6 +129,7 @@ export function useCreateQuestion() {
       options?: string[]
       hint?: string
       is_required?: boolean
+      requires_mojo_review?: boolean
       created_by: string
     }) => {
       const { data, error } = await supabase
@@ -126,19 +155,33 @@ export function useDeleteQuestion() {
   })
 }
 
+export function useUpdateQuestionMojoReview() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, requiresMojoReview }: { id: string; requiresMojoReview: boolean }) => {
+      const { error } = await supabase
+        .from('question_bank')
+        .update({ requires_mojo_review: requiresMojoReview })
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['question_bank'] }),
+  })
+}
+
 // ─── Questionnaires ───────────────────────────────────────────────────────
 
-// companyOwnerId: pass the company owner's ID for team members so they see company questionnaires
-export function useQuestionnaires(createdBy: string | undefined, companyOwnerId?: string) {
-  const effectiveId = companyOwnerId || createdBy
+// RLS scopes rows to: global questionnaires, your own, or any questionnaire
+// created by someone else in your company (see migration 020) — no need to
+// filter by a specific creator id here.
+export function useQuestionnaires(userId: string | undefined) {
   return useQuery({
-    queryKey: ['questionnaires', effectiveId],
-    enabled: !!effectiveId,
+    queryKey: ['questionnaires', userId],
+    enabled: !!userId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('questionnaires')
         .select('*')
-        .or(`created_by.eq.${effectiveId!},is_global.eq.true`)
         .order('is_global', { ascending: false })
         .order('created_at', { ascending: false })
       if (error) throw error
@@ -257,7 +300,7 @@ export function useProjectAssignments(projectId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('questionnaire_assignments')
-        .select('*, questionnaire:questionnaires(id,name), assignee:profiles!assignee_id(full_name,company_name,email,role), assigner:profiles!assigned_by(full_name,company_name)')
+        .select('*, questionnaire:questionnaires(id,name), company:companies(id,name), assignee:profiles!assignee_id(full_name,company_name,email,role), assigner:profiles!assigned_by(full_name,company_name)')
         .eq('project_id', projectId!)
         .order('created_at', { ascending: false })
       if (error) throw error
@@ -266,15 +309,22 @@ export function useProjectAssignments(projectId: string | undefined) {
   })
 }
 
-export function useMyAssignments(assigneeId: string | undefined) {
+// Company-shared: any admin/contributor at the company sees assignments made
+// to their company, plus (for backward compat) any legacy row still
+// pointed at them individually via assignee_id.
+export function useMyAssignments(userId: string | undefined, companyId?: string | null) {
   return useQuery({
-    queryKey: ['assignments', 'mine', assigneeId],
-    enabled: !!assigneeId,
+    queryKey: ['assignments', 'mine', userId, companyId],
+    enabled: !!userId,
     queryFn: async () => {
+      const filter = companyId
+        ? `assignee_id.eq.${userId},company_id.eq.${companyId}`
+        : `assignee_id.eq.${userId}`
       const { data, error } = await supabase
         .from('questionnaire_assignments')
-        .select('*, questionnaire:questionnaires(id,name), project:projects(id,name), assigner:profiles!assigned_by(full_name,company_name)')
-        .eq('assignee_id', assigneeId!)
+        .select('*, questionnaire:questionnaires(id,name), project:projects(id,name), company:companies(id,name), assigner:profiles!assigned_by(full_name,company_name)')
+        .or(filter)
+        .eq('is_exempt', false)
         .order('created_at', { ascending: false })
       if (error) throw error
       return data as Assignment[]
@@ -298,27 +348,73 @@ export function useAssignment(assignmentId: string | undefined) {
   })
 }
 
+// Direct assignment to one company — project_id optional (omit for "applies
+// across all projects with this company"). assignee_id is no longer set up
+// front; whoever at the company actually opens/submits it is stamped later.
 export function useCreateAssignment() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (a: {
       questionnaire_id: string
-      project_id: string
-      assignee_id: string
+      company_id: string
       assigned_by: string
+      project_id?: string
       due_date?: string
     }) => {
       const { data, error } = await supabase
         .from('questionnaire_assignments')
-        .insert({ ...a, due_date: a.due_date || null })
+        .insert({ ...a, project_id: a.project_id || null, due_date: a.due_date || null })
         .select()
         .single()
       if (error) throw error
       return data as Assignment
     },
     onSuccess: (_, vars) => {
-      qc.invalidateQueries({ queryKey: ['assignments', 'project', vars.project_id] })
+      if (vars.project_id) qc.invalidateQueries({ queryKey: ['assignments', 'project', vars.project_id] })
+      qc.invalidateQueries({ queryKey: ['assignments', 'mine'] })
     },
+  })
+}
+
+// "Whole project" rule — fans out into one instance per company via a
+// database trigger (including companies that join the project later).
+export function useCreateAssignmentRule() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (r: {
+      questionnaire_id: string
+      project_id: string
+      assigned_by: string
+      due_date?: string
+    }) => {
+      const { data, error } = await supabase
+        .from('questionnaire_assignment_rules')
+        .insert({ ...r, due_date: r.due_date || null })
+        .select()
+        .single()
+      if (error) throw error
+      return data as AssignmentRule
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['assignments', 'project', vars.project_id] })
+      qc.invalidateQueries({ queryKey: ['assignments', 'mine'] })
+    },
+  })
+}
+
+// Exempt one company from a project-wide rule's auto-generated instance,
+// without touching any other assignment (e.g. a direct one) they have.
+export function useExemptAssignment() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (assignmentId: string) => {
+      const { error } = await supabase
+        .from('questionnaire_assignments')
+        .update({ is_exempt: true })
+        .eq('id', assignmentId)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['assignments'] }),
   })
 }
 
@@ -330,11 +426,14 @@ export function useUpdateAssignmentStatus() {
       status,
       reviewerNotes,
       reviewedBy,
+      assigneeId,
     }: {
       id: string
       status: AssignmentStatus
       reviewerNotes?: string
       reviewedBy?: string
+      /** Stamps who at the company actually did the work — company-shared assignments aren't pre-tied to one person. */
+      assigneeId?: string
     }) => {
       const { data, error } = await supabase
         .from('questionnaire_assignments')
@@ -343,6 +442,7 @@ export function useUpdateAssignmentStatus() {
           reviewer_notes: reviewerNotes || null,
           reviewed_by: reviewedBy || null,
           reviewed_at: new Date().toISOString(),
+          ...(assigneeId ? { assignee_id: assigneeId } : {}),
         })
         .eq('id', id)
         .select()
@@ -371,6 +471,54 @@ export function useAssignmentResponses(assignmentId: string | undefined) {
       if (error) throw error
       return data as Response[]
     },
+  })
+}
+
+// ─── Mojo review queue ──────────────────────────────────────────────────
+
+export function useFlaggedResponses() {
+  return useQuery({
+    queryKey: ['flagged_responses'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('questionnaire_responses')
+        .select(
+          '*, question:question_bank!inner(question_text, category, requires_mojo_review), assignment:questionnaire_assignments(id, status, project:projects(name), company:companies(name), assignee:profiles!assignee_id(full_name, email), questionnaire:questionnaires(name))'
+        )
+        .eq('question.requires_mojo_review', true)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return data as unknown as FlaggedResponse[]
+    },
+  })
+}
+
+export function useMarkResponseMojoReviewed() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      id,
+      reviewedBy,
+      feedback,
+      reviewed,
+    }: {
+      id: string
+      reviewedBy: string
+      feedback?: string
+      /** false re-opens a previously reviewed response */
+      reviewed: boolean
+    }) => {
+      const { error } = await supabase
+        .from('questionnaire_responses')
+        .update({
+          mojo_reviewed_at: reviewed ? new Date().toISOString() : null,
+          mojo_reviewed_by: reviewed ? reviewedBy : null,
+          ...(feedback !== undefined ? { mojo_feedback: feedback || null } : {}),
+        })
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['flagged_responses'] }),
   })
 }
 

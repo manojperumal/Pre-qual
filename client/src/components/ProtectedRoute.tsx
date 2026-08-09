@@ -26,11 +26,16 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  if (profile && !allowedRoles.includes(profile.role)) {
-    // Redirect to the correct dashboard for this user's role
-    if (profile.role === 'owner') return <Navigate to="/owner" replace />
-    if (profile.role === 'gc') return <Navigate to="/gc" replace />
-    return <Navigate to="/trade" replace />
+  if (profile) {
+    // Use company_type if available, fall back to role during transition
+    const effectiveRole = profile.company_type ?? profile.role
+
+    if (!allowedRoles.includes(effectiveRole)) {
+      if (profile.is_mojo_admin) return <Navigate to="/mojo-admin" replace />
+      if (effectiveRole === 'owner') return <Navigate to="/owner" replace />
+      if (effectiveRole === 'gc') return <Navigate to="/gc" replace />
+      return <Navigate to="/trade" replace />
+    }
   }
 
   return <>{children}</>

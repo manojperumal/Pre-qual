@@ -2,11 +2,11 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useProjects, useMyProjects, useTeamMembers, useCompanyProjects, useUpdateMemberRole } from '@/hooks/useProjects'
 import { useContractorProfile, useProjectSubmission } from '@/hooks/useContractorProfile'
-import { useSentInvitations, useResendInvitation } from '@/hooks/usePrequals'
+import { useSentInvitations } from '@/hooks/usePrequals'
+import { getCompanyLogoUrl } from '@/hooks/useCompany'
 import { useMyAssignments } from '@/hooks/useQuestionnaires'
-import { FolderOpen, User, Send, UserPlus, CheckCircle, Clock, AlertCircle, ClipboardList, Users, RefreshCw } from 'lucide-react'
+import { FolderOpen, User, Send, UserPlus, CheckCircle, Clock, AlertCircle, ClipboardList, Users, MapPin } from 'lucide-react'
 import { format } from 'date-fns'
-import { roleLabel } from '@/lib/roleLabels'
 
 const SUBMISSION_COLORS: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
@@ -37,6 +37,12 @@ function ProjectCard({ project, userId }: { project: any; userId: string }) {
           </Link>
           {project.description && (
             <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{project.description}</p>
+          )}
+          {project.address && (
+            <p className="text-xs text-gray-400 mt-0.5 truncate inline-flex items-center gap-1">
+              <MapPin size={11} className="flex-shrink-0" />
+              {project.address}
+            </p>
           )}
         </div>
         <FolderOpen size={16} className="text-brand-400 flex-shrink-0 mt-0.5" />
@@ -76,13 +82,13 @@ function ProjectCard({ project, userId }: { project: any; userId: string }) {
 export default function GCDashboard() {
   const { profile } = useAuth()
 
-  // If this GC is a team member (has company_id), scope to their project_members only
-  const isTeamMember = !!(profile as any)?.company_id
-  const memberRole: 'admin' | 'contributor' = (profile as any)?.member_role ?? 'admin'
-  const companyOwnerId = (profile as any)?.company_id || profile?.id
+  // Use new_company_id as the company identifier; fall back to old company_id during transition
+  const companyId = profile?.new_company_id ?? (profile as any)?.company_id ?? null
+  const isTeamMember = profile?.user_role === 'contributor'
+  const memberRole: 'admin' | 'contributor' = profile?.user_role ?? 'admin'
 
   const { data: companyProjects = [], isLoading: companyLoading } = useCompanyProjects(
-    isTeamMember && memberRole === 'admin' ? companyOwnerId : undefined
+    isTeamMember && memberRole === 'admin' ? companyId : undefined
   )
   const { data: memberProjects = [], isLoading: memberProjectsLoading } = useMyProjects(
     (isTeamMember && memberRole === 'contributor') ? profile?.id : undefined
@@ -90,11 +96,10 @@ export default function GCDashboard() {
   const { data: allProjects = [], isLoading: allProjectsLoading } = useProjects(
     !isTeamMember ? profile?.id : undefined
   )
-  const { data: invitations = [] } = useSentInvitations(companyOwnerId)
-  const resendInvitation = useResendInvitation()
+  const { data: invitations = [] } = useSentInvitations(companyId ?? profile?.id)
   const { data: contractorProfile } = useContractorProfile(profile?.id)
-  const { data: myAssignments = [] } = useMyAssignments(profile?.id)
-  const { data: teamMembers = [] } = useTeamMembers(isTeamMember ? undefined : profile?.id)
+  const { data: myAssignments = [] } = useMyAssignments(profile?.id, companyId)
+  const { data: teamMembers = [] } = useTeamMembers(!isTeamMember ? (companyId ?? undefined) : undefined)
   const updateMemberRole = useUpdateMemberRole()
 
   const projectsLoading = isTeamMember
@@ -115,9 +120,20 @@ export default function GCDashboard() {
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-500">Welcome back, {profile?.full_name || profile?.company_name || 'GC'}</p>
+        <div className="flex items-center gap-3">
+          {profile?.company?.logo_path && (
+            <div className="w-14 h-14 rounded-xl bg-white border border-gray-200 flex items-center justify-center p-1.5 flex-shrink-0">
+              <img
+                src={getCompanyLogoUrl(profile.company.logo_path) ?? undefined}
+                alt=""
+                className="max-w-full max-h-full object-contain"
+              />
+            </div>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+            <p className="mt-1 text-sm text-gray-500">Welcome back, {profile?.full_name || profile?.company_name || 'GC'} {profile?.company?.name ? `· ${profile.company.name}` : ''}</p>
+          </div>
         </div>
         <div className="flex gap-2">
           {!isTeamMember && (
@@ -245,7 +261,7 @@ export default function GCDashboard() {
                       <td className="px-6 py-4 text-sm text-gray-600">{m.email}</td>
                       <td className="px-6 py-4">
                         <select
-                          value={m.member_role ?? 'contributor'}
+                          value={m.user_role ?? m.member_role ?? 'contributor'}
                           onChange={e => updateMemberRole.mutate({ userId: m.id, memberRole: e.target.value as 'admin' | 'contributor' })}
                           className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         >
@@ -263,58 +279,6 @@ export default function GCDashboard() {
         </div>
       )}
 
-      {/* Sent invitations */}
-      {invitations.length > 0 && (
-        <div className="card overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-gray-900">Invitations Sent</h2>
-            <Link to="/gc/invite?role=trade" className="text-sm text-brand-600 hover:text-brand-700 font-medium inline-flex items-center gap-1">
-              + Invite Trade
-            </Link>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  {['Recipient', 'Role', 'Sent', 'Status', ''].map((h) => (
-                    <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {invitations.slice(0, 10).map((inv) => (
-                  <tr key={inv.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-900">{inv.recipient_email}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{roleLabel(inv.recipient_role)}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{format(new Date(inv.created_at), 'MMM d, yyyy')}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        inv.status === 'accepted' ? 'bg-green-100 text-green-700' :
-                        inv.status === 'expired' ? 'bg-gray-100 text-gray-500' :
-                        'bg-yellow-100 text-yellow-700'
-                      }`}>
-                        {inv.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {inv.status !== 'accepted' && (
-                        <button
-                          onClick={() => resendInvitation.mutate(inv.id)}
-                          disabled={resendInvitation.isPending}
-                          className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 font-medium disabled:opacity-50"
-                        >
-                          <RefreshCw size={12} className={resendInvitation.isPending ? 'animate-spin' : ''} />
-                          Resend
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

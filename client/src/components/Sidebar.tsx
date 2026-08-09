@@ -1,6 +1,8 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { getCompanyLogoUrl } from '@/hooks/useCompany'
 import { MojoLogo } from './MojoLogo'
+import { Building2 } from 'lucide-react'
 import clsx from 'clsx'
 import {
   LayoutDashboard,
@@ -12,6 +14,8 @@ import {
   FileText,
   Database,
   ClipboardList,
+  Users,
+  Settings,
 } from 'lucide-react'
 
 interface NavItem {
@@ -26,27 +30,35 @@ const ROLE_NAV: Record<string, NavItem[]> = {
     { label: 'Projects', to: '/owner/projects', icon: <FolderOpen size={18} /> },
     { label: 'General Contractors', to: '/owner/general-contractors', icon: <HardHat size={18} /> },
     { label: 'Trades', to: '/owner/trades', icon: <Wrench size={18} /> },
+    { label: 'My Team', to: '/owner/my-team', icon: <Users size={18} /> },
     { label: 'Questionnaires', to: '/owner/questionnaires', icon: <FileText size={18} /> },
     { label: 'Question Bank', to: '/owner/question-bank', icon: <Database size={18} /> },
+    { label: 'Settings', to: '/owner/settings', icon: <Settings size={18} /> },
   ],
   gc: [
     { label: 'Dashboard', to: '/gc', icon: <LayoutDashboard size={18} /> },
     { label: 'My Profile', to: '/gc/profile', icon: <User size={18} /> },
+    { label: 'My Projects', to: '/gc/my-projects', icon: <FolderOpen size={18} /> },
+    { label: 'My Team', to: '/gc/my-team', icon: <Users size={18} /> },
+    { label: 'Trades', to: '/gc/trades', icon: <Wrench size={18} /> },
     { label: 'Questionnaires', to: '/gc/questionnaires', icon: <FileText size={18} /> },
     { label: 'My Assignments', to: '/gc/assignments', icon: <ClipboardList size={18} /> },
   ],
   trade: [
     { label: 'Dashboard', to: '/trade', icon: <LayoutDashboard size={18} /> },
     { label: 'My Profile', to: '/trade/profile', icon: <User size={18} /> },
+    { label: 'My Projects', to: '/trade/my-projects', icon: <FolderOpen size={18} /> },
+    { label: 'My Team', to: '/trade/my-team', icon: <Users size={18} /> },
     { label: 'My Assignments', to: '/trade/assignments', icon: <ClipboardList size={18} /> },
   ],
 }
 
 export function Sidebar() {
-  const { profile, signOut } = useAuth()
+  const { profile, company, signOut } = useAuth()
   const navigate = useNavigate()
   const role = profile?.role ?? 'owner'
   const navItems = ROLE_NAV[role] ?? ROLE_NAV.owner
+  const companyLogoUrl = getCompanyLogoUrl(company?.logo_path)
 
   async function handleSignOut() {
     await signOut()
@@ -59,6 +71,19 @@ export function Sidebar() {
       <div className="px-5 py-5 border-b border-white/10">
         <MojoLogo size="md" subtitle="Pre-qualification" />
       </div>
+
+      {/* Company branding */}
+      {company && (
+        <div className="flex items-center justify-center px-5 py-4 border-b border-white/10">
+          {companyLogoUrl ? (
+            <img src={companyLogoUrl} alt={company.name} title={company.name} className="max-w-full h-20 object-contain" />
+          ) : (
+            <div className="w-full h-20 rounded-lg bg-white/10 flex items-center justify-center" title={company.name}>
+              <Building2 size={28} className="text-white/50" />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1">

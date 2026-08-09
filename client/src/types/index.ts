@@ -1,4 +1,56 @@
 export type UserRole = 'owner' | 'gc' | 'trade'
+export type CompanyType = 'owner' | 'gc' | 'trade'
+export type UserRoleWithinCompany = 'admin' | 'contributor'
+export type BillingMode = 'pays_all' | 'platform_only'
+
+export interface Company {
+  id: string
+  name: string
+  type: CompanyType
+  address: string | null
+  city: string | null
+  state: string | null
+  zip: string | null
+  phone: string | null
+  website: string | null
+  logo_path: string | null
+  billing_mode: BillingMode
+  created_at: string
+  updated_at: string
+}
+
+export interface Subscription {
+  id: string
+  company_id: string
+  plan: 'annual'
+  status: 'active' | 'past_due' | 'canceled'
+  current_period_start: string
+  current_period_end: string
+  stripe_subscription_id: string | null
+  created_at: string
+}
+
+export interface ProjectSubmissionPayment {
+  id: string
+  project_id: string
+  company_id: string
+  amount_cents: number
+  currency: string
+  status: 'pending' | 'paid' | 'failed' | 'refunded'
+  stripe_payment_intent_id: string | null
+  created_at: string
+  paid_at: string | null
+}
+
+export interface CompanyDocument {
+  id: string
+  company_id: string
+  document_type: 'safety_manual' | 'coi' | 'w9' | 'loss_runs' | 'license' | 'other'
+  document_name: string
+  storage_path: string
+  uploaded_by: string | null
+  created_at: string
+}
 
 export type PrequalStatus =
   | 'draft'
@@ -13,17 +65,29 @@ export type DocType = 'coi' | 'safety' | 'financial'
 
 export interface Profile {
   id: string
+  // Legacy — keep during transition
   role: UserRole
   company_name: string | null
+  company_id: string | null
+  member_role: UserRoleWithinCompany | null
+  // New
+  new_company_id: string | null
+  company_type: CompanyType | null
+  user_role: UserRoleWithinCompany
+  is_mojo_admin: boolean
+  // Personal
   full_name: string | null
   email: string | null
   created_at: string
+  // Joined
+  company?: Company | null
 }
 
 export interface Project {
   id: string
   name: string
   description?: string
+  address?: string | null
   owner_id: string
   start_date?: string | null
   end_date?: string | null
@@ -95,7 +159,8 @@ export interface Invitation {
   id: string
   sender_id: string
   recipient_email: string
-  recipient_role: 'gc' | 'trade'
+  recipient_role: 'gc' | 'trade' | 'gc_member' | 'owner_member' | 'trade_member'
+  recipient_company_name?: string | null
   status: InvitationStatus
   prequalification_id: string | null
   project_id?: string
@@ -219,4 +284,15 @@ export interface SubmissionDocument {
   file_name: string
   storage_path: string
   uploaded_at: string
+}
+
+export interface Notification {
+  id: string
+  user_id: string
+  type: string
+  title: string
+  body: string | null
+  link: string | null
+  is_read: boolean
+  created_at: string
 }

@@ -28,7 +28,8 @@ function createTransporter() {
 const sendSchema = z.object({
   recipient_email: z.string().email(),
   recipient_role: z.enum(['gc', 'trade', 'gc_member', 'owner_member', 'trade_member']),
-  project_id: z.string().uuid().optional(),
+  recipient_company_name: z.string().trim().min(1).optional(),
+  project_ids: z.array(z.string().uuid()).optional(),
 })
 
 /**
@@ -68,39 +69,41 @@ router.post('/send', requireAuth, async (req: Request, res: Response): Promise<v
     return
   }
 
-  const { recipient_email, recipient_role, project_id } = parsed.data
+  const { recipient_email, recipient_role, recipient_company_name, project_ids } = parsed.data
   const senderId = req.userId!
 
   // Generate a secure token
   const token = randomBytes(32).toString('hex')
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
 
-  // Fetch sender profile
+  // Fetch sender profile + company name
   const { data: sender } = await supabaseAdmin
     .from('profiles')
-    .select('full_name, company_name, email')
+    .select('full_name, company_name, email, company:companies!new_company_id(name)')
     .eq('id', senderId)
     .single()
 
-  // Fetch project name if project_id provided
-  let projectName: string | undefined
-  if (project_id) {
-    const { data: project } = await supabaseAdmin
+  // Fetch project names if any project_ids provided
+  let projectNames: string[] = []
+  if (project_ids?.length) {
+    const { data: projectRows } = await supabaseAdmin
       .from('projects')
-      .select('name')
-      .eq('id', project_id)
-      .single()
-    projectName = project?.name
+      .select('id, name')
+      .in('id', project_ids)
+    projectNames = (projectRows ?? []).map((p) => p.name)
   }
 
-  // Insert invitation record (store gc_member as-is in recipient_role)
+  // Insert invitation record (store gc_member as-is in recipient_role).
+  // project_id keeps the first attached project for backward-compat display;
+  // the full set (including zero or many) lives in invitation_projects.
   const { data: invitation, error: insertErr } = await supabaseAdmin
     .from('invitations')
     .insert({
       sender_id: senderId,
       recipient_email,
       recipient_role,
-      project_id: project_id ?? null,
+      recipient_company_name: recipient_company_name ?? null,
+      project_id: project_ids?.[0] ?? null,
       token,
       expires_at: expiresAt,
       status: 'pending',
@@ -114,13 +117,25 @@ router.post('/send', requireAuth, async (req: Request, res: Response): Promise<v
     return
   }
 
-  const senderName = (sender as any)?.company_name || (sender as any)?.full_name || 'A construction company'
+  if (project_ids?.length) {
+    const { error: linkErr } = await supabaseAdmin
+      .from('invitation_projects')
+      .insert(project_ids.map((project_id) => ({ invitation_id: invitation.id, project_id })))
+    if (linkErr) {
+      console.error('[invitations] Failed to link projects:', linkErr)
+    }
+  }
+
+  const senderName = (sender as any)?.company?.name || (sender as any)?.company_name || (sender as any)?.full_name || 'A construction company'
   const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173'
   const inviteLink = `${clientUrl}/invite/${token}`
   const recipientRoleLabel =
     recipient_role === 'gc' ? 'General Contractor' :
     recipient_role === 'trade' ? 'Trade Subcontractor' :
     'Team Member'
+  const projectLine = projectNames.length
+    ? ` for ${projectNames.length === 1 ? 'the project' : 'the projects'} <strong>${projectNames.join(', ')}</strong>`
+    : ''
 
   // Send email or log to console
   const transporter = createTransporter()
@@ -157,7 +172,7 @@ router.post('/send', requireAuth, async (req: Request, res: Response): Promise<v
             </div>
             <div class="body">
               <p>Hello,</p>
-              <p><strong>${senderName}</strong> has invited you to join their team as a <strong>${recipientRoleLabel}</strong>${projectName ? ` for the project <strong>${projectName}</strong>` : ''}.</p>
+              <p><strong>${senderName}</strong> has invited you to join their team as a <strong>${recipientRoleLabel}</strong>${projectLine}.</p>
               <p>Please click the button below to accept your invitation:</p>
               <a href="${inviteLink}" class="btn">Accept Invitation →</a>
               <p style="margin-top: 24px; color: #6b7280; font-size: 13px;">Or copy this link: ${inviteLink}</p>
@@ -223,10 +238,10 @@ router.post('/resend', requireAuth, async (req: Request, res: Response): Promise
     return
   }
 
-  // Fetch sender profile and project name
+  // Fetch sender profile + company name
   const { data: sender } = await supabaseAdmin
     .from('profiles')
-    .select('full_name, company_name, email')
+    .select('full_name, company_name, email, company:companies!new_company_id(name)')
     .eq('id', senderId)
     .single()
 
@@ -240,7 +255,7 @@ router.post('/resend', requireAuth, async (req: Request, res: Response): Promise
     projectName = project?.name
   }
 
-  const senderName = (sender as any)?.company_name || (sender as any)?.full_name || 'A construction company'
+  const senderName = (sender as any)?.company?.name || (sender as any)?.company_name || (sender as any)?.full_name || 'A construction company'
   const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173'
   const inviteLink = `${clientUrl}/invite/${token}`
   const recipientRoleLabel =
@@ -313,7 +328,7 @@ router.get('/token/:token', async (req: Request, res: Response): Promise<void> =
 
   const { data: invitation, error } = await supabaseAdmin
     .from('invitations')
-    .select('*, sender:profiles!sender_id(id, full_name, company_name), project:projects(name)')
+    .select('*, sender:profiles!sender_id(id, full_name, company_name, company:companies!new_company_id(name)), invitation_projects(project:projects(id, name))')
     .eq('token', token)
     .single()
 
@@ -332,16 +347,19 @@ router.get('/token/:token', async (req: Request, res: Response): Promise<void> =
     return
   }
 
-  const sender = invitation.sender as { id?: string; full_name?: string; company_name?: string } | null
-  const project = invitation.project as { name?: string } | null
+  const sender = invitation.sender as { id?: string; full_name?: string; company_name?: string; company?: { name?: string } } | null
+  const projects = ((invitation.invitation_projects ?? []) as any[])
+    .map((ip) => ip.project)
+    .filter(Boolean) as { id: string; name: string }[]
 
   res.json({
     recipient_email: invitation.recipient_email,
     recipient_role: invitation.recipient_role,
+    recipient_company_name: invitation.recipient_company_name,
     project_id: invitation.project_id,
-    project_name: project?.name,
+    projects,
     sender_id: sender?.id,
-    sender_name: sender?.company_name || sender?.full_name,
+    sender_name: sender?.company?.name || sender?.company_name || sender?.full_name,
   })
 })
 
@@ -362,7 +380,7 @@ router.post('/accept', requireAuth, async (req: Request, res: Response): Promise
 
   const { data: invitation, error } = await supabaseAdmin
     .from('invitations')
-    .select('*, sender:profiles!sender_id(id, company_id)')
+    .select('*, sender:profiles!sender_id(id, company_id, new_company_id)')
     .eq('token', token)
     .single()
 
@@ -394,42 +412,68 @@ router.post('/accept', requireAuth, async (req: Request, res: Response): Promise
     return
   }
 
-  // For team member invites: set company_id and correct role on the acceptor's profile
+  // For team member invites: set company on the acceptor's profile
   const memberRoleMap: Record<string, string> = {
     gc_member: 'gc',
     owner_member: 'owner',
     trade_member: 'trade',
   }
   if (memberRoleMap[invitation.recipient_role]) {
-    const sender = invitation.sender as { id?: string; company_id?: string } | null
-    const companyId = sender?.company_id || sender?.id
-    if (companyId) {
+    const sender = invitation.sender as { id?: string; company_id?: string; new_company_id?: string } | null
+    const companyType = memberRoleMap[invitation.recipient_role]
+    // Legacy self-ref company_id fallback: sender.company_id || sender.id
+    const legacyCompanyId = sender?.company_id || sender?.id
+    const newCompanyId = sender?.new_company_id
+
+    if (legacyCompanyId || newCompanyId) {
       await supabaseAdmin
         .from('profiles')
         .update({
-          company_id: companyId,
-          role: memberRoleMap[invitation.recipient_role],
+          // Legacy columns — keep populated during transition
+          company_id: legacyCompanyId,
+          role: companyType,
           member_role: 'contributor',
+          // New columns
+          new_company_id: newCompanyId ?? null,
+          company_type: companyType,
+          user_role: 'contributor',
         })
         .eq('id', req.userId!)
     }
   }
 
-  // Insert project_member if project_id is set
-  if (invitation.project_id) {
+  // Connect to every project attached to the invite (zero, one, or many).
+  // Falls back to the legacy single project_id for invites sent before
+  // multi-project support existed.
+  const { data: linkedProjects } = await supabaseAdmin
+    .from('invitation_projects')
+    .select('project_id')
+    .eq('invitation_id', invitation.id)
+
+  const projectIds = linkedProjects?.length
+    ? linkedProjects.map((p) => p.project_id)
+    : invitation.project_id
+      ? [invitation.project_id]
+      : []
+
+  if (projectIds.length) {
     const memberRole = memberRoleMap[invitation.recipient_role] ?? invitation.recipient_role
-    await supabaseAdmin
+    const { data: existingMemberships } = await supabaseAdmin
       .from('project_members')
-      .insert({
-        project_id: invitation.project_id,
-        user_id: req.userId,
-        role: memberRole,
-      })
-      .select()
-      .single()
+      .select('project_id')
+      .eq('user_id', req.userId!)
+      .in('project_id', projectIds)
+    const alreadyMember = new Set((existingMemberships ?? []).map((m) => m.project_id))
+    const toInsert = projectIds
+      .filter((id) => !alreadyMember.has(id))
+      .map((project_id) => ({ project_id, user_id: req.userId, role: memberRole }))
+
+    if (toInsert.length) {
+      await supabaseAdmin.from('project_members').insert(toInsert)
+    }
   }
 
-  res.json({ success: true, project_id: invitation.project_id ?? null })
+  res.json({ success: true, project_ids: projectIds })
 })
 
 export default router

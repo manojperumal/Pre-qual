@@ -18,7 +18,8 @@ const VIEW_STATUSES: AssignmentStatus[] = ['submitted', 'approved', 'rejected']
 
 export default function MyAssignmentsPage() {
   const { profile } = useAuth()
-  const { data: assignments = [], isLoading } = useMyAssignments(profile?.id)
+  const companyId = profile?.new_company_id ?? (profile as any)?.company_id ?? null
+  const { data: assignments = [], isLoading } = useMyAssignments(profile?.id, companyId)
 
   const role = profile?.role ?? 'trade'
 
@@ -66,7 +67,7 @@ export default function MyAssignmentsPage() {
                         {a.questionnaire?.name ?? '—'}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
-                        {a.project?.name ?? '—'}
+                        {a.project?.name ?? <span className="text-xs text-gray-400 italic">All projects</span>}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
                         {a.assigner?.company_name || a.assigner?.full_name || '—'}
