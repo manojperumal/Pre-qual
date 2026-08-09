@@ -155,6 +155,29 @@ export function useDeleteQuestion() {
   })
 }
 
+export function useUpdateQuestion() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (q: {
+      id: string
+      category: QuestionCategory
+      question_text: string
+      answer_type: AnswerType
+      options?: string[]
+      hint?: string
+      is_required?: boolean
+    }) => {
+      const { id, ...updates } = q
+      const { error } = await supabase
+        .from('question_bank')
+        .update({ ...updates, options: updates.options ?? null, hint: updates.hint || null })
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['question_bank'] }),
+  })
+}
+
 export function useUpdateQuestionMojoReview() {
   const qc = useQueryClient()
   return useMutation({
