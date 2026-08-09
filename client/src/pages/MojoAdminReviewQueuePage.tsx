@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useFlaggedResponses, useMarkResponseMojoReviewed, FlaggedResponse } from '@/hooks/useQuestionnaires'
 import { supabase } from '@/lib/supabase'
-import { ArrowLeft, ShieldCheck, CheckCircle, RotateCcw } from 'lucide-react'
+import { ShieldCheck, CheckCircle, RotateCcw } from 'lucide-react'
 import { format } from 'date-fns'
 
 function DocumentLink({ path, name }: { path: string; name: string | null }) {
@@ -115,56 +114,50 @@ export default function MojoAdminReviewQueuePage() {
   const shown = tab === 'pending' ? pending : reviewed
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
-        <div>
-          <Link to="/mojo-admin" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-3">
-            <ArrowLeft size={14} />
-            Companies
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900 inline-flex items-center gap-2">
-            <ShieldCheck size={22} className="text-brand-600" />
-            Mojo Review Queue
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Answers to questions flagged for Mojo review. This runs alongside the company's own approval — it doesn't block it.
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 inline-flex items-center gap-2">
+          <ShieldCheck size={22} className="text-brand-600" />
+          Mojo Review Queue
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Answers to questions flagged for Mojo review. This runs alongside the company's own approval — it doesn't block it.
+        </p>
+      </div>
+
+      <div className="flex gap-1 p-1 bg-gray-100 rounded-xl w-fit">
+        <button
+          onClick={() => setTab('pending')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'pending' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          Pending ({pending.length})
+        </button>
+        <button
+          onClick={() => setTab('reviewed')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'reviewed' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          Reviewed ({reviewed.length})
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" />
+        </div>
+      ) : shown.length === 0 ? (
+        <div className="card p-12 text-center text-gray-500">
+          <ShieldCheck size={32} className="mx-auto mb-3 text-gray-300" />
+          <p className="font-medium">
+            {tab === 'pending' ? 'Nothing pending review' : 'Nothing reviewed yet'}
           </p>
         </div>
-
-        <div className="flex gap-1 p-1 bg-gray-100 rounded-xl w-fit">
-          <button
-            onClick={() => setTab('pending')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'pending' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            Pending ({pending.length})
-          </button>
-          <button
-            onClick={() => setTab('reviewed')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'reviewed' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            Reviewed ({reviewed.length})
-          </button>
+      ) : (
+        <div className="space-y-4">
+          {shown.map((item) => (
+            <QueueItem key={item.id} item={item} />
+          ))}
         </div>
-
-        {isLoading ? (
-          <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" />
-          </div>
-        ) : shown.length === 0 ? (
-          <div className="card p-12 text-center text-gray-500">
-            <ShieldCheck size={32} className="mx-auto mb-3 text-gray-300" />
-            <p className="font-medium">
-              {tab === 'pending' ? 'Nothing pending review' : 'Nothing reviewed yet'}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {shown.map((item) => (
-              <QueueItem key={item.id} item={item} />
-            ))}
-          </div>
-        )}
-      </div>
+      )}
     </div>
   )
 }
