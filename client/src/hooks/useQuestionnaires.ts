@@ -43,8 +43,11 @@ export interface QuestionnaireQuestion {
 export interface Assignment {
   id: string
   questionnaire_id: string
-  project_id: string
-  assignee_id: string
+  project_id: string | null
+  company_id: string | null
+  rule_id: string | null
+  is_exempt: boolean
+  assignee_id: string | null
   assigned_by: string
   due_date: string | null
   status: AssignmentStatus
@@ -55,8 +58,18 @@ export interface Assignment {
   updated_at: string
   questionnaire?: Questionnaire
   project?: { id: string; name: string }
+  company?: { id: string; name: string }
   assignee?: { full_name: string | null; company_name: string | null; email: string | null; role: string }
   assigner?: { full_name: string | null; company_name: string | null }
+}
+
+export interface AssignmentRule {
+  id: string
+  questionnaire_id: string
+  project_id: string
+  assigned_by: string
+  due_date: string | null
+  created_at: string
 }
 
 export interface Response {
@@ -257,7 +270,7 @@ export function useProjectAssignments(projectId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('questionnaire_assignments')
-        .select('*, questionnaire:questionnaires(id,name), assignee:profiles!assignee_id(full_name,company_name,email,role), assigner:profiles!assigned_by(full_name,company_name)')
+        .select('*, questionnaire:questionnaires(id,name), company:companies(id,name), assignee:profiles!assignee_id(full_name,company_name,email,role), assigner:profiles!assigned_by(full_name,company_name)')
         .eq('project_id', projectId!)
         .order('created_at', { ascending: false })
       if (error) throw error
@@ -266,15 +279,22 @@ export function useProjectAssignments(projectId: string | undefined) {
   })
 }
 
-export function useMyAssignments(assigneeId: string | undefined) {
+// Company-shared: any admin/contributor at the company sees assignments made
+// to their company, plus (for backward compat) any legacy row still
+// pointed at them individually via assignee_id.
+export function useMyAssignments(userId: string | undefined, companyId?: string | null) {
   return useQuery({
-    queryKey: ['assignments', 'mine', assigneeId],
-    enabled: !!assigneeId,
+    queryKey: ['assignments', 'mine', userId, companyId],
+    enabled: !!userId,
     queryFn: async () => {
+      const filter = companyId
+        ? `assignee_id.eq.${userId},company_id.eq.${companyId}`
+        : `assignee_id.eq.${userId}`
       const { data, error } = await supabase
         .from('questionnaire_assignments')
-        .select('*, questionnaire:questionnaires(id,name), project:projects(id,name), assigner:profiles!assigned_by(full_name,company_name)')
-        .eq('assignee_id', assigneeId!)
+        .select('*, questionnaire:questionnaires(id,name), project:projects(id,name), company:companies(id,name), assigner:profiles!assigned_by(full_name,company_name)')
+        .or(filter)
+        .eq('is_exempt', false)
         .order('created_at', { ascending: false })
       if (error) throw error
       return data as Assignment[]
@@ -298,27 +318,73 @@ export function useAssignment(assignmentId: string | undefined) {
   })
 }
 
+// Direct assignment to one company — project_id optional (omit for "applies
+// across all projects with this company"). assignee_id is no longer set up
+// front; whoever at the company actually opens/submits it is stamped later.
 export function useCreateAssignment() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (a: {
       questionnaire_id: string
-      project_id: string
-      assignee_id: string
+      company_id: string
       assigned_by: string
+      project_id?: string
       due_date?: string
     }) => {
       const { data, error } = await supabase
         .from('questionnaire_assignments')
-        .insert({ ...a, due_date: a.due_date || null })
+        .insert({ ...a, project_id: a.project_id || null, due_date: a.due_date || null })
         .select()
         .single()
       if (error) throw error
       return data as Assignment
     },
     onSuccess: (_, vars) => {
-      qc.invalidateQueries({ queryKey: ['assignments', 'project', vars.project_id] })
+      if (vars.project_id) qc.invalidateQueries({ queryKey: ['assignments', 'project', vars.project_id] })
+      qc.invalidateQueries({ queryKey: ['assignments', 'mine'] })
     },
+  })
+}
+
+// "Whole project" rule — fans out into one instance per company via a
+// database trigger (including companies that join the project later).
+export function useCreateAssignmentRule() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (r: {
+      questionnaire_id: string
+      project_id: string
+      assigned_by: string
+      due_date?: string
+    }) => {
+      const { data, error } = await supabase
+        .from('questionnaire_assignment_rules')
+        .insert({ ...r, due_date: r.due_date || null })
+        .select()
+        .single()
+      if (error) throw error
+      return data as AssignmentRule
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['assignments', 'project', vars.project_id] })
+      qc.invalidateQueries({ queryKey: ['assignments', 'mine'] })
+    },
+  })
+}
+
+// Exempt one company from a project-wide rule's auto-generated instance,
+// without touching any other assignment (e.g. a direct one) they have.
+export function useExemptAssignment() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (assignmentId: string) => {
+      const { error } = await supabase
+        .from('questionnaire_assignments')
+        .update({ is_exempt: true })
+        .eq('id', assignmentId)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['assignments'] }),
   })
 }
 
@@ -330,11 +396,14 @@ export function useUpdateAssignmentStatus() {
       status,
       reviewerNotes,
       reviewedBy,
+      assigneeId,
     }: {
       id: string
       status: AssignmentStatus
       reviewerNotes?: string
       reviewedBy?: string
+      /** Stamps who at the company actually did the work — company-shared assignments aren't pre-tied to one person. */
+      assigneeId?: string
     }) => {
       const { data, error } = await supabase
         .from('questionnaire_assignments')
@@ -343,6 +412,7 @@ export function useUpdateAssignmentStatus() {
           reviewer_notes: reviewerNotes || null,
           reviewed_by: reviewedBy || null,
           reviewed_at: new Date().toISOString(),
+          ...(assigneeId ? { assignee_id: assigneeId } : {}),
         })
         .eq('id', id)
         .select()

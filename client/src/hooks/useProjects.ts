@@ -219,6 +219,7 @@ export interface OwnerContractorRow {
   contractorId: string
   contractorName: string | null
   contractorEmail: string | null
+  companyId: string | null
   companyName: string | null
   city: string | null
   state: string | null
@@ -229,7 +230,7 @@ export interface OwnerContractorRow {
 }
 
 const CONTRACTOR_MEMBER_SELECT =
-  'id, project_id, user_id, joined_at, profile:profiles!inner(id, full_name, email, company_name, company_type, role, company:companies!new_company_id(name, city, state, logo_path))'
+  'id, project_id, user_id, joined_at, profile:profiles!inner(id, full_name, email, company_name, company_type, role, company:companies!new_company_id(id, name, city, state, logo_path))'
 
 function roleOf(profile: any): string {
   return profile?.company_type ?? profile?.role
@@ -282,6 +283,7 @@ export function useOwnerGCs(ownerId: string | undefined) {
           contractorId: m.user_id,
           contractorName: m.profile?.full_name ?? null,
           contractorEmail: m.profile?.email ?? null,
+          companyId: m.profile?.company?.id ?? null,
           companyName: m.profile?.company?.name ?? m.profile?.company_name ?? null,
           city: m.profile?.company?.city ?? null,
           state: m.profile?.company?.state ?? null,
@@ -345,6 +347,7 @@ async function fetchTradeRows(projectIds: string[]): Promise<OwnerContractorRow[
       contractorId: m.user_id,
       contractorName: m.profile?.full_name ?? null,
       contractorEmail: m.profile?.email ?? null,
+      companyId: m.profile?.company?.id ?? null,
       companyName: m.profile?.company?.name ?? m.profile?.company_name ?? null,
       city: m.profile?.company?.city ?? null,
       state: m.profile?.company?.state ?? null,

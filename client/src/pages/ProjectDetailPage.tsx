@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useProjectMembers, useUpdateProject, useSetProjectPrimaryContact } from '@/hooks/useProjects'
 import { useProjects } from '@/hooks/useProjects'
 import { useProjectSubmissions } from '@/hooks/useContractorProfile'
-import { useProjectAssignments, AssignmentStatus } from '@/hooks/useQuestionnaires'
+import { useProjectAssignments, useExemptAssignment, AssignmentStatus } from '@/hooks/useQuestionnaires'
 import { Users, UserPlus, ChevronRight, Pencil, X, Check, Calendar, ClipboardList, Star, MapPin } from 'lucide-react'
 import { format } from 'date-fns'
 import { useForm } from 'react-hook-form'
@@ -36,6 +36,7 @@ export default function ProjectDetailPage() {
   const { data: members = [], isLoading } = useProjectMembers(projectId)
   const { data: submissions = [], isLoading: subsLoading } = useProjectSubmissions(projectId)
   const { data: projectAssignments = [] } = useProjectAssignments(projectId)
+  const exemptAssignment = useExemptAssignment()
   const updateProject = useUpdateProject()
   const setPrimaryContact = useSetProjectPrimaryContact()
 
@@ -330,7 +331,7 @@ export default function ProjectDetailPage() {
             </Link>
           )}
         </div>
-        {projectAssignments.length === 0 ? (
+        {projectAssignments.filter((a) => !a.is_exempt).length === 0 ? (
           <div className="text-center py-10 text-gray-500">
             <p className="text-sm">No questionnaires assigned yet</p>
           </div>
@@ -339,19 +340,23 @@ export default function ProjectDetailPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  {['Questionnaire', 'Assigned To', 'Due Date', 'Status', 'Action'].map((h) => (
+                  {['Questionnaire', 'Company', 'Due Date', 'Status', 'Action'].map((h) => (
                     <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {projectAssignments.map((a) => {
+                {projectAssignments.filter((a) => !a.is_exempt).map((a) => {
                   const reviewable: AssignmentStatus[] = ['submitted', 'approved', 'rejected']
+                  const canExempt = !!a.rule_id && (role === 'owner' || role === 'gc')
                   return (
                     <tr key={a.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{a.questionnaire?.name ?? '—'}</td>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                        {a.questionnaire?.name ?? '—'}
+                        {a.rule_id && <span className="ml-2 text-xs text-gray-400 italic">(whole project)</span>}
+                      </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
-                        {a.assignee?.company_name || a.assignee?.full_name || a.assignee?.email || '—'}
+                        {a.company?.name || a.assignee?.company_name || a.assignee?.full_name || '—'}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500">
                         {a.due_date ? format(new Date(a.due_date), 'MMM d, yyyy') : '—'}
@@ -369,14 +374,26 @@ export default function ProjectDetailPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        {reviewable.includes(a.status) && (
-                          <Link
-                            to={`/${role}/assignments/${a.id}/review`}
-                            className="text-sm text-brand-600 hover:text-brand-700 font-medium"
-                          >
-                            Review
-                          </Link>
-                        )}
+                        <div className="flex items-center gap-3">
+                          {reviewable.includes(a.status) && (
+                            <Link
+                              to={`/${role}/assignments/${a.id}/review`}
+                              className="text-sm text-brand-600 hover:text-brand-700 font-medium"
+                            >
+                              Review
+                            </Link>
+                          )}
+                          {canExempt && (
+                            <button
+                              onClick={() => exemptAssignment.mutate(a.id)}
+                              disabled={exemptAssignment.isPending}
+                              className="text-xs text-gray-500 hover:text-red-600 font-medium"
+                              title="Exempt this company from the whole-project questionnaire"
+                            >
+                              Exempt
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )

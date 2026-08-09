@@ -98,7 +98,7 @@ export default function GCDashboard() {
   )
   const { data: invitations = [] } = useSentInvitations(companyId ?? profile?.id)
   const { data: contractorProfile } = useContractorProfile(profile?.id)
-  const { data: myAssignments = [] } = useMyAssignments(profile?.id)
+  const { data: myAssignments = [] } = useMyAssignments(profile?.id, companyId)
   const { data: teamMembers = [] } = useTeamMembers(!isTeamMember ? (companyId ?? undefined) : undefined)
   const updateMemberRole = useUpdateMemberRole()
 

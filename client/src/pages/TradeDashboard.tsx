@@ -102,7 +102,7 @@ export default function TradeDashboard() {
   const { data: invitations = [] } = useReceivedInvitations(profile?.email ?? undefined)
   const { data: contractorProfile } = useContractorProfile(profile?.id)
   const { data: allSubmissions = [] } = useMyProjectSubmissions(profile?.id)
-  const { data: myAssignments = [] } = useMyAssignments(profile?.id)
+  const { data: myAssignments = [] } = useMyAssignments(profile?.id, companyId)
 
   const projectsLoading = isTeamMember
     ? (memberRole === 'admin' ? companyLoading : memberProjectsLoading)

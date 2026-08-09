@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
-import { roleLabel } from '@/lib/roleLabels'
 import { useAuth } from '@/hooks/useAuth'
-import { useQuestionnaires, useCreateAssignment } from '@/hooks/useQuestionnaires'
-import { useProjects, useCompanyProjects, useProjectMembers } from '@/hooks/useProjects'
+import { useQuestionnaires, useCreateAssignment, useCreateAssignmentRule } from '@/hooks/useQuestionnaires'
+import { useProjects, useCompanyProjects, useOwnerGCs, useOwnerTrades, useGCTrades } from '@/hooks/useProjects'
+
+type Scope = 'project_all' | 'company'
 
 export default function AssignQuestionnairePage() {
   const { profile } = useAuth()
@@ -20,33 +21,66 @@ export default function AssignQuestionnairePage() {
   const { data: memberProjects = [] } = useCompanyProjects(!isOwner ? (companyId ?? undefined) : undefined)
   const projects = isOwner ? ownerProjects : memberProjects
   const createAssignment = useCreateAssignment()
+  const createRule = useCreateAssignmentRule()
+
+  // Ecosystem companies this Owner/GC can target directly, regardless of project
+  const { data: ownerGcRows = [] } = useOwnerGCs(isOwner ? profile?.id : undefined)
+  const { data: ownerTradeRows = [] } = useOwnerTrades(isOwner ? profile?.id : undefined)
+  const { data: gcTradeRows = [] } = useGCTrades(!isOwner ? profile?.id : undefined)
+  const ecosystemRows = isOwner ? [...ownerGcRows, ...ownerTradeRows] : gcTradeRows
+  const ecosystemCompanies = useMemo(() => {
+    const seen = new Map<string, string>()
+    for (const r of ecosystemRows) {
+      if (r.companyId && !seen.has(r.companyId)) seen.set(r.companyId, r.companyName ?? 'Unnamed company')
+    }
+    return Array.from(seen, ([id, name]) => ({ id, name }))
+  }, [ecosystemRows])
 
   const [questionnaireId, setQuestionnaireId] = useState('')
+  const [scope, setScope] = useState<Scope>('project_all')
   const [projectId, setProjectId] = useState(routeProjectId ?? '')
-  const [assigneeId, setAssigneeId] = useState('')
+  const [tieToProject, setTieToProject] = useState(!!routeProjectId)
+  const [companyIds, setCompanyIds] = useState<string[]>([])
   const [dueDate, setDueDate] = useState('')
-
-  const { data: members = [] } = useProjectMembers(projectId || undefined)
-
-  // Owners can assign to GCs and Trades; GCs can assign to Trades only
-  const assignableRoles = isOwner ? ['gc', 'trade'] : ['trade']
-  const assignableMembers = members.filter((m: any) =>
-    m.profile?.id !== profile?.id && assignableRoles.includes(m.profile?.role)
-  )
+  const [submitting, setSubmitting] = useState(false)
 
   const basePath = isOwner ? '/owner' : '/gc'
 
+  function toggleCompany(id: string) {
+    setCompanyIds((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]))
+  }
+
+  const canSubmit =
+    !!questionnaireId &&
+    (scope === 'project_all' ? !!projectId : companyIds.length > 0 && (!tieToProject || !!projectId))
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!profile || !questionnaireId || !projectId || !assigneeId) return
-    await createAssignment.mutateAsync({
-      questionnaire_id: questionnaireId,
-      project_id: projectId,
-      assignee_id: assigneeId,
-      assigned_by: profile.id,
-      due_date: dueDate || undefined,
-    })
-    navigate(`${basePath}/questionnaires`)
+    if (!profile || !canSubmit) return
+    setSubmitting(true)
+    try {
+      if (scope === 'project_all') {
+        await createRule.mutateAsync({
+          questionnaire_id: questionnaireId,
+          project_id: projectId,
+          assigned_by: profile.id,
+          due_date: dueDate || undefined,
+        })
+      } else {
+        for (const company_id of companyIds) {
+          await createAssignment.mutateAsync({
+            questionnaire_id: questionnaireId,
+            company_id,
+            assigned_by: profile.id,
+            project_id: tieToProject ? projectId : undefined,
+            due_date: dueDate || undefined,
+          })
+        }
+      }
+      navigate(`${basePath}/questionnaires`)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -60,15 +94,15 @@ export default function AssignQuestionnairePage() {
 
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Assign Questionnaire</h1>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
+      <form onSubmit={handleSubmit} className="card p-6 space-y-5">
         {/* Questionnaire */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Questionnaire *</label>
+          <label className="label">Questionnaire *</label>
           <select
             required
             value={questionnaireId}
             onChange={e => setQuestionnaireId(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="input-field"
           >
             <option value="">Select a questionnaire…</option>
             {questionnaires.map(q => (
@@ -83,15 +117,38 @@ export default function AssignQuestionnairePage() {
           )}
         </div>
 
-        {/* Project */}
+        {/* Scope */}
         {!routeProjectId && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Project *</label>
+            <label className="label">Who has to complete this?</label>
+            <div className="grid grid-cols-1 gap-2">
+              <label className="flex items-start gap-2 p-3 border border-gray-200 rounded-lg cursor-pointer has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
+                <input type="radio" className="mt-1" checked={scope === 'project_all'} onChange={() => setScope('project_all')} />
+                <span>
+                  <span className="block text-sm font-medium text-gray-900">Entire project</span>
+                  <span className="block text-xs text-gray-500">Every company currently on the project — and any added later — must complete it.</span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2 p-3 border border-gray-200 rounded-lg cursor-pointer has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
+                <input type="radio" className="mt-1" checked={scope === 'company'} onChange={() => setScope('company')} />
+                <span>
+                  <span className="block text-sm font-medium text-gray-900">Specific companies</span>
+                  <span className="block text-xs text-gray-500">Pick one or more companies, tied to a project or standing across all your projects with them.</span>
+                </span>
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* Project (required for project_all; optional-tie for company scope) */}
+        {!routeProjectId && (scope === 'project_all' || tieToProject) && (
+          <div>
+            <label className="label">Project {scope === 'project_all' ? '*' : ''}</label>
             <select
-              required
+              required={scope === 'project_all'}
               value={projectId}
-              onChange={e => { setProjectId(e.target.value); setAssigneeId('') }}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              onChange={e => setProjectId(e.target.value)}
+              className="input-field"
             >
               <option value="">Select a project…</option>
               {projects.map(p => (
@@ -101,58 +158,58 @@ export default function AssignQuestionnairePage() {
           </div>
         )}
 
-        {/* Assignee */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Assign To *</label>
-          {assignableMembers.length > 0 ? (
-            <select
-              required
-              value={assigneeId}
-              onChange={e => setAssigneeId(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              <option value="">Select a member…</option>
-              {assignableMembers.map((m: any) => (
-                <option key={m.profile?.id ?? m.id} value={m.profile?.id ?? m.id}>
-                  {m.profile?.full_name || m.profile?.email || 'Unknown'}
-                  {m.profile?.company_name ? ` (${m.profile.company_name})` : ''} — {roleLabel(m.profile?.role)}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <p className="text-sm text-gray-400 italic">
-              {!projectId
-                ? 'Select a project first.'
-                : isOwner
-                ? 'No General Contractors or trades found on this project.'
-                : 'No trades found on this project.'}
-            </p>
-          )}
-        </div>
+        {/* Company picker + project tie toggle for company scope */}
+        {!routeProjectId && scope === 'company' && (
+          <>
+            <div>
+              <label className="label">Companies *</label>
+              {ecosystemCompanies.length === 0 ? (
+                <p className="text-sm text-gray-400 italic">No companies in your ecosystem yet.</p>
+              ) : (
+                <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-48 overflow-y-auto">
+                  {ecosystemCompanies.map((c) => (
+                    <label key={c.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="checkbox"
+                        checked={companyIds.includes(c.id)}
+                        onChange={() => toggleCompany(c.id)}
+                        className="rounded border-gray-300"
+                      />
+                      {c.name}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={tieToProject}
+                onChange={e => { setTieToProject(e.target.checked); if (!e.target.checked) setProjectId('') }}
+                className="rounded border-gray-300"
+              />
+              Tie to a specific project
+              <span className="text-xs text-gray-400">(otherwise applies across all your projects with them)</span>
+            </label>
+          </>
+        )}
 
         {/* Due date */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Due Date (optional)</label>
+          <label className="label">Due Date (optional)</label>
           <input
             type="date"
             value={dueDate}
             onChange={e => setDueDate(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="input-field"
           />
         </div>
 
         <div className="flex gap-3 pt-2">
-          <button
-            type="submit"
-            disabled={createAssignment.isPending || !questionnaireId || !projectId || !assigneeId}
-            className="px-5 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
-          >
-            {createAssignment.isPending ? 'Assigning…' : 'Assign'}
+          <button type="submit" disabled={submitting || !canSubmit} className="btn-primary">
+            {submitting ? 'Assigning…' : 'Assign'}
           </button>
-          <Link
-            to={`${basePath}/questionnaires`}
-            className="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
-          >
+          <Link to={`${basePath}/questionnaires`} className="btn-secondary">
             Cancel
           </Link>
         </div>
