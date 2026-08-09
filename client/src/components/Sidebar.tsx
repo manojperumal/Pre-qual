@@ -74,12 +74,12 @@ export function Sidebar() {
 
       {/* Company branding */}
       {company && (
-        <div className="flex items-center px-5 py-3 border-b border-white/10">
+        <div className="flex items-center justify-center px-5 py-4 border-b border-white/10">
           {companyLogoUrl ? (
-            <img src={companyLogoUrl} alt={company.name} title={company.name} className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+            <img src={companyLogoUrl} alt={company.name} title={company.name} className="max-w-full h-20 object-contain" />
           ) : (
-            <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0" title={company.name}>
-              <Building2 size={16} className="text-white/50" />
+            <div className="w-full h-20 rounded-lg bg-white/10 flex items-center justify-center" title={company.name}>
+              <Building2 size={28} className="text-white/50" />
             </div>
           )}
         </div>
