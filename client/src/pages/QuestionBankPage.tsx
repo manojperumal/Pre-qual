@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { useQuestionBank, useCreateQuestion, useDeleteQuestion, useUpdateQuestionMojoReview, QuestionCategory, AnswerType } from '@/hooks/useQuestionnaires'
-import { Plus, Trash2, ChevronDown, ChevronUp, Search, ShieldCheck } from 'lucide-react'
+import { useQuestionBank, useCreateQuestion, useUpdateQuestion, useDeleteQuestion, useUpdateQuestionMojoReview, Question, QuestionCategory, AnswerType } from '@/hooks/useQuestionnaires'
+import { Plus, Trash2, Pencil, ChevronDown, ChevronUp, Search, ShieldCheck } from 'lucide-react'
 
 const CATEGORIES: { value: QuestionCategory; label: string }[] = [
   { value: 'company_info', label: 'Company Info' },
@@ -35,6 +35,7 @@ export default function QuestionBankPage() {
   const { profile } = useAuth()
   const { data: questions = [], isLoading } = useQuestionBank(profile?.id)
   const createQuestion = useCreateQuestion()
+  const updateQuestion = useUpdateQuestion()
   const deleteQuestion = useDeleteQuestion()
   const updateMojoReview = useUpdateQuestionMojoReview()
   const isAdmin = profile?.user_role === 'admin'
@@ -42,10 +43,10 @@ export default function QuestionBankPage() {
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState<QuestionCategory | 'all'>('all')
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
-  // New question form state
-  const [form, setForm] = useState({
+  const emptyForm = {
     category: 'company_info' as QuestionCategory,
     question_text: '',
     answer_type: 'radio_yes_no' as AnswerType,
@@ -53,7 +54,30 @@ export default function QuestionBankPage() {
     options: '',
     is_required: true,
     requires_mojo_review: false,
-  })
+  }
+
+  // Shared form state for both "New Question" and "Edit Question"
+  const [form, setForm] = useState(emptyForm)
+
+  function startCreate() {
+    setEditingId(null)
+    setForm(emptyForm)
+    setShowForm(true)
+  }
+
+  function startEdit(q: Question) {
+    setEditingId(q.id)
+    setForm({
+      category: q.category,
+      question_text: q.question_text,
+      answer_type: q.answer_type,
+      hint: q.hint ?? '',
+      options: (q.options ?? []).join('\n'),
+      is_required: q.is_required,
+      requires_mojo_review: q.requires_mojo_review,
+    })
+    setShowForm(true)
+  }
 
   const filtered = questions.filter((q) => {
     const matchCat = filterCategory === 'all' || q.category === filterCategory
@@ -66,21 +90,39 @@ export default function QuestionBankPage() {
     questions: filtered.filter((q) => q.category === cat.value),
   })).filter((g) => g.questions.length > 0)
 
-  async function handleCreate() {
+  async function handleSave() {
     if (!profile?.id || !form.question_text.trim()) return
-    await createQuestion.mutateAsync({
-      category: form.category,
-      question_text: form.question_text.trim(),
-      answer_type: form.answer_type,
-      hint: form.hint.trim() || undefined,
-      options: form.answer_type === 'multi_select'
-        ? form.options.split('\n').map((s) => s.trim()).filter(Boolean)
-        : undefined,
-      is_required: form.is_required,
-      requires_mojo_review: form.requires_mojo_review,
-      created_by: profile.id,
-    })
-    setForm({ category: 'company_info', question_text: '', answer_type: 'radio_yes_no', hint: '', options: '', is_required: true, requires_mojo_review: false })
+    const options = form.answer_type === 'multi_select'
+      ? form.options.split('\n').map((s) => s.trim()).filter(Boolean)
+      : undefined
+
+    if (editingId) {
+      await updateQuestion.mutateAsync({
+        id: editingId,
+        category: form.category,
+        question_text: form.question_text.trim(),
+        answer_type: form.answer_type,
+        hint: form.hint.trim() || undefined,
+        options,
+        is_required: form.is_required,
+      })
+      if (form.requires_mojo_review !== undefined) {
+        await updateMojoReview.mutateAsync({ id: editingId, requiresMojoReview: form.requires_mojo_review })
+      }
+    } else {
+      await createQuestion.mutateAsync({
+        category: form.category,
+        question_text: form.question_text.trim(),
+        answer_type: form.answer_type,
+        hint: form.hint.trim() || undefined,
+        options,
+        is_required: form.is_required,
+        requires_mojo_review: form.requires_mojo_review,
+        created_by: profile.id,
+      })
+    }
+    setForm(emptyForm)
+    setEditingId(null)
     setShowForm(false)
   }
 
@@ -91,16 +133,16 @@ export default function QuestionBankPage() {
           <h1 className="text-2xl font-bold text-gray-900">Question Bank</h1>
           <p className="mt-1 text-sm text-gray-500">{questions.length} questions · {questions.filter(q => q.is_global).length} global · {questions.filter(q => !q.is_global).length} custom</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="btn-primary inline-flex items-center gap-2 text-sm">
+        <button onClick={() => (showForm ? setShowForm(false) : startCreate())} className="btn-primary inline-flex items-center gap-2 text-sm">
           <Plus size={16} />
           Add Question
         </button>
       </div>
 
-      {/* Add question form */}
+      {/* Add/Edit question form */}
       {showForm && (
         <div className="card p-6 space-y-4">
-          <h2 className="text-base font-semibold text-gray-900">New Question</h2>
+          <h2 className="text-base font-semibold text-gray-900">{editingId ? 'Edit Question' : 'New Question'}</h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="label">Category</label>
@@ -138,9 +180,9 @@ export default function QuestionBankPage() {
             <label htmlFor="requires_mojo_review" className="text-sm text-gray-700">Requires Mojo Review</label>
           </div>
           <div className="flex gap-2 justify-end pt-2">
-            <button onClick={() => setShowForm(false)} className="btn-secondary">Cancel</button>
-            <button onClick={handleCreate} disabled={!form.question_text.trim() || createQuestion.isPending} className="btn-primary">
-              {createQuestion.isPending ? 'Saving…' : 'Save Question'}
+            <button onClick={() => { setShowForm(false); setEditingId(null) }} className="btn-secondary">Cancel</button>
+            <button onClick={handleSave} disabled={!form.question_text.trim() || createQuestion.isPending || updateQuestion.isPending} className="btn-primary">
+              {createQuestion.isPending || updateQuestion.isPending ? 'Saving…' : editingId ? 'Save Changes' : 'Save Question'}
             </button>
           </div>
         </div>
@@ -214,6 +256,11 @@ export default function QuestionBankPage() {
                             title={q.requires_mojo_review ? 'Disable Mojo Review' : 'Require Mojo Review'}
                           >
                             <ShieldCheck size={14} />
+                          </button>
+                        )}
+                        {!q.is_global && isAdmin && (
+                          <button onClick={() => startEdit(q)} className="p-1.5 text-gray-400 hover:text-brand-600 rounded">
+                            <Pencil size={14} />
                           </button>
                         )}
                         {!q.is_global && (
