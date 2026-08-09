@@ -170,8 +170,16 @@ begin
 end;
 $$ language plpgsql security definer set search_path = public;
 
-create trigger trg_enforce_submission_payment
-  before insert or update of status on project_submissions
+-- Split into separate INSERT/UPDATE triggers — Postgres doesn't allow
+-- referencing OLD in an INSERT trigger's WHEN clause (no old row exists).
+create trigger trg_enforce_submission_payment_insert
+  before insert on project_submissions
   for each row
-  when (new.status = 'submitted' and (old.status is null or old.status is distinct from 'submitted'))
+  when (new.status = 'submitted')
+  execute procedure enforce_submission_payment();
+
+create trigger trg_enforce_submission_payment_update
+  before update of status on project_submissions
+  for each row
+  when (new.status = 'submitted' and old.status is distinct from 'submitted')
   execute procedure enforce_submission_payment();
