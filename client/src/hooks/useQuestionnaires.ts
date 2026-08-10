@@ -20,6 +20,8 @@ export interface Question {
   requires_mojo_review: boolean
   /** Why this question needs Mojo review — shown to the Mojo reviewer, and to the respondent before they answer. */
   mojo_review_note: string | null
+  /** Internal guidance for the AI on where/how to find the answer in uploaded documents. Never shown to the respondent. */
+  ai_extraction_notes: string | null
   /** Only meaningful for answer_type = 'document_upload'. Null/empty = any file type allowed. */
   allowed_file_types: string[] | null
   tags: string[] | null
@@ -158,6 +160,7 @@ export function useCreateQuestion() {
       is_required?: boolean
       requires_mojo_review?: boolean
       mojo_review_note?: string
+      ai_extraction_notes?: string
       allowed_file_types?: string[]
       tags?: string[]
       created_by: string
@@ -192,6 +195,7 @@ export function useDuplicateQuestion() {
           requires_mojo_review: false,
           allowed_file_types: question.allowed_file_types,
           tags: question.tags,
+          ai_extraction_notes: question.ai_extraction_notes,
           is_global: false,
           created_by: createdBy,
         })
@@ -245,6 +249,7 @@ export function useUpdateQuestion() {
       is_required?: boolean
       allowed_file_types?: string[]
       tags?: string[]
+      ai_extraction_notes?: string
       changedBy: string
     }) => {
       const { id, previous, changedBy, ...updates } = q
@@ -271,6 +276,7 @@ export function useUpdateQuestion() {
           hint: updates.hint || null,
           allowed_file_types: updates.allowed_file_types?.length ? updates.allowed_file_types : null,
           tags: updates.tags?.length ? updates.tags : null,
+          ai_extraction_notes: updates.ai_extraction_notes?.trim() || null,
           version: previous.version + 1,
         })
         .eq('id', id)
