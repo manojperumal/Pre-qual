@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { useQuestionBank, useCreateQuestion, useUpdateQuestion, useDeleteQuestion, useUpdateQuestionMojoReview, Question, QuestionCategory, AnswerType } from '@/hooks/useQuestionnaires'
-import { Plus, Trash2, Pencil, ChevronDown, ChevronUp, Search, ShieldCheck } from 'lucide-react'
+import { useQuestionBank, useCreateQuestion, useUpdateQuestion, useDeleteQuestion, useUpdateQuestionMojoReview, useDuplicateQuestion, useQuestionVersions, Question, QuestionCategory, AnswerType } from '@/hooks/useQuestionnaires'
+import { Plus, Trash2, Pencil, ChevronDown, ChevronUp, Search, ShieldCheck, Copy, History, X as XIcon } from 'lucide-react'
 
 const CATEGORIES: { value: QuestionCategory; label: string }[] = [
   { value: 'company_info', label: 'Company Info' },
@@ -40,13 +40,18 @@ export default function QuestionBankPage() {
   const updateQuestion = useUpdateQuestion()
   const deleteQuestion = useDeleteQuestion()
   const updateMojoReview = useUpdateQuestionMojoReview()
+  const duplicateQuestion = useDuplicateQuestion()
   const isAdmin = profile?.user_role === 'admin'
 
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState<QuestionCategory | 'all'>('all')
+  const [filterTag, setFilterTag] = useState<string | 'all'>('all')
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingPrevious, setEditingPrevious] = useState<Question | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [historyForId, setHistoryForId] = useState<string | null>(null)
+  const [tagInput, setTagInput] = useState('')
 
   const emptyForm = {
     category: 'company_info' as QuestionCategory,
@@ -57,6 +62,7 @@ export default function QuestionBankPage() {
     is_required: true,
     requires_mojo_review: false,
     allowed_file_types: [] as string[],
+    tags: [] as string[],
   }
 
   // Shared form state for both "New Question" and "Edit Question"
@@ -64,12 +70,14 @@ export default function QuestionBankPage() {
 
   function startCreate() {
     setEditingId(null)
+    setEditingPrevious(null)
     setForm(emptyForm)
     setShowForm(true)
   }
 
   function startEdit(q: Question) {
     setEditingId(q.id)
+    setEditingPrevious(q)
     setForm({
       category: q.category,
       question_text: q.question_text,
@@ -79,8 +87,14 @@ export default function QuestionBankPage() {
       is_required: q.is_required,
       requires_mojo_review: q.requires_mojo_review,
       allowed_file_types: q.allowed_file_types ?? [],
+      tags: q.tags ?? [],
     })
     setShowForm(true)
+  }
+
+  function startDuplicate(q: Question) {
+    if (!profile?.id) return
+    duplicateQuestion.mutate({ question: q, createdBy: profile.id })
   }
 
   function toggleFileType(type: string) {
@@ -92,10 +106,24 @@ export default function QuestionBankPage() {
     }))
   }
 
+  function addTag() {
+    const t = tagInput.trim().toLowerCase()
+    if (!t || form.tags.includes(t)) { setTagInput(''); return }
+    setForm((f) => ({ ...f, tags: [...f.tags, t] }))
+    setTagInput('')
+  }
+
+  function removeTag(tag: string) {
+    setForm((f) => ({ ...f, tags: f.tags.filter((t) => t !== tag) }))
+  }
+
+  const allTags = Array.from(new Set(questions.flatMap((q) => q.tags ?? []))).sort()
+
   const filtered = questions.filter((q) => {
     const matchCat = filterCategory === 'all' || q.category === filterCategory
+    const matchTag = filterTag === 'all' || (q.tags ?? []).includes(filterTag)
     const matchSearch = q.question_text.toLowerCase().includes(search.toLowerCase())
-    return matchCat && matchSearch
+    return matchCat && matchTag && matchSearch
   })
 
   const grouped = CATEGORIES.map((cat) => ({
@@ -111,9 +139,11 @@ export default function QuestionBankPage() {
 
     const allowedFileTypes = form.answer_type === 'document_upload' ? form.allowed_file_types : undefined
 
-    if (editingId) {
+    if (editingId && editingPrevious) {
       await updateQuestion.mutateAsync({
         id: editingId,
+        previous: editingPrevious,
+        changedBy: profile.id,
         category: form.category,
         question_text: form.question_text.trim(),
         answer_type: form.answer_type,
@@ -121,6 +151,7 @@ export default function QuestionBankPage() {
         options,
         is_required: form.is_required,
         allowed_file_types: allowedFileTypes,
+        tags: form.tags,
       })
       if (form.requires_mojo_review !== undefined) {
         await updateMojoReview.mutateAsync({ id: editingId, requiresMojoReview: form.requires_mojo_review })
@@ -135,11 +166,13 @@ export default function QuestionBankPage() {
         is_required: form.is_required,
         requires_mojo_review: form.requires_mojo_review,
         allowed_file_types: allowedFileTypes,
+        tags: form.tags,
         created_by: profile.id,
       })
     }
     setForm(emptyForm)
     setEditingId(null)
+    setEditingPrevious(null)
     setShowForm(false)
   }
 
@@ -206,6 +239,30 @@ export default function QuestionBankPage() {
             </div>
           )}
           <div>
+            <label className="label">Tags <span className="text-gray-400 font-normal">(optional, for filtering/search)</span></label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {form.tags.map((tag) => (
+                <span key={tag} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                  {tag}
+                  <button type="button" onClick={() => removeTag(tag)} className="text-gray-400 hover:text-gray-600">
+                    <XIcon size={11} />
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                className="input-field flex-1"
+                placeholder="Type a tag and press Enter"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }}
+              />
+              <button type="button" onClick={addTag} className="btn-secondary text-sm">Add</button>
+            </div>
+          </div>
+          <div>
             <label className="label">Hint / Helper Text <span className="text-gray-400 font-normal">(optional)</span></label>
             <input type="text" className="input-field" placeholder="Shown below the question to guide the respondent" value={form.hint} onChange={e => setForm(f => ({ ...f, hint: e.target.value }))} />
           </div>
@@ -242,6 +299,18 @@ export default function QuestionBankPage() {
             </button>
           ))}
         </div>
+        {allTags.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => setFilterTag('all')} className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${filterTag === 'all' ? 'bg-brand-600 text-white' : 'bg-brand-50 text-brand-700 hover:bg-brand-100'}`}>
+              All tags
+            </button>
+            {allTags.map((tag) => (
+              <button key={tag} onClick={() => setFilterTag(tag)} className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${filterTag === tag ? 'bg-brand-600 text-white' : 'bg-brand-50 text-brand-700 hover:bg-brand-100'}`}>
+                {tag}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Questions grouped by category */}
@@ -272,13 +341,17 @@ export default function QuestionBankPage() {
                               Mojo Review
                             </span>
                           )}
+                          {q.version > 1 && <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">v{q.version}</span>}
                         </div>
-                        <div className="flex items-center gap-3 mt-1">
+                        <div className="flex items-center gap-3 mt-1 flex-wrap">
                           <span className="text-xs text-gray-500">{ANSWER_TYPES.find(a => a.value === q.answer_type)?.label}</span>
                           {q.options && <span className="text-xs text-gray-400">{(q.options as string[]).join(', ')}</span>}
                           {q.allowed_file_types && q.allowed_file_types.length > 0 && (
                             <span className="text-xs text-gray-400">{q.allowed_file_types.map((t) => `.${t}`).join(', ')} only</span>
                           )}
+                          {(q.tags ?? []).map((tag) => (
+                            <span key={tag} className="text-xs bg-brand-50 text-brand-700 px-1.5 py-0.5 rounded">{tag}</span>
+                          ))}
                         </div>
                         {q.hint && expandedId === q.id && (
                           <p className="text-xs text-gray-500 mt-1 italic">{q.hint}</p>
@@ -304,6 +377,14 @@ export default function QuestionBankPage() {
                             <Pencil size={14} />
                           </button>
                         )}
+                        {q.version > 1 && (
+                          <button onClick={() => setHistoryForId(q.id)} className="p-1.5 text-gray-400 hover:text-brand-600 rounded" title="Version history">
+                            <History size={14} />
+                          </button>
+                        )}
+                        <button onClick={() => startDuplicate(q)} className="p-1.5 text-gray-400 hover:text-brand-600 rounded" title="Duplicate question">
+                          <Copy size={14} />
+                        </button>
                         {!q.is_global && (
                           <button onClick={() => deleteQuestion.mutate(q.id)} className="p-1.5 text-gray-400 hover:text-red-500 rounded">
                             <Trash2 size={14} />
@@ -318,6 +399,43 @@ export default function QuestionBankPage() {
           ))}
         </div>
       )}
+
+      {historyForId && (
+        <QuestionHistoryModal questionId={historyForId} onClose={() => setHistoryForId(null)} />
+      )}
+    </div>
+  )
+}
+
+function QuestionHistoryModal({ questionId, onClose }: { questionId: string; onClose: () => void }) {
+  const { data: versions = [], isLoading } = useQuestionVersions(questionId)
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="card w-full max-w-lg max-h-[80vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-gray-900">Version History</h2>
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded">
+            <XIcon size={16} />
+          </button>
+        </div>
+        {isLoading ? (
+          <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-600" /></div>
+        ) : versions.length === 0 ? (
+          <p className="text-sm text-gray-500">No prior versions recorded.</p>
+        ) : (
+          <div className="space-y-3">
+            {versions.map((v) => (
+              <div key={v.id} className="border border-gray-200 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-medium text-gray-500">Version {v.version}</span>
+                  <span className="text-xs text-gray-400">{new Date(v.changed_at).toLocaleString()}</span>
+                </div>
+                <p className="text-sm text-gray-800">{v.question_text}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
