@@ -222,7 +222,7 @@ export default function MojoAdminCompaniesPage() {
                         <LogIn size={12} />
                         {impersonatingId === c.id ? 'Loading…' : 'View as Admin'}
                       </button>
-                      {c.type !== 'owner' && (
+                      {c.type !== 'owner' && !subscriptions.has(c.id) && (
                         <button
                           onClick={() => handleActivateSubscription(c)}
                           disabled={activatingId === c.id}
