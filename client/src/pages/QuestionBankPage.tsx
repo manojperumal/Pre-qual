@@ -58,6 +58,7 @@ export default function QuestionBankPage() {
     question_text: '',
     answer_type: 'radio_yes_no' as AnswerType,
     hint: '',
+    ai_extraction_notes: '',
     options: '',
     is_required: true,
     requires_mojo_review: false,
@@ -84,6 +85,7 @@ export default function QuestionBankPage() {
       question_text: q.question_text,
       answer_type: q.answer_type,
       hint: q.hint ?? '',
+      ai_extraction_notes: q.ai_extraction_notes ?? '',
       options: (q.options ?? []).join('\n'),
       is_required: q.is_required,
       requires_mojo_review: q.requires_mojo_review,
@@ -150,6 +152,7 @@ export default function QuestionBankPage() {
         question_text: form.question_text.trim(),
         answer_type: form.answer_type,
         hint: form.hint.trim() || undefined,
+        ai_extraction_notes: form.ai_extraction_notes.trim() || undefined,
         options,
         is_required: form.is_required,
         allowed_file_types: allowedFileTypes,
@@ -162,6 +165,7 @@ export default function QuestionBankPage() {
         question_text: form.question_text.trim(),
         answer_type: form.answer_type,
         hint: form.hint.trim() || undefined,
+        ai_extraction_notes: form.ai_extraction_notes.trim() || undefined,
         options,
         is_required: form.is_required,
         requires_mojo_review: form.requires_mojo_review,
@@ -266,6 +270,16 @@ export default function QuestionBankPage() {
           <div>
             <label className="label">Hint / Helper Text <span className="text-gray-400 font-normal">(optional)</span></label>
             <input type="text" className="input-field" placeholder="Shown below the question to guide the respondent" value={form.hint} onChange={e => setForm(f => ({ ...f, hint: e.target.value }))} />
+          </div>
+          <div>
+            <label className="label">AI Extraction Notes <span className="text-gray-400 font-normal">(optional, internal — guides Mojo AI, never shown to the respondent)</span></label>
+            <textarea
+              rows={2}
+              className="input-field resize-none"
+              placeholder="e.g. Check the EMR value in Section 3 of the Loss Runs report, not the summary page"
+              value={form.ai_extraction_notes}
+              onChange={e => setForm(f => ({ ...f, ai_extraction_notes: e.target.value }))}
+            />
           </div>
           <div className="flex items-center gap-2">
             <input type="checkbox" id="is_required" checked={form.is_required} onChange={e => setForm(f => ({ ...f, is_required: e.target.checked }))} className="rounded border-gray-300" />
@@ -374,9 +388,12 @@ export default function QuestionBankPage() {
                         {q.hint && expandedId === q.id && (
                           <p className="text-xs text-gray-500 mt-1 italic">{q.hint}</p>
                         )}
+                        {q.ai_extraction_notes && expandedId === q.id && (
+                          <p className="text-xs text-brand-600 mt-1 italic">AI notes: {q.ai_extraction_notes}</p>
+                        )}
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        {q.hint && (
+                        {(q.hint || q.ai_extraction_notes) && (
                           <button onClick={() => setExpandedId(expandedId === q.id ? null : q.id)} className="p-1.5 text-gray-400 hover:text-gray-600 rounded">
                             {expandedId === q.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                           </button>

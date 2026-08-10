@@ -25,11 +25,6 @@ router.post('/:assignmentId/ai-complete', requireAuth, async (req: Request, res:
     document_paths: Array<{ path: string; type: string; name: string }>
   }
 
-  if (!document_paths.length) {
-    res.status(400).json({ error: 'No documents provided. Please upload at least one document.' })
-    return
-  }
-
   // Fetch assignment + verify access
   const { data: assignment, error: assignmentErr } = await supabaseAdmin
     .from('questionnaire_assignments')
@@ -59,10 +54,31 @@ router.post('/:assignmentId/ai-complete', requireAuth, async (req: Request, res:
     return
   }
 
+  // Also pull in documents already uploaded as answers to document_upload
+  // questions elsewhere in this questionnaire — e.g. a COI uploaded to
+  // answer "Upload your Certificate of Insurance" is fair game for
+  // answering other questions ("What is your policy expiry date?") too.
+  const { data: existingDocResponses } = await supabaseAdmin
+    .from('questionnaire_responses')
+    .select('document_path, document_name')
+    .eq('assignment_id', assignmentId)
+    .not('document_path', 'is', null)
+
+  const allDocs: Array<{ path: string; type: string; name: string }> = [...document_paths]
+  for (const r of existingDocResponses ?? []) {
+    if (!r.document_path || allDocs.some((d) => d.path === r.document_path)) continue
+    allDocs.push({ path: r.document_path, type: 'other', name: r.document_name ?? r.document_path })
+  }
+
+  if (!allDocs.length) {
+    res.status(400).json({ error: 'No documents to work from. Upload at least one document, or answer a document-upload question first.' })
+    return
+  }
+
   // Download documents from Supabase Storage and convert to base64
   const documentContents: Array<{ name: string; type: string; base64: string; mimeType: string }> = []
 
-  for (const doc of document_paths) {
+  for (const doc of allDocs) {
     try {
       const { data, error } = await supabaseAdmin.storage
         .from('questionnaire-docs')
@@ -104,6 +120,7 @@ router.post('/:assignmentId/ai-complete', requireAuth, async (req: Request, res:
         meta += ` [Options: ${(q.options as string[]).join(' | ')}]`
       }
       if (q.hint) meta += ` [Hint: ${q.hint}]`
+      if (q.ai_extraction_notes) meta += ` [AI extraction notes: ${q.ai_extraction_notes}]`
       return `${meta}\n${q.question_text}`
     })
     .filter(Boolean)
@@ -169,13 +186,17 @@ ${docDescriptions}
 
 Review these documents and call the submit_answers tool with your findings for each question below.
 
+CRITICAL SOURCING RULE: Answer strictly and only from what is stated in the attached documents. Never use outside/general knowledge, typical industry standards, or assumptions to fill a gap — if the documents don't address a question, that question must be left unanswered (null), even if you believe you know the likely answer. Every non-null answer must be traceable to a specific document.
+
 Rules:
 - For radio_yes_no: answer_text must be exactly "yes" or "no". Also populate company_comments with a brief explanation of what the document shows (e.g. policy number, coverage limits, expiry date, EMR value, etc.)
 - For number: answer_text must be a numeric string (e.g. "1.2" or "5"). Populate company_comments with where in the document the value was found.
 - For multi_select: answer_options must only contain values from the provided options list. Populate company_comments with supporting details from the document.
 - For document_upload: set answer_text to null. Populate company_comments noting whether the relevant document was provided and any key details visible.
 - For text_area: provide a concise extracted answer in answer_text.
-- If you cannot determine an answer, set answer_text/answer_options to null and use company_comments to explain what additional document or information is needed.
+- If a question has [AI extraction notes], follow that guidance on exactly where/how to locate the answer in the documents.
+- If you cannot find the answer in the documents, set answer_text/answer_options to null and use company_comments to explain what additional document or information is needed. Do not guess.
+- mojo_feedback must always name the specific source document (by filename) that the answer came from, or state "Not found in provided documents" if left unanswered.
 - Be conservative — only answer "yes" when you have clear evidence.
 
 Questions:

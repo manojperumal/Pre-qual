@@ -141,8 +141,10 @@ export default function QuestionnaireResponsePage() {
     setUploadedDocs(prev => prev.filter(d => d.path !== path))
   }
 
+  const hasExistingDocumentAnswers = qqList.some(qq => qq.question?.answer_type === 'document_upload' && answers[qq.question_id]?.docPath)
+
   async function handleAIComplete() {
-    if (!assignmentId || !uploadedDocs.length) return
+    if (!assignmentId || (!uploadedDocs.length && !hasExistingDocumentAnswers)) return
     setAiError(null)
     setAiSuccess(false)
     try {
@@ -329,11 +331,15 @@ export default function QuestionnaireResponsePage() {
 
           <button
             onClick={handleAIComplete}
-            disabled={!uploadedDocs.length || aiComplete.isPending}
+            disabled={(!uploadedDocs.length && !hasExistingDocumentAnswers) || aiComplete.isPending}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Sparkles size={15} />
-            {aiComplete.isPending ? 'Analyzing documents…' : `Complete with AI (${uploadedDocs.length} doc${uploadedDocs.length !== 1 ? 's' : ''})`}
+            {aiComplete.isPending
+              ? 'Analyzing documents…'
+              : uploadedDocs.length
+              ? `Complete with AI (${uploadedDocs.length} doc${uploadedDocs.length !== 1 ? 's' : ''})`
+              : 'Complete with AI (using previously uploaded documents)'}
           </button>
         </div>
       )}
