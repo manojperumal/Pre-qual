@@ -76,7 +76,17 @@ export default function QuestionnaireResponsePage() {
   const isReadOnly = assignment?.status === 'submitted' || assignment?.status === 'approved'
   const basePath = profile?.role === 'gc' ? '/gc' : '/trade'
 
-  const answeredCount = qqList.filter(qq => {
+  function isConditionMet(qq: typeof qqList[number]): boolean {
+    if (!qq.depends_on_question_id) return true
+    const target = answers[qq.depends_on_question_id]
+    if (!target) return false
+    if (target.options) return target.options.includes(qq.depends_on_value ?? '')
+    return target.text === qq.depends_on_value
+  }
+
+  const visibleQQList = qqList.filter(isConditionMet)
+
+  const answeredCount = visibleQQList.filter(qq => {
     const a = answers[qq.question_id]
     if (!a) return false
     if (a.text && a.text.trim()) return true
@@ -233,10 +243,10 @@ export default function QuestionnaireResponsePage() {
         <div className="flex-1 bg-gray-200 rounded-full h-2">
           <div
             className="bg-brand-600 h-2 rounded-full transition-all"
-            style={{ width: qqList.length ? `${(answeredCount / qqList.length) * 100}%` : '0%' }}
+            style={{ width: visibleQQList.length ? `${(answeredCount / visibleQQList.length) * 100}%` : '0%' }}
           />
         </div>
-        <span className="text-xs text-gray-500 whitespace-nowrap">{answeredCount} / {qqList.length} answered</span>
+        <span className="text-xs text-gray-500 whitespace-nowrap">{answeredCount} / {visibleQQList.length} answered</span>
       </div>
 
       {/* Due date */}
@@ -330,8 +340,8 @@ export default function QuestionnaireResponsePage() {
 
       {/* Questions, grouped by category */}
       {(() => {
-        const indexMap = new Map(qqList.map((qq, i) => [qq.id, i]))
-        const groups = groupByCategory(qqList, (qq) => qq.question?.category)
+        const indexMap = new Map(visibleQQList.map((qq, i) => [qq.id, i]))
+        const groups = groupByCategory(visibleQQList, (qq) => qq.question?.category)
         return (
           <div className="space-y-8">
             {groups.map((group) => (
@@ -470,14 +480,29 @@ export default function QuestionnaireResponsePage() {
                     <p className="text-sm text-brand-600">{a.docName}</p>
                   ) : (
                     !isReadOnly && (
-                      <input
-                        type="file"
-                        onChange={e => {
-                          const file = e.target.files?.[0]
-                          if (file) handleFileUpload(q.id, file)
-                        }}
-                        className="text-sm"
-                      />
+                      <div>
+                        <input
+                          type="file"
+                          accept={q.allowed_file_types?.length ? q.allowed_file_types.map(t => `.${t}`).join(',') : undefined}
+                          onChange={e => {
+                            const file = e.target.files?.[0]
+                            if (!file) return
+                            if (q.allowed_file_types?.length) {
+                              const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+                              if (!q.allowed_file_types.map(t => t.toLowerCase()).includes(ext)) {
+                                alert(`Only ${q.allowed_file_types.join(', ')} files are allowed for this question.`)
+                                e.target.value = ''
+                                return
+                              }
+                            }
+                            handleFileUpload(q.id, file)
+                          }}
+                          className="text-sm"
+                        />
+                        {q.allowed_file_types?.length ? (
+                          <p className="text-xs text-gray-400 mt-1">Allowed: {q.allowed_file_types.join(', ')}</p>
+                        ) : null}
+                      </div>
                     )
                   )}
                 </div>

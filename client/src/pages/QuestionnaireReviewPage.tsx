@@ -49,6 +49,16 @@ export default function QuestionnaireReviewPage() {
 
   const responseMap = Object.fromEntries((responses as Response[]).map(r => [r.question_id, r]))
 
+  function isConditionMet(qq: typeof qqList[number]): boolean {
+    if (!qq.depends_on_question_id) return true
+    const target = responseMap[qq.depends_on_question_id]
+    if (!target) return false
+    if (target.answer_options) return target.answer_options.includes(qq.depends_on_value ?? '')
+    return target.answer_text === qq.depends_on_value
+  }
+
+  const visibleQQList = qqList.filter(isConditionMet)
+
   // Init mojo feedback from saved responses
   useEffect(() => {
     const init: Record<string, string> = {}
@@ -134,8 +144,8 @@ export default function QuestionnaireReviewPage() {
 
       {/* Responses, grouped by category */}
       {(() => {
-        const indexMap = new Map(qqList.map((qq, i) => [qq.id, i]))
-        const groups = groupByCategory(qqList, (qq) => qq.question?.category)
+        const indexMap = new Map(visibleQQList.map((qq, i) => [qq.id, i]))
+        const groups = groupByCategory(visibleQQList, (qq) => qq.question?.category)
         return (
           <div className="space-y-6 mb-8">
             {groups.map((group) => (
