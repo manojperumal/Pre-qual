@@ -50,6 +50,11 @@ function QueueItem({ item }: { item: FlaggedResponse }) {
         <div>
           <p className="text-xs text-gray-400 uppercase tracking-wide">{item.question.category}</p>
           <p className="text-sm font-semibold text-gray-900 mt-0.5">{item.question.question_text}</p>
+          {item.question.mojo_review_note && (
+            <p className="text-xs text-brand-700 bg-brand-50 rounded px-2 py-1 mt-1 inline-block">
+              Why: {item.question.mojo_review_note}
+            </p>
+          )}
           <p className="text-xs text-gray-500 mt-1">
             {item.assignment.company?.name ?? item.assignment.assignee?.full_name ?? item.assignment.assignee?.email ?? 'Unknown company'}
             {item.assignment.project?.name && <> · {item.assignment.project.name}</>}

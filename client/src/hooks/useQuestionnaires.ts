@@ -18,6 +18,8 @@ export interface Question {
   is_global: boolean
   is_required: boolean
   requires_mojo_review: boolean
+  /** Why this question needs Mojo review — shown to the Mojo reviewer, and to the respondent before they answer. */
+  mojo_review_note: string | null
   /** Only meaningful for answer_type = 'document_upload'. Null/empty = any file type allowed. */
   allowed_file_types: string[] | null
   tags: string[] | null
@@ -116,7 +118,7 @@ export interface Response {
 }
 
 export interface FlaggedResponse extends Response {
-  question: { question_text: string; category: QuestionCategory; requires_mojo_review: boolean }
+  question: { question_text: string; category: QuestionCategory; requires_mojo_review: boolean; mojo_review_note: string | null }
   assignment: {
     id: string
     status: AssignmentStatus
@@ -155,6 +157,7 @@ export function useCreateQuestion() {
       hint?: string
       is_required?: boolean
       requires_mojo_review?: boolean
+      mojo_review_note?: string
       allowed_file_types?: string[]
       tags?: string[]
       created_by: string
@@ -283,10 +286,13 @@ export function useUpdateQuestion() {
 export function useUpdateQuestionMojoReview() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, requiresMojoReview }: { id: string; requiresMojoReview: boolean }) => {
+    mutationFn: async ({ id, requiresMojoReview, note }: { id: string; requiresMojoReview: boolean; note?: string }) => {
       const { error } = await supabase
         .from('question_bank')
-        .update({ requires_mojo_review: requiresMojoReview })
+        .update({
+          requires_mojo_review: requiresMojoReview,
+          ...(note !== undefined ? { mojo_review_note: note.trim() || null } : {}),
+        })
         .eq('id', id)
       if (error) throw error
     },
@@ -616,7 +622,7 @@ export function useFlaggedResponses() {
       const { data, error } = await supabase
         .from('questionnaire_responses')
         .select(
-          '*, question:question_bank!inner(question_text, category, requires_mojo_review), assignment:questionnaire_assignments(id, status, project:projects(name), company:companies(name), assignee:profiles!assignee_id(full_name, email), questionnaire:questionnaires(name))'
+          '*, question:question_bank!inner(question_text, category, requires_mojo_review, mojo_review_note), assignment:questionnaire_assignments(id, status, project:projects(name), company:companies(name), assignee:profiles!assignee_id(full_name, email), questionnaire:questionnaires(name))'
         )
         .eq('question.requires_mojo_review', true)
         .order('created_at', { ascending: false })
