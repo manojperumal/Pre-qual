@@ -61,6 +61,7 @@ export default function QuestionBankPage() {
     options: '',
     is_required: true,
     requires_mojo_review: false,
+    mojo_review_note: '',
     allowed_file_types: [] as string[],
     tags: [] as string[],
   }
@@ -86,6 +87,7 @@ export default function QuestionBankPage() {
       options: (q.options ?? []).join('\n'),
       is_required: q.is_required,
       requires_mojo_review: q.requires_mojo_review,
+      mojo_review_note: q.mojo_review_note ?? '',
       allowed_file_types: q.allowed_file_types ?? [],
       tags: q.tags ?? [],
     })
@@ -153,9 +155,7 @@ export default function QuestionBankPage() {
         allowed_file_types: allowedFileTypes,
         tags: form.tags,
       })
-      if (form.requires_mojo_review !== undefined) {
-        await updateMojoReview.mutateAsync({ id: editingId, requiresMojoReview: form.requires_mojo_review })
-      }
+      await updateMojoReview.mutateAsync({ id: editingId, requiresMojoReview: form.requires_mojo_review, note: form.mojo_review_note })
     } else {
       await createQuestion.mutateAsync({
         category: form.category,
@@ -165,6 +165,7 @@ export default function QuestionBankPage() {
         options,
         is_required: form.is_required,
         requires_mojo_review: form.requires_mojo_review,
+        mojo_review_note: form.mojo_review_note.trim() || undefined,
         allowed_file_types: allowedFileTypes,
         tags: form.tags,
         created_by: profile.id,
@@ -270,9 +271,23 @@ export default function QuestionBankPage() {
             <input type="checkbox" id="is_required" checked={form.is_required} onChange={e => setForm(f => ({ ...f, is_required: e.target.checked }))} className="rounded border-gray-300" />
             <label htmlFor="is_required" className="text-sm text-gray-700">Required</label>
           </div>
-          <div className="flex items-center gap-2">
-            <input type="checkbox" id="requires_mojo_review" checked={form.requires_mojo_review} onChange={e => setForm(f => ({ ...f, requires_mojo_review: e.target.checked }))} className="rounded border-gray-300" />
-            <label htmlFor="requires_mojo_review" className="text-sm text-gray-700">Requires Mojo Review</label>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="requires_mojo_review" checked={form.requires_mojo_review} onChange={e => setForm(f => ({ ...f, requires_mojo_review: e.target.checked }))} className="rounded border-gray-300" />
+              <label htmlFor="requires_mojo_review" className="text-sm text-gray-700">Requires Mojo Review</label>
+            </div>
+            {form.requires_mojo_review && (
+              <div>
+                <label className="label">Why does this need Mojo review? <span className="text-gray-400 font-normal">(optional, shown to the Mojo reviewer and to the respondent)</span></label>
+                <textarea
+                  rows={2}
+                  className="input-field resize-none"
+                  placeholder="e.g. High-risk answer that needs a compliance check before it counts as final"
+                  value={form.mojo_review_note}
+                  onChange={e => setForm(f => ({ ...f, mojo_review_note: e.target.value }))}
+                />
+              </div>
+            )}
           </div>
           <div className="flex gap-2 justify-end pt-2">
             <button onClick={() => { setShowForm(false); setEditingId(null) }} className="btn-secondary">Cancel</button>
@@ -336,7 +351,10 @@ export default function QuestionBankPage() {
                           {q.is_global && <span className="text-xs bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded">Global</span>}
                           {q.is_required && <span className="text-xs text-gray-400">Required</span>}
                           {q.requires_mojo_review && (
-                            <span className="inline-flex items-center gap-1 text-xs bg-brand-50 text-brand-700 px-1.5 py-0.5 rounded">
+                            <span
+                              className="inline-flex items-center gap-1 text-xs bg-brand-50 text-brand-700 px-1.5 py-0.5 rounded"
+                              title={q.mojo_review_note ?? undefined}
+                            >
                               <ShieldCheck size={11} />
                               Mojo Review
                             </span>

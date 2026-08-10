@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { ChevronRight, CheckCircle2, Clock, Sparkles, Upload, X, FileText, AlertCircle, Info } from 'lucide-react'
+import { ChevronRight, CheckCircle2, Clock, Sparkles, Upload, X, FileText, AlertCircle, Info, ShieldCheck } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import {
   useAssignment,
@@ -369,8 +369,22 @@ export default function QuestionnaireResponsePage() {
                     <Sparkles size={11} /> AI
                   </span>
                 )}
+                {q.requires_mojo_review && (
+                  <span
+                    className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full flex-shrink-0"
+                    title={q.mojo_review_note ?? undefined}
+                  >
+                    <ShieldCheck size={11} /> Mojo Review
+                  </span>
+                )}
               </div>
               {q.hint && <p className="text-xs text-gray-400 mb-3">{q.hint}</p>}
+              {q.requires_mojo_review && q.mojo_review_note && (
+                <p className="flex items-start gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1.5 mb-3">
+                  <ShieldCheck size={12} className="flex-shrink-0 mt-0.5" />
+                  {q.mojo_review_note}
+                </p>
+              )}
 
               {/* Radio yes/no */}
               {q.answer_type === 'radio_yes_no' && (
