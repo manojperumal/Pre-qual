@@ -18,8 +18,13 @@ export interface Question {
   is_global: boolean
   is_required: boolean
   requires_mojo_review: boolean
+  /** Only meaningful for answer_type = 'document_upload'. Null/empty = any file type allowed. */
+  allowed_file_types: string[] | null
   created_at: string
 }
+
+/** Answer types with a small, fixed set of possible values a later question can key off of. */
+export const CONDITIONABLE_ANSWER_TYPES: AnswerType[] = ['radio_yes_no', 'radio_yes_no_comments', 'multi_select']
 
 export interface Questionnaire {
   id: string
@@ -38,6 +43,9 @@ export interface QuestionnaireQuestion {
   question_id: string
   order_index: number
   is_required: boolean
+  /** Show this question only if depends_on_question_id's answer equals/includes depends_on_value */
+  depends_on_question_id: string | null
+  depends_on_value: string | null
   question?: Question
 }
 
@@ -130,6 +138,7 @@ export function useCreateQuestion() {
       hint?: string
       is_required?: boolean
       requires_mojo_review?: boolean
+      allowed_file_types?: string[]
       created_by: string
     }) => {
       const { data, error } = await supabase
@@ -166,11 +175,17 @@ export function useUpdateQuestion() {
       options?: string[]
       hint?: string
       is_required?: boolean
+      allowed_file_types?: string[]
     }) => {
       const { id, ...updates } = q
       const { error } = await supabase
         .from('question_bank')
-        .update({ ...updates, options: updates.options ?? null, hint: updates.hint || null })
+        .update({
+          ...updates,
+          options: updates.options ?? null,
+          hint: updates.hint || null,
+          allowed_file_types: updates.allowed_file_types?.length ? updates.allowed_file_types : null,
+        })
         .eq('id', id)
       if (error) throw error
     },
@@ -292,18 +307,26 @@ export function useDeleteQuestionnaire() {
   })
 }
 
+export interface QuestionnaireQuestionInput {
+  questionId: string
+  dependsOnQuestionId?: string | null
+  dependsOnValue?: string | null
+}
+
 export function useSaveQuestionnaireQuestions() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ questionnaireId, questionIds }: { questionnaireId: string; questionIds: string[] }) => {
+    mutationFn: async ({ questionnaireId, questions }: { questionnaireId: string; questions: QuestionnaireQuestionInput[] }) => {
       // Replace all questions for this questionnaire
       await supabase.from('questionnaire_questions').delete().eq('questionnaire_id', questionnaireId)
-      if (questionIds.length === 0) return
-      const rows = questionIds.map((qid, i) => ({
+      if (questions.length === 0) return
+      const rows = questions.map((q, i) => ({
         questionnaire_id: questionnaireId,
-        question_id: qid,
+        question_id: q.questionId,
         order_index: i,
         is_required: true,
+        depends_on_question_id: q.dependsOnQuestionId || null,
+        depends_on_value: q.dependsOnValue || null,
       }))
       const { error } = await supabase.from('questionnaire_questions').insert(rows)
       if (error) throw error

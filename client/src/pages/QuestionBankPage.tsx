@@ -21,6 +21,8 @@ const ANSWER_TYPES: { value: AnswerType; label: string }[] = [
   { value: 'document_upload', label: 'Document Upload' },
 ]
 
+const FILE_TYPE_OPTIONS = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx']
+
 const CATEGORY_COLORS: Record<QuestionCategory, string> = {
   company_info: 'bg-blue-100 text-blue-700',
   insurance: 'bg-purple-100 text-purple-700',
@@ -54,6 +56,7 @@ export default function QuestionBankPage() {
     options: '',
     is_required: true,
     requires_mojo_review: false,
+    allowed_file_types: [] as string[],
   }
 
   // Shared form state for both "New Question" and "Edit Question"
@@ -75,8 +78,18 @@ export default function QuestionBankPage() {
       options: (q.options ?? []).join('\n'),
       is_required: q.is_required,
       requires_mojo_review: q.requires_mojo_review,
+      allowed_file_types: q.allowed_file_types ?? [],
     })
     setShowForm(true)
+  }
+
+  function toggleFileType(type: string) {
+    setForm((f) => ({
+      ...f,
+      allowed_file_types: f.allowed_file_types.includes(type)
+        ? f.allowed_file_types.filter((t) => t !== type)
+        : [...f.allowed_file_types, type],
+    }))
   }
 
   const filtered = questions.filter((q) => {
@@ -96,6 +109,8 @@ export default function QuestionBankPage() {
       ? form.options.split('\n').map((s) => s.trim()).filter(Boolean)
       : undefined
 
+    const allowedFileTypes = form.answer_type === 'document_upload' ? form.allowed_file_types : undefined
+
     if (editingId) {
       await updateQuestion.mutateAsync({
         id: editingId,
@@ -105,6 +120,7 @@ export default function QuestionBankPage() {
         hint: form.hint.trim() || undefined,
         options,
         is_required: form.is_required,
+        allowed_file_types: allowedFileTypes,
       })
       if (form.requires_mojo_review !== undefined) {
         await updateMojoReview.mutateAsync({ id: editingId, requiresMojoReview: form.requires_mojo_review })
@@ -118,6 +134,7 @@ export default function QuestionBankPage() {
         options,
         is_required: form.is_required,
         requires_mojo_review: form.requires_mojo_review,
+        allowed_file_types: allowedFileTypes,
         created_by: profile.id,
       })
     }
@@ -165,6 +182,27 @@ export default function QuestionBankPage() {
             <div>
               <label className="label">Options <span className="text-gray-400 font-normal">(one per line)</span></label>
               <textarea rows={4} className="input-field resize-none" placeholder={"Option A\nOption B\nOption C"} value={form.options} onChange={e => setForm(f => ({ ...f, options: e.target.value }))} />
+            </div>
+          )}
+          {form.answer_type === 'document_upload' && (
+            <div>
+              <label className="label">Allowed File Types <span className="text-gray-400 font-normal">(none selected = any file type)</span></label>
+              <div className="flex flex-wrap gap-2">
+                {FILE_TYPE_OPTIONS.map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => toggleFileType(type)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium uppercase transition-colors ${
+                      form.allowed_file_types.includes(type)
+                        ? 'bg-brand-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    .{type}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
           <div>
@@ -238,6 +276,9 @@ export default function QuestionBankPage() {
                         <div className="flex items-center gap-3 mt-1">
                           <span className="text-xs text-gray-500">{ANSWER_TYPES.find(a => a.value === q.answer_type)?.label}</span>
                           {q.options && <span className="text-xs text-gray-400">{(q.options as string[]).join(', ')}</span>}
+                          {q.allowed_file_types && q.allowed_file_types.length > 0 && (
+                            <span className="text-xs text-gray-400">{q.allowed_file_types.map((t) => `.${t}`).join(', ')} only</span>
+                          )}
                         </div>
                         {q.hint && expandedId === q.id && (
                           <p className="text-xs text-gray-500 mt-1 italic">{q.hint}</p>

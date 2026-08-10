@@ -8,10 +8,16 @@ import {
   useCreateQuestionnaire,
   useUpdateQuestionnaire,
   useSaveQuestionnaireQuestions,
+  CONDITIONABLE_ANSWER_TYPES,
   Question,
   QuestionCategory,
 } from '@/hooks/useQuestionnaires'
-import { ChevronRight, Search, Plus, X, GripVertical, Check } from 'lucide-react'
+import { ChevronRight, Search, Plus, X, GripVertical, Check, GitBranch } from 'lucide-react'
+
+interface Condition {
+  questionId: string
+  value: string
+}
 
 const CATEGORIES: { value: QuestionCategory; label: string; color: string }[] = [
   { value: 'company_info', label: 'Company Info', color: 'bg-blue-100 text-blue-700' },
@@ -40,6 +46,8 @@ export default function QuestionnaireBuilderPage() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [selected, setSelected] = useState<Question[]>([])
+  const [conditions, setConditions] = useState<Record<string, Condition | undefined>>({})
+  const [editingConditionFor, setEditingConditionFor] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [filterCat, setFilterCat] = useState<QuestionCategory | 'all'>('all')
   const [saved, setSaved] = useState(false)
@@ -56,6 +64,14 @@ export default function QuestionnaireBuilderPage() {
         .map(qq => allQuestions.find(q => q.id === qq.question_id))
         .filter(Boolean) as Question[]
       setSelected(ordered)
+
+      const conds: Record<string, Condition | undefined> = {}
+      for (const qq of existingQQs) {
+        if (qq.depends_on_question_id && qq.depends_on_value) {
+          conds[qq.question_id] = { questionId: qq.depends_on_question_id, value: qq.depends_on_value }
+        }
+      }
+      setConditions(conds)
     }
   }, [existingQQs, allQuestions])
 
@@ -74,6 +90,18 @@ export default function QuestionnaireBuilderPage() {
 
   function removeQuestion(id: string) {
     setSelected(prev => prev.filter(q => q.id !== id))
+    setConditions(prev => {
+      const next: Record<string, Condition | undefined> = {}
+      for (const [qid, cond] of Object.entries(prev)) {
+        if (qid === id) continue // drop the removed question's own condition
+        next[qid] = cond?.questionId === id ? undefined : cond // clear anyone conditioned on the removed question
+      }
+      return next
+    })
+  }
+
+  function setCondition(questionId: string, cond: Condition | undefined) {
+    setConditions(prev => ({ ...prev, [questionId]: cond }))
   }
 
   function moveUp(i: number) {
@@ -94,7 +122,14 @@ export default function QuestionnaireBuilderPage() {
     } else {
       await updateQuestionnaire.mutateAsync({ id: id!, name, description })
     }
-    await saveQuestions.mutateAsync({ questionnaireId: qId!, questionIds: selected.map(q => q.id) })
+    await saveQuestions.mutateAsync({
+      questionnaireId: qId!,
+      questions: selected.map(q => ({
+        questionId: q.id,
+        dependsOnQuestionId: conditions[q.id]?.questionId,
+        dependsOnValue: conditions[q.id]?.value,
+      })),
+    })
     setSaved(true)
     setTimeout(() => {
       navigate('/owner/questionnaires')
@@ -183,28 +218,89 @@ export default function QuestionnaireBuilderPage() {
               </div>
             ) : selected.map((q, i) => {
               const cat = CATEGORIES.find(c => c.value === q.category)
+              const eligibleTargets = selected.slice(0, i).filter(t => CONDITIONABLE_ANSWER_TYPES.includes(t.answer_type))
+              const condition = conditions[q.id]
+              const targetQuestion = condition ? selected.find(t => t.id === condition.questionId) : undefined
+              const valueOptions = targetQuestion?.answer_type === 'multi_select'
+                ? targetQuestion.options ?? []
+                : ['yes', 'no']
+
               return (
-                <div key={q.id} className="flex items-start gap-2 px-4 py-3 hover:bg-gray-50">
-                  <div className="flex flex-col gap-0.5 mt-1 flex-shrink-0">
-                    <button onClick={() => moveUp(i)} disabled={i === 0} className="text-gray-300 hover:text-gray-500 disabled:opacity-30">
-                      <ChevronRight size={12} className="-rotate-90" />
-                    </button>
-                    <button onClick={() => moveDown(i)} disabled={i === selected.length - 1} className="text-gray-300 hover:text-gray-500 disabled:opacity-30">
-                      <ChevronRight size={12} className="rotate-90" />
-                    </button>
-                  </div>
-                  <GripVertical size={14} className="text-gray-300 mt-2 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-xs text-gray-400 font-medium">{i + 1}.</span>
-                    <p className="text-sm text-gray-800 inline ml-1">{q.question_text}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      {cat && <span className={`text-xs px-1.5 py-0.5 rounded ${cat.color}`}>{cat.label}</span>}
-                      <span className="text-xs text-gray-400">{q.answer_type.replace(/_/g, ' ')}</span>
+                <div key={q.id} className="px-4 py-3 hover:bg-gray-50">
+                  <div className="flex items-start gap-2">
+                    <div className="flex flex-col gap-0.5 mt-1 flex-shrink-0">
+                      <button onClick={() => moveUp(i)} disabled={i === 0} className="text-gray-300 hover:text-gray-500 disabled:opacity-30">
+                        <ChevronRight size={12} className="-rotate-90" />
+                      </button>
+                      <button onClick={() => moveDown(i)} disabled={i === selected.length - 1} className="text-gray-300 hover:text-gray-500 disabled:opacity-30">
+                        <ChevronRight size={12} className="rotate-90" />
+                      </button>
                     </div>
+                    <GripVertical size={14} className="text-gray-300 mt-2 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-xs text-gray-400 font-medium">{i + 1}.</span>
+                      <p className="text-sm text-gray-800 inline ml-1">{q.question_text}</p>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        {cat && <span className={`text-xs px-1.5 py-0.5 rounded ${cat.color}`}>{cat.label}</span>}
+                        <span className="text-xs text-gray-400">{q.answer_type.replace(/_/g, ' ')}</span>
+                        {condition && targetQuestion && (
+                          <span className="text-xs text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded">
+                            Only if "{targetQuestion.question_text.slice(0, 24)}{targetQuestion.question_text.length > 24 ? '…' : ''}" = {condition.value}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {eligibleTargets.length > 0 && (
+                      <button
+                        onClick={() => setEditingConditionFor(editingConditionFor === q.id ? null : q.id)}
+                        className={`flex-shrink-0 p-1.5 rounded ${condition ? 'text-brand-600' : 'text-gray-300 hover:text-brand-600'}`}
+                        title="Show only if another answer matches"
+                      >
+                        <GitBranch size={14} />
+                      </button>
+                    )}
+                    <button onClick={() => removeQuestion(q.id)} className="flex-shrink-0 p-1.5 text-gray-300 hover:text-red-500 rounded">
+                      <X size={14} />
+                    </button>
                   </div>
-                  <button onClick={() => removeQuestion(q.id)} className="flex-shrink-0 p-1.5 text-gray-300 hover:text-red-500 rounded">
-                    <X size={14} />
-                  </button>
+
+                  {editingConditionFor === q.id && (
+                    <div className="mt-2 ml-9 p-3 bg-gray-50 rounded-lg space-y-2">
+                      <div>
+                        <label className="text-xs text-gray-500">Show this question only if</label>
+                        <select
+                          className="input-field py-1.5 text-sm mt-1"
+                          value={condition?.questionId ?? ''}
+                          onChange={e => {
+                            const qid = e.target.value
+                            if (!qid) { setCondition(q.id, undefined); return }
+                            const target = eligibleTargets.find(t => t.id === qid)
+                            const defaultValue = target?.answer_type === 'multi_select' ? (target.options?.[0] ?? '') : 'yes'
+                            setCondition(q.id, { questionId: qid, value: defaultValue })
+                          }}
+                        >
+                          <option value="">Always show</option>
+                          {eligibleTargets.map(t => (
+                            <option key={t.id} value={t.id}>{t.question_text}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {condition && (
+                        <div>
+                          <label className="text-xs text-gray-500">equals</label>
+                          <select
+                            className="input-field py-1.5 text-sm mt-1"
+                            value={condition.value}
+                            onChange={e => setCondition(q.id, { ...condition, value: e.target.value })}
+                          >
+                            {valueOptions.map(v => (
+                              <option key={v} value={v} className="capitalize">{v}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )
             })}
