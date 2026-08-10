@@ -20,7 +20,24 @@ export interface Question {
   requires_mojo_review: boolean
   /** Only meaningful for answer_type = 'document_upload'. Null/empty = any file type allowed. */
   allowed_file_types: string[] | null
+  tags: string[] | null
+  version: number
   created_at: string
+}
+
+export interface QuestionVersion {
+  id: string
+  question_id: string
+  version: number
+  question_text: string
+  category: QuestionCategory
+  answer_type: AnswerType
+  options: string[] | null
+  hint: string | null
+  allowed_file_types: string[] | null
+  tags: string[] | null
+  changed_by: string | null
+  changed_at: string
 }
 
 /** Answer types with a small, fixed set of possible values a later question can key off of. */
@@ -139,17 +156,64 @@ export function useCreateQuestion() {
       is_required?: boolean
       requires_mojo_review?: boolean
       allowed_file_types?: string[]
+      tags?: string[]
       created_by: string
     }) => {
       const { data, error } = await supabase
         .from('question_bank')
-        .insert({ ...q, is_global: false })
+        .insert({ ...q, tags: q.tags?.length ? q.tags : null, is_global: false })
         .select()
         .single()
       if (error) throw error
       return data as Question
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['question_bank'] }),
+  })
+}
+
+/** Copies a question into a new question_bank row (optionally into a different
+ * category) so it can be reused/adapted without altering the original. */
+export function useDuplicateQuestion() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ question, category, createdBy }: { question: Question; category?: QuestionCategory; createdBy: string }) => {
+      const { data, error } = await supabase
+        .from('question_bank')
+        .insert({
+          category: category ?? question.category,
+          question_text: `${question.question_text} (Copy)`,
+          answer_type: question.answer_type,
+          options: question.options,
+          hint: question.hint,
+          is_required: question.is_required,
+          requires_mojo_review: false,
+          allowed_file_types: question.allowed_file_types,
+          tags: question.tags,
+          is_global: false,
+          created_by: createdBy,
+        })
+        .select()
+        .single()
+      if (error) throw error
+      return data as Question
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['question_bank'] }),
+  })
+}
+
+export function useQuestionVersions(questionId: string | null) {
+  return useQuery({
+    queryKey: ['question_bank_versions', questionId],
+    enabled: !!questionId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('question_bank_versions')
+        .select('*')
+        .eq('question_id', questionId)
+        .order('version', { ascending: false })
+      if (error) throw error
+      return data as QuestionVersion[]
+    },
   })
 }
 
@@ -169,6 +233,7 @@ export function useUpdateQuestion() {
   return useMutation({
     mutationFn: async (q: {
       id: string
+      previous: Question
       category: QuestionCategory
       question_text: string
       answer_type: AnswerType
@@ -176,8 +241,25 @@ export function useUpdateQuestion() {
       hint?: string
       is_required?: boolean
       allowed_file_types?: string[]
+      tags?: string[]
+      changedBy: string
     }) => {
-      const { id, ...updates } = q
+      const { id, previous, changedBy, ...updates } = q
+      // Snapshot the pre-edit state so history shows what it used to say.
+      const { error: versionError } = await supabase.from('question_bank_versions').insert({
+        question_id: id,
+        version: previous.version,
+        question_text: previous.question_text,
+        category: previous.category,
+        answer_type: previous.answer_type,
+        options: previous.options,
+        hint: previous.hint,
+        allowed_file_types: previous.allowed_file_types,
+        tags: previous.tags,
+        changed_by: changedBy,
+      })
+      if (versionError) throw versionError
+
       const { error } = await supabase
         .from('question_bank')
         .update({
@@ -185,11 +267,16 @@ export function useUpdateQuestion() {
           options: updates.options ?? null,
           hint: updates.hint || null,
           allowed_file_types: updates.allowed_file_types?.length ? updates.allowed_file_types : null,
+          tags: updates.tags?.length ? updates.tags : null,
+          version: previous.version + 1,
         })
         .eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['question_bank'] }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['question_bank'] })
+      qc.invalidateQueries({ queryKey: ['question_bank_versions', vars.id] })
+    },
   })
 }
 
