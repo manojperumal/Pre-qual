@@ -1,11 +1,13 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useProjects } from '@/hooks/useProjects'
-import { FolderOpen, Plus, MapPin } from 'lucide-react'
+import { FolderOpen, Plus, Upload, MapPin } from 'lucide-react'
 import { format } from 'date-fns'
 
 export default function ProjectsListPage() {
   const { profile } = useAuth()
+  const location = useLocation()
+  const basePath = '/' + location.pathname.split('/')[1]
   const { data: projects = [], isLoading } = useProjects(profile?.id)
 
   return (
@@ -15,13 +17,22 @@ export default function ProjectsListPage() {
           <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
           <p className="mt-1 text-sm text-gray-500">All your pre-qualification projects</p>
         </div>
-        <Link
-          to="/owner/projects/new"
-          className="btn-primary inline-flex items-center gap-2 text-sm py-2 px-4"
-        >
-          <Plus size={16} />
-          New Project
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to={`${basePath}/projects/bulk-upload`}
+            className="btn-secondary inline-flex items-center gap-2 text-sm py-2 px-4"
+          >
+            <Upload size={16} />
+            Bulk Upload
+          </Link>
+          <Link
+            to={`${basePath}/projects/new`}
+            className="btn-primary inline-flex items-center gap-2 text-sm py-2 px-4"
+          >
+            <Plus size={16} />
+            New Project
+          </Link>
+        </div>
       </div>
 
       {isLoading ? (
@@ -33,10 +44,16 @@ export default function ProjectsListPage() {
           <FolderOpen size={40} className="mx-auto mb-4 text-gray-300" />
           <p className="font-semibold text-gray-700">No projects yet</p>
           <p className="text-sm mt-1">Create your first project to start managing pre-qualifications</p>
-          <Link to="/owner/projects/new" className="btn-primary mt-5 inline-flex items-center gap-2">
-            <Plus size={16} />
-            Create Project
-          </Link>
+          <div className="flex items-center justify-center gap-3 mt-5">
+            <Link to={`${basePath}/projects/bulk-upload`} className="btn-secondary inline-flex items-center gap-2">
+              <Upload size={16} />
+              Bulk Upload
+            </Link>
+            <Link to={`${basePath}/projects/new`} className="btn-primary inline-flex items-center gap-2">
+              <Plus size={16} />
+              Create Project
+            </Link>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -45,7 +62,7 @@ export default function ProjectsListPage() {
             return (
               <Link
                 key={project.id}
-                to={`/owner/projects/${project.id}`}
+                to={`${basePath}/projects/${project.id}`}
                 className="card-hover p-5 block"
               >
                 <div className="flex items-start justify-between">
