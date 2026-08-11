@@ -3,13 +3,8 @@ import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useBulkCreateProjects, BulkProjectRow } from '@/hooks/useProjects'
 import { parseCSV, rowsToObjects } from '@/lib/csv'
+import { PROJECT_CSV_HEADERS, downloadProjectCsvTemplate } from '@/lib/projectCsvTemplate'
 import { ChevronRight, Download, Upload, AlertCircle } from 'lucide-react'
-
-const TEMPLATE_HEADERS = ['name', 'description', 'address', 'start_date', 'end_date']
-const TEMPLATE_CSV =
-  TEMPLATE_HEADERS.join(',') +
-  '\n' +
-  'Downtown Office Tower,Brief description of the project,"123 Main St, Austin, TX 78701",2026-01-15,2026-12-31\n'
 
 interface ParsedRow extends BulkProjectRow {
   rowNumber: number
@@ -56,16 +51,6 @@ export default function BulkUploadProjectsPage() {
   const [fileName, setFileName] = useState<string | null>(null)
   const [rows, setRows] = useState<ParsedRow[]>([])
   const [parseError, setParseError] = useState<string | null>(null)
-
-  function downloadTemplate() {
-    const blob = new Blob([TEMPLATE_CSV], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'projects_template.csv'
-    a.click()
-    URL.revokeObjectURL(url)
-  }
 
   function handleFile(file: File) {
     setFileName(file.name)
@@ -124,10 +109,10 @@ export default function BulkUploadProjectsPage() {
           <div>
             <p className="text-sm font-medium text-gray-900">Need the CSV format?</p>
             <p className="text-xs text-gray-500 mt-0.5">
-              Columns: {TEMPLATE_HEADERS.join(', ')}
+              Columns: {PROJECT_CSV_HEADERS.join(', ')}
             </p>
           </div>
-          <button type="button" onClick={downloadTemplate} className="btn-secondary inline-flex items-center gap-2 text-sm">
+          <button type="button" onClick={downloadProjectCsvTemplate} className="btn-secondary inline-flex items-center gap-2 text-sm">
             <Download size={16} />
             Download Template
           </button>

@@ -1,7 +1,8 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useProjects } from '@/hooks/useProjects'
-import { FolderOpen, Plus, Upload, MapPin } from 'lucide-react'
+import { downloadProjectCsvTemplate } from '@/lib/projectCsvTemplate'
+import { FolderOpen, Plus, Upload, Download, MapPin } from 'lucide-react'
 import { format } from 'date-fns'
 
 export default function ProjectsListPage() {
@@ -18,6 +19,14 @@ export default function ProjectsListPage() {
           <p className="mt-1 text-sm text-gray-500">All your pre-qualification projects</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={downloadProjectCsvTemplate}
+            className="btn-secondary inline-flex items-center gap-2 text-sm py-2 px-4"
+          >
+            <Download size={16} />
+            Download CSV Template
+          </button>
           <Link
             to={`${basePath}/projects/bulk-upload`}
             className="btn-secondary inline-flex items-center gap-2 text-sm py-2 px-4"
@@ -45,6 +54,10 @@ export default function ProjectsListPage() {
           <p className="font-semibold text-gray-700">No projects yet</p>
           <p className="text-sm mt-1">Create your first project to start managing pre-qualifications</p>
           <div className="flex items-center justify-center gap-3 mt-5">
+            <button type="button" onClick={downloadProjectCsvTemplate} className="btn-secondary inline-flex items-center gap-2">
+              <Download size={16} />
+              Download Template
+            </button>
             <Link to={`${basePath}/projects/bulk-upload`} className="btn-secondary inline-flex items-center gap-2">
               <Upload size={16} />
               Bulk Upload
