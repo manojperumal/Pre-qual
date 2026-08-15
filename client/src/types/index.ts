@@ -26,7 +26,7 @@ export interface Subscription {
   status: 'active' | 'past_due' | 'canceled'
   current_period_start: string
   current_period_end: string
-  stripe_subscription_id: string | null
+  quickbooks_recurring_id: string | null
   created_at: string
 }
 
@@ -37,7 +37,7 @@ export interface ProjectSubmissionPayment {
   amount_cents: number
   currency: string
   status: 'pending' | 'paid' | 'failed' | 'refunded'
-  stripe_payment_intent_id: string | null
+  quickbooks_payment_id: string | null
   created_at: string
   paid_at: string | null
 }

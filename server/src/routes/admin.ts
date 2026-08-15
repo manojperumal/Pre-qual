@@ -83,8 +83,7 @@ router.post('/impersonate', requireAuth, async (req: Request, res: Response): Pr
 /**
  * POST /api/admin/billing/mark-project-paid
  * Mojo-admin only. Manually records a project's one-time processing fee
- * as paid — for handling payment outside Stripe (check, wire, etc.) until
- * real Checkout is wired up.
+ * as paid — for handling payment outside QuickBooks (check, wire, etc.).
  */
 const markProjectPaidSchema = z.object({
   project_id: z.string().uuid(),
@@ -125,8 +124,7 @@ router.post('/billing/mark-project-paid', requireAuth, async (req: Request, res:
 /**
  * POST /api/admin/billing/activate-subscription
  * Mojo-admin only. Manually activates a company's platform-wide annual
- * subscription — for handling payment outside Stripe until real
- * subscriptions are wired up.
+ * subscription — for handling payment outside QuickBooks (check, wire, etc.).
  */
 const activateSubscriptionSchema = z.object({
   company_id: z.string().uuid(),
