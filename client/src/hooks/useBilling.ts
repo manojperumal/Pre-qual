@@ -1,13 +1,13 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { BillingMode, Subscription, ProjectSubmissionPayment } from '@/types'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
-async function postCheckout(path: string, body: Record<string, unknown>): Promise<string> {
+async function postPayment(path: string, body: Record<string, unknown>): Promise<void> {
   const { data: sessionData } = await supabase.auth.getSession()
   const token = sessionData.session?.access_token
-  const res = await fetch(`${API_URL}/api/checkout/${path}`, {
+  const res = await fetch(`${API_URL}/api/payments/${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -16,26 +16,30 @@ async function postCheckout(path: string, body: Record<string, unknown>): Promis
     body: JSON.stringify(body),
   })
   const result = await res.json()
-  if (!res.ok) throw new Error(result.error || 'Failed to start checkout')
-  return result.url as string
+  if (!res.ok) throw new Error(result.error || 'Payment failed')
 }
 
-// Redirects the browser to Stripe Checkout for the one-time per-project fee.
-export function useCreateProjectCheckout() {
+// Charges the one-time per-project fee via a QuickBooks payment token
+// (see client/src/lib/quickbooks.ts for how that token is produced).
+export function useChargeProjectFee() {
+  const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (projectId: string) => postCheckout('project', { project_id: projectId, return_url: window.location.href }),
-    onSuccess: (url) => {
-      window.location.href = url
+    mutationFn: async ({ projectId, paymentToken }: { projectId: string; paymentToken: string }) =>
+      postPayment('project', { project_id: projectId, payment_token: paymentToken }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['submission_payment'] })
     },
   })
 }
 
-// Redirects the browser to Stripe Checkout for the platform-wide annual subscription.
-export function useCreateSubscriptionCheckout() {
+// Charges the platform-wide annual fee via a QuickBooks payment token.
+export function useChargeSubscription() {
+  const qc = useQueryClient()
   return useMutation({
-    mutationFn: async () => postCheckout('subscription', { return_url: window.location.href }),
-    onSuccess: (url) => {
-      window.location.href = url
+    mutationFn: async ({ paymentToken }: { paymentToken: string }) =>
+      postPayment('subscription', { payment_token: paymentToken }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['subscription'] })
     },
   })
 }

@@ -1,4 +1,4 @@
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -19,6 +19,8 @@ type FormData = z.infer<typeof schema>
 export default function CreateProjectPage() {
   const { profile } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const basePath = '/' + location.pathname.split('/')[1]
   const createProject = useCreateProject()
 
   const {
@@ -40,7 +42,7 @@ export default function CreateProjectPage() {
         endDate: data.end_date || undefined,
         ownerId: profile.id,
       })
-      navigate('/owner/projects')
+      navigate(`${basePath}/projects`)
     } catch (err) {
       console.error('Failed to create project', err)
     }
@@ -50,7 +52,7 @@ export default function CreateProjectPage() {
     <div className="max-w-lg space-y-6">
       {/* Breadcrumbs */}
       <nav className="flex items-center gap-1.5 text-sm text-gray-500">
-        <Link to="/owner/projects" className="hover:text-brand-600 transition-colors">Projects</Link>
+        <Link to={`${basePath}/projects`} className="hover:text-brand-600 transition-colors">Projects</Link>
         <ChevronRight size={14} className="text-gray-400 flex-shrink-0" />
         <span className="text-gray-900 font-medium">New Project</span>
       </nav>
@@ -124,7 +126,7 @@ export default function CreateProjectPage() {
           </div>
 
           <div className="flex items-center justify-between pt-2">
-            <Link to="/owner/projects" className="btn-secondary">Cancel</Link>
+            <Link to={`${basePath}/projects`} className="btn-secondary">Cancel</Link>
             <button
               type="submit"
               disabled={isSubmitting || createProject.isPending}

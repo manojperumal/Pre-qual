@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import {
   useContractorProfile,
@@ -12,9 +11,10 @@ import {
   useGoverningBillingCompany,
   useCompanySubscription,
   useProjectSubmissionPayment,
-  useCreateProjectCheckout,
-  useCreateSubscriptionCheckout,
+  useChargeProjectFee,
+  useChargeSubscription,
 } from '@/hooks/useBilling'
+import { QuickBooksPaymentModal } from '@/components/QuickBooksPaymentModal'
 import { SubmissionDocument } from '@/types'
 import { Upload, AlertTriangle, CheckCircle, CreditCard } from 'lucide-react'
 import { format } from 'date-fns'
@@ -60,8 +60,6 @@ export default function ProjectSubmissionPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const { profile } = useAuth()
   const navigate = useNavigate()
-  const qc = useQueryClient()
-  const [searchParams, setSearchParams] = useSearchParams()
 
   const { data: contractorProfile, isLoading: profileLoading } = useContractorProfile(profile?.id)
   const { data: submission, isLoading: subLoading } = useProjectSubmission(projectId, profile?.id)
@@ -71,8 +69,8 @@ export default function ProjectSubmissionPage() {
   const { data: governingCompany } = useGoverningBillingCompany(projectId, companyId)
   const { data: activeSubscription } = useCompanySubscription(companyId)
   const { data: submissionPayment } = useProjectSubmissionPayment(projectId, companyId)
-  const createProjectCheckout = useCreateProjectCheckout()
-  const createSubscriptionCheckout = useCreateSubscriptionCheckout()
+  const chargeProjectFee = useChargeProjectFee()
+  const chargeSubscription = useChargeSubscription()
 
   const paymentRequired = governingCompany?.billing_mode === 'platform_only'
   const hasPaid = !!activeSubscription || submissionPayment?.status === 'paid'
@@ -83,22 +81,7 @@ export default function ProjectSubmissionPage() {
   const [saved, setSaved] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [paymentNotice, setPaymentNotice] = useState<string | null>(null)
-
-  // Coming back from Stripe Checkout
-  useEffect(() => {
-    const paymentResult = searchParams.get('payment')
-    if (!paymentResult) return
-    if (paymentResult === 'success') {
-      setPaymentNotice('Payment received — it may take a few seconds to reflect below.')
-      qc.invalidateQueries({ queryKey: ['submission_payment'] })
-      qc.invalidateQueries({ queryKey: ['subscription'] })
-    } else if (paymentResult === 'cancelled') {
-      setPaymentNotice('Checkout was cancelled — no charge was made.')
-    }
-    searchParams.delete('payment')
-    setSearchParams(searchParams, { replace: true })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  const [paymentModal, setPaymentModal] = useState<'project' | 'subscription' | null>(null)
 
   const dashPath = profile?.role === 'gc' ? '/gc' : '/trade'
   const profilePath = profile?.role === 'gc' ? '/gc/profile' : '/trade/profile'
@@ -210,28 +193,20 @@ export default function ProjectSubmissionPage() {
               {governingCompany?.name ?? 'This project'} requires payment for pre-qualification processing —
               a one-time fee for this project, or a platform-wide annual subscription covering every project.
             </p>
-            {createProjectCheckout.isError && (
-              <p className="text-red-600 mt-1">{(createProjectCheckout.error as Error).message}</p>
-            )}
-            {createSubscriptionCheckout.isError && (
-              <p className="text-red-600 mt-1">{(createSubscriptionCheckout.error as Error).message}</p>
-            )}
             <div className="flex gap-2 mt-3">
               <button
                 type="button"
-                onClick={() => projectId && createProjectCheckout.mutate(projectId)}
-                disabled={createProjectCheckout.isPending || createSubscriptionCheckout.isPending}
+                onClick={() => setPaymentModal('project')}
                 className="btn-primary text-xs py-1.5 px-3"
               >
-                {createProjectCheckout.isPending ? 'Redirecting…' : 'Pay $150 for this project'}
+                Pay $150 for this project
               </button>
               <button
                 type="button"
-                onClick={() => createSubscriptionCheckout.mutate()}
-                disabled={createProjectCheckout.isPending || createSubscriptionCheckout.isPending}
+                onClick={() => setPaymentModal('subscription')}
                 className="btn-secondary text-xs py-1.5 px-3"
               >
-                {createSubscriptionCheckout.isPending ? 'Redirecting…' : 'Subscribe annually — $450/yr'}
+                Subscribe annually — $450/yr
               </button>
             </div>
           </div>
@@ -378,6 +353,29 @@ export default function ProjectSubmissionPage() {
           {upsert.isPending ? 'Submitting...' : 'Submit for Review'}
         </button>
       </div>
+
+      {paymentModal === 'project' && projectId && (
+        <QuickBooksPaymentModal
+          title="Pay Project Fee"
+          amountLabel="$150.00 — one-time processing fee for this project"
+          onClose={() => setPaymentModal(null)}
+          onCharge={async (paymentToken) => {
+            await chargeProjectFee.mutateAsync({ projectId, paymentToken })
+            setPaymentNotice('Payment received.')
+          }}
+        />
+      )}
+      {paymentModal === 'subscription' && (
+        <QuickBooksPaymentModal
+          title="Subscribe Annually"
+          amountLabel="$450.00/year — covers pre-qualification processing on every project"
+          onClose={() => setPaymentModal(null)}
+          onCharge={async (paymentToken) => {
+            await chargeSubscription.mutateAsync({ paymentToken })
+            setPaymentNotice('Subscription activated.')
+          }}
+        />
+      )}
     </div>
   )
 }

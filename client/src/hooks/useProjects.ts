@@ -131,6 +131,43 @@ export function useCreateProject() {
   })
 }
 
+export interface BulkProjectRow {
+  name: string
+  description?: string
+  address?: string
+  startDate?: string
+  endDate?: string
+}
+
+export function useBulkCreateProjects() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ rows, ownerId }: { rows: BulkProjectRow[]; ownerId: string }) => {
+      const { data: projects, error } = await supabase
+        .from('projects')
+        .insert(
+          rows.map((r) => ({
+            name: r.name,
+            description: r.description || null,
+            address: r.address || null,
+            start_date: r.startDate || null,
+            end_date: r.endDate || null,
+            owner_id: ownerId,
+          }))
+        )
+        .select()
+      if (error) throw error
+
+      await supabase
+        .from('project_members')
+        .insert((projects ?? []).map((p) => ({ project_id: p.id, user_id: ownerId, role: 'owner' })))
+
+      return projects as Project[]
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
+  })
+}
+
 export function useUpdateProject() {
   const qc = useQueryClient()
   return useMutation({

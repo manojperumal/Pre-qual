@@ -11,6 +11,7 @@ import PrequalForm from '@/pages/PrequalForm'
 import PrequalDetail from '@/pages/PrequalDetail'
 import InvitePage from '@/pages/InvitePage'
 import CreateProjectPage from '@/pages/CreateProjectPage'
+import BulkUploadProjectsPage from '@/pages/BulkUploadProjectsPage'
 import ProjectDetailPage from '@/pages/ProjectDetailPage'
 import ProjectsListPage from '@/pages/ProjectsListPage'
 import GeneralContractorsPage from '@/pages/GeneralContractorsPage'
@@ -115,6 +116,7 @@ export default function App() {
         <Route path="invite" element={<InvitePage />} />
         <Route path="projects" element={<ProjectsListPage />} />
         <Route path="projects/new" element={<CreateProjectPage />} />
+        <Route path="projects/bulk-upload" element={<BulkUploadProjectsPage />} />
         <Route path="projects/:projectId" element={<ProjectDetailPage />} />
         <Route path="projects/:projectId/invite" element={<InvitePage />} />
         <Route path="projects/:projectId/submissions/:submissionId" element={<SubmissionReviewPage />} />
@@ -145,6 +147,9 @@ export default function App() {
         <Route path="invite" element={<InvitePage />} />
         <Route path="profile" element={<ContractorProfilePage />} />
         <Route path="my-projects" element={<MyProjectsPage />} />
+        <Route path="projects" element={<ProjectsListPage />} />
+        <Route path="projects/new" element={<CreateProjectPage />} />
+        <Route path="projects/bulk-upload" element={<BulkUploadProjectsPage />} />
         <Route path="my-team" element={<MyTeamPage />} />
         <Route path="trades" element={<TradesPage />} />
         <Route path="projects/:projectId" element={<ProjectDetailPage />} />
