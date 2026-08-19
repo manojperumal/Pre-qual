@@ -9,6 +9,7 @@ import {
   useUpsertResponse,
   useUpdateAssignmentStatus,
   useAICompleteQuestionnaire,
+  useAvailableAIDocuments,
   type Response,
 } from '@/hooks/useQuestionnaires'
 import { supabase } from '@/lib/supabase'
@@ -41,6 +42,7 @@ export default function QuestionnaireResponsePage() {
   const upsertResponse = useUpsertResponse()
   const updateStatus = useUpdateAssignmentStatus()
   const aiComplete = useAICompleteQuestionnaire()
+  const { data: availableDocs } = useAvailableAIDocuments(assignmentId)
 
   const [answers, setAnswers] = useState<Record<string, { text?: string; options?: string[]; docName?: string; docPath?: string; companyComments?: string; mojoFeedback?: string; aiSuggested?: boolean }>>({})
 
@@ -142,11 +144,16 @@ export default function QuestionnaireResponsePage() {
   }
 
   const hasExistingDocumentAnswers = qqList.some(qq => qq.question?.answer_type === 'document_upload' && answers[qq.question_id]?.docPath)
+  const hasDocsOnFile = (availableDocs?.documents.length ?? 0) > 0
+  const canRunAI = uploadedDocs.length > 0 || hasExistingDocumentAnswers || hasDocsOnFile
+
+  const [aiMessage, setAiMessage] = useState<string | null>(null)
 
   async function handleAIComplete() {
-    if (!assignmentId || (!uploadedDocs.length && !hasExistingDocumentAnswers)) return
+    if (!assignmentId || !canRunAI) return
     setAiError(null)
     setAiSuccess(false)
+    setAiMessage(null)
     try {
       const data = await aiComplete.mutateAsync({ assignmentId, documentPaths: uploadedDocs })
       if (data.responses?.length) {
@@ -166,7 +173,14 @@ export default function QuestionnaireResponsePage() {
           return next
         })
       }
-      setAiSuccess(true)
+      if (data.message) {
+        setAiMessage(data.message)
+      } else {
+        setAiSuccess(true)
+        if (data.documents_truncated) {
+          setAiMessage(`Used the ${data.documents_used} most recent documents on file — some older ones were skipped to keep the request manageable.`)
+        }
+      }
     } catch (err: any) {
       setAiError(err.message ?? 'AI completion failed')
     }
@@ -265,8 +279,33 @@ export default function QuestionnaireResponsePage() {
             <Sparkles size={18} className="text-brand-600" />
             <h2 className="text-sm font-semibold text-gray-900">Complete with AI</h2>
           </div>
-          <p className="text-xs text-gray-500 mb-4">
-            Upload your company documents (Safety Manual, OSHA logs, COIs, Loss Runs) and let Mojo AI fill in the questionnaire for you. Review the answers before submitting.
+          <p className="text-xs text-gray-500 mb-3">
+            Mojo AI can fill in this questionnaire from your company's documents. Review the answers before submitting.
+          </p>
+
+          {hasDocsOnFile && (
+            <div className="mb-4 bg-white/70 rounded-lg px-3 py-2.5 border border-brand-100">
+              <p className="text-xs font-medium text-gray-700 mb-1.5">
+                {availableDocs!.documents.length} document{availableDocs!.documents.length !== 1 ? 's' : ''} already on file will be used automatically:
+              </p>
+              <ul className="space-y-1">
+                {availableDocs!.documents.slice(0, 6).map((d, i) => (
+                  <li key={i} className="flex items-center gap-1.5 text-xs text-gray-500">
+                    <FileText size={11} className="text-brand-400 flex-shrink-0" />
+                    <span className="truncate">{d.name}</span>
+                    <span className="text-gray-300">·</span>
+                    <span className="text-gray-400 flex-shrink-0">{d.source}</span>
+                  </li>
+                ))}
+                {availableDocs!.documents.length > 6 && (
+                  <li className="text-xs text-gray-400">+ {availableDocs!.documents.length - 6} more</li>
+                )}
+              </ul>
+            </div>
+          )}
+
+          <p className="text-xs text-gray-500 mb-3">
+            Need to add something else (not already in your company profile or a past submission)? Upload it here:
           </p>
 
           {/* Upload controls */}
@@ -329,17 +368,26 @@ export default function QuestionnaireResponsePage() {
             </div>
           )}
 
+          {aiMessage && (
+            <div className="flex items-start gap-2 text-blue-700 bg-blue-50 rounded-lg px-3 py-2 text-xs mb-3">
+              <Info size={14} className="flex-shrink-0 mt-0.5" />
+              {aiMessage}
+            </div>
+          )}
+
           <button
             onClick={handleAIComplete}
-            disabled={(!uploadedDocs.length && !hasExistingDocumentAnswers) || aiComplete.isPending}
+            disabled={!canRunAI || aiComplete.isPending}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Sparkles size={15} />
             {aiComplete.isPending
               ? 'Analyzing documents…'
               : uploadedDocs.length
-              ? `Complete with AI (${uploadedDocs.length} doc${uploadedDocs.length !== 1 ? 's' : ''})`
-              : 'Complete with AI (using previously uploaded documents)'}
+              ? `Complete with AI (+${uploadedDocs.length} new doc${uploadedDocs.length !== 1 ? 's' : ''})`
+              : canRunAI
+              ? 'Complete with AI'
+              : 'Complete with AI (no documents found — upload one above)'}
           </button>
         </div>
       )}

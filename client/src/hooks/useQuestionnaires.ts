@@ -667,6 +667,35 @@ export function useMarkResponseMojoReviewed() {
   })
 }
 
+export interface AvailableDocument {
+  name: string
+  type: string
+  source: string
+}
+
+// What's already on file for this contractor's company (their document
+// library + past project submissions) that AI-complete will automatically
+// draw on, without the contractor needing to re-upload anything.
+export function useAvailableAIDocuments(assignmentId: string | undefined) {
+  return useQuery({
+    queryKey: ['available_ai_documents', assignmentId],
+    enabled: !!assignmentId,
+    queryFn: async (): Promise<{ documents: AvailableDocument[]; truncated: boolean }> => {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      const apiUrl = import.meta.env.VITE_API_URL || ''
+      const res = await fetch(`${apiUrl}/api/questionnaires/${assignmentId}/available-documents`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as any).error || 'Failed to load available documents')
+      }
+      return res.json()
+    },
+  })
+}
+
 export function useAICompleteQuestionnaire() {
   const qc = useQueryClient()
   return useMutation({

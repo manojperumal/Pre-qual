@@ -9,9 +9,135 @@ const router = Router()
 const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   safety_manual: 'Safety Manual',
   osha_log: 'OSHA Log',
+  osha_300: 'OSHA 300 Log',
+  osha_301: 'OSHA 301 Log',
+  osha_citations: 'OSHA Citations',
   coi: 'Certificate of Insurance (COI)',
+  w9: 'W-9',
+  license: 'License',
   loss_runs: 'Loss Runs',
+  ptp_photos: 'PTP Photos',
   other: 'Supporting Document',
+}
+
+interface GatheredDoc {
+  path: string
+  bucket: string
+  type: string
+  name: string
+  source: string
+}
+
+// A hard cap on how many documents we'll ever send to the model in one
+// call — company libraries and submission history can accumulate a lot of
+// files over time, and an unbounded set risks blowing the context window
+// and the per-request cost. Newest-first ordering (each source query below
+// orders by created_at desc) means anything dropped is the oldest/least
+// relevant.
+const MAX_AUTO_DOCUMENTS = 25
+
+/**
+ * Automatically collects every document already on file for a company that
+ * could plausibly answer a questionnaire — its shared document library
+ * (Safety Manual, COI, W-9, Loss Runs, License) plus whatever it has
+ * uploaded to any of its own project pre-qualification submissions (COI,
+ * OSHA logs, Loss Runs, PTP photos) — so a contractor doesn't have to
+ * re-upload things it has already given us elsewhere. Manually-added
+ * per-questionnaire uploads (see the route handler) are merged in on top
+ * of this, and existing document_upload answers within the SAME
+ * questionnaire are still pulled in by the caller as before.
+ */
+async function gatherCompanyDocuments(companyId: string): Promise<{ docs: GatheredDoc[]; truncated: boolean }> {
+  const docs: GatheredDoc[] = []
+
+  const { data: companyDocs } = await supabaseAdmin
+    .from('company_documents')
+    .select('storage_path, document_type, document_name, created_at')
+    .eq('company_id', companyId)
+    .order('created_at', { ascending: false })
+
+  for (const d of companyDocs ?? []) {
+    docs.push({ path: d.storage_path, bucket: 'prequal-documents', type: d.document_type, name: d.document_name, source: 'Company document library' })
+  }
+
+  // Every profile at this company, so we can pull in documents any of
+  // them uploaded to a project submission (not just the one respondent).
+  const { data: companyProfiles } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .eq('new_company_id', companyId)
+  const profileIds = (companyProfiles ?? []).map((p) => p.id)
+
+  if (profileIds.length) {
+    const { data: submissions } = await supabaseAdmin
+      .from('project_submissions')
+      .select('id')
+      .in('contractor_id', profileIds)
+
+    const submissionIds = (submissions ?? []).map((s) => s.id)
+    if (submissionIds.length) {
+      const { data: subDocs } = await supabaseAdmin
+        .from('submission_documents')
+        .select('storage_path, doc_type, file_name, created_at')
+        .in('submission_id', submissionIds)
+        .order('created_at', { ascending: false })
+
+      for (const d of subDocs ?? []) {
+        docs.push({ path: d.storage_path, bucket: 'prequal-documents', type: d.doc_type, name: d.file_name, source: 'Project pre-qualification submission' })
+      }
+    }
+  }
+
+  const truncated = docs.length > MAX_AUTO_DOCUMENTS
+  return { docs: docs.slice(0, MAX_AUTO_DOCUMENTS), truncated }
+}
+
+/**
+ * GET /api/questionnaires/:assignmentId/available-documents
+ * Lets the client show the contractor what's already on file (without
+ * downloading/processing anything) before they click "Complete with AI" —
+ * so they know whether they need to upload anything extra.
+ */
+router.get('/:assignmentId/available-documents', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const { assignmentId } = req.params
+
+  const { data: assignment, error: assignmentErr } = await supabaseAdmin
+    .from('questionnaire_assignments')
+    .select('assignee_id, assigned_by, company_id')
+    .eq('id', assignmentId)
+    .single()
+
+  if (assignmentErr || !assignment) {
+    res.status(404).json({ error: 'Assignment not found' })
+    return
+  }
+  if (assignment.assignee_id !== req.userId && assignment.assigned_by !== req.userId) {
+    res.status(403).json({ error: 'Access denied' })
+    return
+  }
+
+  const companyId = await resolveCompanyId(assignment)
+  if (!companyId) {
+    res.json({ documents: [], truncated: false })
+    return
+  }
+
+  const { docs, truncated } = await gatherCompanyDocuments(companyId)
+  res.json({
+    documents: docs.map((d) => ({ name: d.name, type: d.type, source: d.source })),
+    truncated,
+  })
+})
+
+async function resolveCompanyId(assignment: { company_id?: string | null; assignee_id?: string | null }): Promise<string | null> {
+  if (assignment.company_id) return assignment.company_id
+  if (!assignment.assignee_id) return null
+  const { data: profile } = await supabaseAdmin
+    .from('profiles')
+    .select('new_company_id')
+    .eq('id', assignment.assignee_id)
+    .single()
+  return profile?.new_company_id ?? null
 }
 
 /**
@@ -64,10 +190,37 @@ router.post('/:assignmentId/ai-complete', requireAuth, async (req: Request, res:
     .eq('assignment_id', assignmentId)
     .not('document_path', 'is', null)
 
-  const allDocs: Array<{ path: string; type: string; name: string }> = [...document_paths]
+  // Answers a person already typed in by hand are off-limits — AI-complete
+  // should fill gaps, never overwrite someone's own review/edit of an
+  // answer. ai_suggested is null/false for anything a human entered
+  // (including a human edit of a prior AI suggestion).
+  const { data: existingResponses } = await supabaseAdmin
+    .from('questionnaire_responses')
+    .select('question_id, answer_text, answer_options, ai_suggested')
+    .eq('assignment_id', assignmentId)
+  const humanAnsweredQuestionIds = new Set(
+    (existingResponses ?? [])
+      .filter((r) => !r.ai_suggested && (r.answer_text || (r.answer_options && r.answer_options.length > 0)))
+      .map((r) => r.question_id)
+  )
+
+  const allDocs: GatheredDoc[] = document_paths.map((d) => ({ ...d, bucket: 'questionnaire-docs', source: 'Uploaded for this AI request' }))
   for (const r of existingDocResponses ?? []) {
     if (!r.document_path || allDocs.some((d) => d.path === r.document_path)) continue
-    allDocs.push({ path: r.document_path, type: 'other', name: r.document_name ?? r.document_path })
+    allDocs.push({ path: r.document_path, bucket: 'questionnaire-docs', type: 'other', name: r.document_name ?? r.document_path, source: 'Answered elsewhere in this questionnaire' })
+  }
+
+  // Auto-include the company's document library and anything it has
+  // uploaded to any project submission — see gatherCompanyDocuments().
+  let autoDocsTruncated = false
+  const companyId = await resolveCompanyId(assignment)
+  if (companyId) {
+    const { docs: autoDocs, truncated } = await gatherCompanyDocuments(companyId)
+    autoDocsTruncated = truncated
+    for (const d of autoDocs) {
+      if (allDocs.some((existing) => existing.path === d.path)) continue
+      allDocs.push(d)
+    }
   }
 
   if (!allDocs.length) {
@@ -81,7 +234,7 @@ router.post('/:assignmentId/ai-complete', requireAuth, async (req: Request, res:
   for (const doc of allDocs) {
     try {
       const { data, error } = await supabaseAdmin.storage
-        .from('questionnaire-docs')
+        .from(doc.bucket)
         .download(doc.path)
 
       if (error || !data) {
@@ -110,8 +263,14 @@ router.post('/:assignmentId/ai-complete', requireAuth, async (req: Request, res:
     return
   }
 
-  // Build the questions list for the prompt
-  const questionsText = qqList
+  // Build the questions list for the prompt — skip anything a human has
+  // already answered themselves, so the AI never overwrites their work.
+  const qqListForAI = qqList.filter((qq) => !humanAnsweredQuestionIds.has(qq.question_id))
+  if (!qqListForAI.length) {
+    res.json({ success: true, answers_count: 0, responses: [], message: 'Every question already has a manually-entered answer — nothing left for AI to fill in.' })
+    return
+  }
+  const questionsText = qqListForAI
     .map((qq, i) => {
       const q = qq.question as any
       if (!q) return null
@@ -253,7 +412,7 @@ ${questionsText}`,
   // Upsert each AI-suggested response into DB
   let savedCount = 0
   for (const answer of answers) {
-    if (!answer.question_id) continue
+    if (!answer.question_id || humanAnsweredQuestionIds.has(answer.question_id)) continue
     const { error: upsertErr } = await supabaseAdmin
       .from('questionnaire_responses')
       .upsert(
@@ -291,7 +450,13 @@ ${questionsText}`,
     .eq('assignment_id', assignmentId)
 
   console.log(`[ai-complete] Returning ${savedResponses?.length ?? 0} responses from DB`)
-  res.json({ success: true, answers_count: savedCount, responses: savedResponses ?? [] })
+  res.json({
+    success: true,
+    answers_count: savedCount,
+    responses: savedResponses ?? [],
+    documents_used: allDocs.length,
+    documents_truncated: autoDocsTruncated,
+  })
 })
 
 export default router
