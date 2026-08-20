@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -76,8 +77,30 @@ export default function ProjectSubmissionPage() {
   const hasPaid = !!activeSubscription || submissionPayment?.status === 'paid'
   const blockedByPayment = paymentRequired && !hasPaid
 
+  const { data: existingDocs } = useQuery({
+    queryKey: ['submission_documents', submission?.id],
+    enabled: !!submission?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('submission_documents')
+        .select('doc_type, file_name')
+        .eq('submission_id', submission!.id)
+      if (error) throw error
+      return data as { doc_type: string; file_name: string }[]
+    },
+  })
+
   const [uploading, setUploading] = useState<string | null>(null)
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    if (!existingDocs?.length) return
+    setUploadedDocs((prev) => {
+      const next = { ...prev }
+      for (const d of existingDocs) next[d.doc_type] = d.file_name
+      return next
+    })
+  }, [existingDocs])
   const [saved, setSaved] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [paymentNotice, setPaymentNotice] = useState<string | null>(null)
@@ -121,25 +144,45 @@ export default function ProjectSubmissionPage() {
   }
 
   async function handleUpload(docType: SubmissionDocument['doc_type'], file: File) {
-    if (!submission?.id && !projectId) return
+    if (!projectId || !profile?.id) return
     setUploading(docType)
     try {
-      const submissionId = submission?.id ?? 'pending'
+      // A submission row must exist before we can record a document against
+      // it — if this is the contractor's first action on this project (no
+      // draft saved yet), create one now rather than uploading to a
+      // placeholder path that's never linked to anything.
+      let submissionId = submission?.id
+      if (!submissionId) {
+        if (!contractorProfile) {
+          alert('Your contractor profile is still loading — please try again in a moment.')
+          return
+        }
+        const created = await upsert.mutateAsync({
+          project_id: projectId,
+          contractor_id: profile.id,
+          status: 'draft',
+          snapshot: contractorProfile as unknown as Record<string, unknown>,
+        })
+        submissionId = created.id
+      }
+
       const path = `${submissionId}/${docType}/${file.name}`
       const { error: uploadError } = await supabase.storage
         .from('prequal-documents')
         .upload(path, file, { upsert: true })
       if (uploadError) throw uploadError
 
-      if (submission?.id) {
-        await supabase.from('submission_documents').insert({
-          submission_id: submission.id,
-          doc_type: docType,
-          file_name: file.name,
-          storage_path: path,
-        })
-      }
+      const { error: insertError } = await supabase.from('submission_documents').insert({
+        submission_id: submissionId,
+        doc_type: docType,
+        file_name: file.name,
+        storage_path: path,
+      })
+      if (insertError) throw insertError
+
       setUploadedDocs((prev) => ({ ...prev, [docType]: file.name }))
+    } catch (err: any) {
+      alert('Upload failed: ' + (err?.message ?? 'Please try again.'))
     } finally {
       setUploading(null)
     }
