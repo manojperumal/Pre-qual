@@ -44,17 +44,6 @@ export function useChargeSubscription() {
   })
 }
 
-export function useUpdateBillingMode() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ companyId, billingMode }: { companyId: string; billingMode: BillingMode }) => {
-      const { error } = await supabase.from('companies').update({ billing_mode: billingMode }).eq('id', companyId)
-      if (error) throw error
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['mojo_admin_company'] }),
-  })
-}
-
 export function useCompanySubscription(companyId: string | null | undefined) {
   return useQuery({
     queryKey: ['subscription', companyId],

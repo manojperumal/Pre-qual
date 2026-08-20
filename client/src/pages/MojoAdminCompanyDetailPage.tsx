@@ -1,12 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useOwnerGCs, useOwnerTrades, useGCTrades } from '@/hooks/useProjects'
 import { isValidDomoEmbedUrl } from '@/lib/domoEmbed'
 import { BillingSettingsCard } from '@/components/BillingSettingsCard'
-import { Company } from '@/types'
-import { ArrowLeft, Users, HardHat, Wrench, ClipboardList, CheckCircle, Clock, LayoutDashboard } from 'lucide-react'
+import { Company, BillingMode } from '@/types'
+import { ArrowLeft, Users, HardHat, Wrench, ClipboardList, CheckCircle, Clock, LayoutDashboard, AlertCircle } from 'lucide-react'
 import { format } from 'date-fns'
 
 const ANSWERED_STATUSES = ['submitted', 'approved', 'rejected', 'needs_more_info']
@@ -77,62 +77,20 @@ function useAssignmentStats(companyId: string | undefined) {
   })
 }
 
-function useSetDomoEmbedUrl() {
+// Single combined save for everything editable on this page — one write,
+// one Save button, rather than each section silently saving on its own.
+function useSaveCompanySettings() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ companyId, url }: { companyId: string; url: string | null }) => {
-      const { error } = await supabase.from('companies').update({ domo_embed_url: url }).eq('id', companyId)
+    mutationFn: async ({ companyId, billingMode, domoEmbedUrl }: { companyId: string; billingMode: BillingMode; domoEmbedUrl: string | null }) => {
+      const { error } = await supabase
+        .from('companies')
+        .update({ billing_mode: billingMode, domo_embed_url: domoEmbedUrl })
+        .eq('id', companyId)
       if (error) throw error
     },
     onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ['mojo_admin_company', vars.companyId] }),
   })
-}
-
-function DomoDashboardCard({ company }: { company: Company }) {
-  const [url, setUrl] = useState(company.domo_embed_url ?? '')
-  const [error, setError] = useState<string | null>(null)
-  const setDomoEmbedUrl = useSetDomoEmbedUrl()
-
-  function handleSave() {
-    setError(null)
-    if (url.trim() && !isValidDomoEmbedUrl(url.trim())) {
-      setError('Must be a public Domo embed URL (https://*.domo.com/...)')
-      return
-    }
-    setDomoEmbedUrl.mutate({ companyId: company.id, url: url.trim() || null })
-  }
-
-  return (
-    <div className="card p-6">
-      <div className="flex items-center gap-2 mb-1">
-        <LayoutDashboard size={18} className="text-brand-600" />
-        <h2 className="text-base font-semibold text-gray-900">Domo Dashboard</h2>
-      </div>
-      <p className="text-sm text-gray-500 mb-4">
-        Paste a public Domo dashboard embed URL to show it on this Owner's home page. Leave blank to remove it.
-      </p>
-      <div className="flex gap-2">
-        <input
-          type="url"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://public.domo.com/embed/..."
-          className="input-field flex-1"
-        />
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={setDomoEmbedUrl.isPending}
-          className="btn-primary text-sm px-4"
-        >
-          {setDomoEmbedUrl.isPending ? 'Saving…' : 'Save'}
-        </button>
-      </div>
-      {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
-      {setDomoEmbedUrl.isError && <p className="text-sm text-red-600 mt-2">Failed to save. Please try again.</p>}
-      {setDomoEmbedUrl.isSuccess && !error && <p className="text-sm text-emerald-600 mt-2">Saved.</p>}
-    </div>
-  )
 }
 
 function StatTile({ icon, label, value, color, bg }: { icon: React.ReactNode; label: string; value: number; color: string; bg: string }) {
@@ -159,6 +117,34 @@ export default function MojoAdminCompanyDetailPage() {
   const isOwner = company?.type === 'owner'
   const isGC = company?.type === 'gc'
 
+  const [pendingBillingMode, setPendingBillingMode] = useState<BillingMode>('pays_all')
+  const [pendingDomoUrl, setPendingDomoUrl] = useState('')
+  const [domoError, setDomoError] = useState<string | null>(null)
+  const saveSettings = useSaveCompanySettings()
+
+  // Re-seed local pending state whenever the underlying company record
+  // loads/changes (including right after a save, via the invalidate above).
+  useEffect(() => {
+    if (!company) return
+    setPendingBillingMode(company.billing_mode)
+    setPendingDomoUrl(company.domo_embed_url ?? '')
+  }, [company])
+
+  const isDirty =
+    !!company &&
+    (pendingBillingMode !== company.billing_mode || pendingDomoUrl !== (company.domo_embed_url ?? ''))
+
+  function handleSaveSettings() {
+    if (!company) return
+    setDomoError(null)
+    const trimmedUrl = pendingDomoUrl.trim()
+    if (trimmedUrl && !isValidDomoEmbedUrl(trimmedUrl)) {
+      setDomoError('Must be a public Domo embed URL (https://*.domo.com/...)')
+      return
+    }
+    saveSettings.mutate({ companyId: company.id, billingMode: pendingBillingMode, domoEmbedUrl: trimmedUrl || null })
+  }
+
   const { data: ownerGcRows = [] } = useOwnerGCs(isOwner ? adminUser?.id : undefined)
   const { data: ownerTradeRows = [] } = useOwnerTrades(isOwner ? adminUser?.id : undefined)
   const { data: gcTradeRows = [] } = useGCTrades(isGC ? adminUser?.id : undefined)
@@ -184,27 +170,64 @@ export default function MojoAdminCompanyDetailPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <Link to="/mojo-admin/companies" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-3">
-          <ArrowLeft size={14} />
-          Companies
-        </Link>
-        <h1 className="text-2xl font-bold text-gray-900">{company.name}</h1>
-        <p className="mt-1 text-sm text-gray-500 capitalize">
-          {company.type} · Billing: {company.billing_mode === 'platform_only' ? 'Platform only' : 'Pays for everyone'}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <Link to="/mojo-admin/companies" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-3">
+            <ArrowLeft size={14} />
+            Companies
+          </Link>
+          <h1 className="text-2xl font-bold text-gray-900">{company.name}</h1>
+          <p className="mt-1 text-sm text-gray-500 capitalize">
+            {company.type} · Billing: {company.billing_mode === 'platform_only' ? 'Platform only' : 'Pays for everyone'}
+          </p>
+        </div>
+        {(isOwner || isGC) && (
+          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+            <button
+              type="button"
+              onClick={handleSaveSettings}
+              disabled={!isDirty || saveSettings.isPending}
+              className="btn-primary text-sm px-4"
+            >
+              {saveSettings.isPending ? 'Saving…' : 'Save Changes'}
+            </button>
+            {saveSettings.isError && (
+              <p className="flex items-center gap-1 text-xs text-red-600"><AlertCircle size={12} /> Failed to save. Please try again.</p>
+            )}
+            {saveSettings.isSuccess && !isDirty && !domoError && (
+              <p className="flex items-center gap-1 text-xs text-emerald-600"><CheckCircle size={12} /> Saved</p>
+            )}
+          </div>
+        )}
       </div>
 
       {(isOwner || isGC) && (
         <BillingSettingsCard
-          companyId={company.id}
-          billingMode={company.billing_mode}
-          isAdmin
+          billingMode={pendingBillingMode}
+          onChange={setPendingBillingMode}
           inviteeLabel={isOwner ? 'General Contractors and Trades' : 'Trades'}
         />
       )}
 
-      {isOwner && <DomoDashboardCard company={company} />}
+      {isOwner && (
+        <div className="card p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <LayoutDashboard size={18} className="text-brand-600" />
+            <h2 className="text-base font-semibold text-gray-900">Domo Dashboard</h2>
+          </div>
+          <p className="text-sm text-gray-500 mb-4">
+            Paste a public Domo dashboard embed URL to show it on this Owner's home page. Leave blank to remove it.
+          </p>
+          <input
+            type="url"
+            value={pendingDomoUrl}
+            onChange={(e) => setPendingDomoUrl(e.target.value)}
+            placeholder="https://public.domo.com/embed/..."
+            className="input-field w-full"
+          />
+          {domoError && <p className="text-sm text-red-600 mt-2">{domoError}</p>}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatTile icon={<Users size={20} />} label="Users" value={teamMembers.length} color="text-brand-600" bg="bg-brand-50" />
