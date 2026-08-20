@@ -22,6 +22,7 @@ import ProjectSubmissionPage from '@/pages/ProjectSubmissionPage'
 import SubmissionReviewPage from '@/pages/SubmissionReviewPage'
 import QuestionnairesPage from '@/pages/QuestionnairesPage'
 import QuestionnaireBuilderPage from '@/pages/QuestionnaireBuilderPage'
+import QuestionnaireAssignmentsPage from '@/pages/QuestionnaireAssignmentsPage'
 import QuestionBankPage from '@/pages/QuestionBankPage'
 import AssignQuestionnairePage from '@/pages/AssignQuestionnairePage'
 import QuestionnaireResponsePage from '@/pages/QuestionnaireResponsePage'
@@ -129,6 +130,7 @@ export default function App() {
         <Route path="questionnaires" element={<QuestionnairesPage />} />
         <Route path="questionnaires/new" element={<QuestionnaireBuilderPage />} />
         <Route path="questionnaires/assign" element={<AssignQuestionnairePage />} />
+        <Route path="questionnaires/:questionnaireId/assignments" element={<QuestionnaireAssignmentsPage />} />
         <Route path="questionnaires/:id" element={<QuestionnaireBuilderPage />} />
         <Route path="question-bank" element={<QuestionBankPage />} />
         <Route path="assignments/:assignmentId/review" element={<QuestionnaireReviewPage />} />
@@ -161,6 +163,7 @@ export default function App() {
         <Route path="questionnaires" element={<QuestionnairesPage />} />
         <Route path="questionnaires/new" element={<QuestionnaireBuilderPage />} />
         <Route path="questionnaires/assign" element={<AssignQuestionnairePage />} />
+        <Route path="questionnaires/:questionnaireId/assignments" element={<QuestionnaireAssignmentsPage />} />
         <Route path="questionnaires/:id" element={<QuestionnaireBuilderPage />} />
         <Route path="assignments" element={<MyAssignmentsPage />} />
         <Route path="assignments/:assignmentId/respond" element={<QuestionnaireResponsePage />} />

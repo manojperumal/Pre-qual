@@ -454,6 +454,25 @@ export function useProjectAssignments(projectId: string | undefined) {
   })
 }
 
+// Every instance of one questionnaire template across every company/project
+// it's been assigned to — lets whoever assigned it see the full rollout
+// status at a glance instead of hunting through each project individually.
+export function useQuestionnaireAssignments(questionnaireId: string | undefined) {
+  return useQuery({
+    queryKey: ['assignments', 'questionnaire', questionnaireId],
+    enabled: !!questionnaireId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('questionnaire_assignments')
+        .select('*, questionnaire:questionnaires(id,name), project:projects(id,name), company:companies(id,name), assignee:profiles!assignee_id(full_name,company_name,email,role), assigner:profiles!assigned_by(full_name,company_name)')
+        .eq('questionnaire_id', questionnaireId!)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return data as Assignment[]
+    },
+  })
+}
+
 // Company-shared: any admin/contributor at the company sees assignments made
 // to their company, plus (for backward compat) any legacy row still
 // pointed at them individually via assignee_id.

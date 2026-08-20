@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useQuestionnaires, useDeleteQuestionnaire } from '@/hooks/useQuestionnaires'
-import { Plus, ClipboardList, Trash2, Pencil, ChevronRight } from 'lucide-react'
+import { Plus, ClipboardList, Trash2, Pencil, ChevronRight, Users } from 'lucide-react'
 import { format } from 'date-fns'
 
 export default function QuestionnairesPage() {
@@ -70,6 +70,13 @@ export default function QuestionnairesPage() {
                     Edit
                   </Link>
                 )}
+                <Link
+                  to={`${basePath}/questionnaires/${q.id}/assignments`}
+                  className="inline-flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-800 font-medium"
+                >
+                  <Users size={13} />
+                  Assignments
+                </Link>
                 <Link
                   to={`${basePath}/questionnaires/assign?questionnaireId=${q.id}`}
                   className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 ml-auto"
