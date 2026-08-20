@@ -2,7 +2,7 @@
 
 > **Status:** Living document — update this alongside feature work, don't let it drift.
 > **Audience:** QA, Engineering, Product.
-> **Last updated:** 2026-08-16
+> **Last updated:** 2026-08-20
 > **Maintainer:** Manoj Perumal
 
 ---
@@ -142,7 +142,7 @@ Independent of the main approve/reject decision — any answer flagged `requires
 - **Governing billing company logic:** if the submitting company *is* the project's coordinating GC, the Project Owner governs billing; otherwise (a Trade), the coordinating GC governs if one exists, else the Owner.
 - **Pricing:** $150 one-time per-project fee, or $450/year platform-wide subscription (covers all projects for that company).
 - **No auto-renewal yet** — an annual subscription just records a fixed one-year active window; nothing re-charges automatically when it lapses. **This is a known gap, not a bug** — flag it if QA finds a subscription silently expiring with no renewal prompt, that's currently expected.
-- **Payment processor: migrating from Stripe to QuickBooks Payments** (in progress as of this writing — see §11). Testing payment flows end-to-end is blocked until the QuickBooks sandbox connection is completed.
+- **Payment processor: migrated from Stripe to QuickBooks Payments.** Stripe code and its DB columns have been fully removed. The QuickBooks OAuth connection (one platform-wide sandbox company, admin-authorized from the Mojo Admin dashboard) has been **confirmed working end-to-end** — token exchange and storage verified against a live sandbox connection. **Not yet verified: an actual charge** (`/api/payments/project`, `/api/payments/subscription`) — the request/response shape for QuickBooks' Payments API charge call was written from documentation, not tested live, since a real project/company on `platform_only` billing hasn't been run through it yet. **QA should treat any payment-flow test as the first real test of that code path** and report the exact error if a charge fails — that's expected to need at least one iteration.
 - **Manual override:** Mojo Admin can mark a project as paid or activate a subscription directly, for payments handled outside the platform (check/wire).
 
 ---
@@ -156,6 +156,7 @@ Platform-wide internal role, separate layout/nav from customer-facing roles:
 - **Review Queue** — flagged-answer review, independent of company-level decisions
 - **Impersonation** — view/act as any company's admin, with actions attributed to that admin's real account (not Mojo) — **QA should specifically verify the attribution**, since a mis-attributed impersonated action is a serious audit-trail bug
 - **Manual billing overrides** (§8)
+- **Domo dashboard embed** — on an Owner company's detail page, Mojo Admin can paste a public Domo dashboard embed URL; it then renders as an iframe on that Owner's home page. Enforced at the database level (a trigger) so only a Mojo admin can ever set it, even via a direct API call — an Owner's own admin cannot set this for themselves despite otherwise having broad update rights on their own company record. Both the admin form and the render step validate the URL is `https://` on a `*.domo.com` host before it's used. **QA should verify:** a non-Domo URL is rejected by the form, an Owner cannot set/change it themselves, and clearing the field removes the dashboard from the Owner's home page.
 
 ---
 
@@ -173,22 +174,36 @@ QA should verify links inside notifications route to the correct role-prefixed p
 
 ## 11. AI Features
 
-One AI feature exists: **AI-assisted questionnaire autofill.** Given a contractor's uploaded documents (COI, OSHA logs, loss runs, safety manuals, etc. — PDFs, Word docs, and images all supported), an LLM (Claude) proposes answers for a questionnaire's document-upload-adjacent questions, with a strict "only answer from what's actually in the documents, never guess" instruction, plus an internal confidence/source note for Mojo review.
+One AI feature exists: **AI-assisted questionnaire autofill.** Given a contractor's documents, an LLM (Claude) proposes answers for a questionnaire, with a strict "only answer from what's actually in the documents, never guess" instruction, plus an internal confidence/source note for Mojo review. PDFs, Word docs, and images are all supported (PDFs and images sent natively; Word docs text-extracted first).
+
+**Document sources — this was recently expanded.** AI-complete no longer only looks at documents manually re-uploaded for that one request. It now automatically pulls in, for the responding company:
+1. That company's shared document library (Safety Manual, COI, W-9, Loss Runs, License — from company profile/settings)
+2. Everything uploaded to any of that company's own project pre-qualification submissions (COI, OSHA logs, Loss Runs, PTP Photos), across every user at the company
+3. Answers already given to other document-upload questions within the same questionnaire
+4. Anything manually uploaded for this specific AI-complete request (still supported, for one-off documents not otherwise on file)
+
+The contractor sees what's already on file (with its source) before running AI-complete, so they know what they don't need to re-upload. Capped at 25 auto-included documents (newest first) to bound cost/context — if truncated, the UI says so rather than silently dropping older documents.
+
+**AI answers never overwrite a human-entered answer.** If a person has already typed/selected an answer to a question (whether from scratch or editing a prior AI suggestion), AI-complete skips that question entirely — both in what it asks Claude to answer and, as a second safety check, in what it's willing to save. This was a real gap until recently (an AI-complete run used to silently overwrite manual answers) — QA should regression-test this specifically: manually answer a question, then run AI-complete, and confirm that answer is untouched.
 
 **QA priorities for this feature:**
 - Verify it never fabricates an answer when the source document doesn't actually contain the needed info (this is the stated design intent — test it directly with a document that's missing the relevant field)
 - Verify AI-suggested answers are visibly marked as such, not indistinguishable from human answers, in every place answers are displayed (assignment page, review page)
+- Verify a human-entered answer is never overwritten by a later AI-complete run (see above)
 - Test with malformed/corrupted uploads of each supported type (PDF, .doc, .docx, image)
+- **Not yet tested end-to-end against a live case** as of this writing — the document-gathering logic and human-answer protection are implemented and typecheck clean, but no real assignment has been run through the full flow yet to confirm actual answer accuracy against real documents.
 
 ---
 
 ## 12. Known Gaps / In-Progress Work
 
-- **QuickBooks migration (active):** Stripe billing has been replaced with QuickBooks Payments. OAuth connection flow and charge-on-submit are scaffolded but **not yet tested against a live sandbox** — the Web Payments SDK integration and the exact charge API request/response shape are marked TODO in code pending sandbox access. **Do not test billing flows until this is confirmed working end-to-end.**
+- **QuickBooks migration:** OAuth connection confirmed working against a live sandbox. **The actual charge call is not yet verified** — this is the one remaining piece before billing can be called done. See §8.
+- **AI questionnaire autofill:** document-gathering expansion and human-answer protection are built but not yet run against a real live case end-to-end. See §11.
 - **No subscription auto-renewal** (§8) — by design for now, not a bug.
 - **Legacy `prequalifications` model** — unclear if still in scope; confirm with engineering before writing test cases against it.
 - **Three separate document tables** (`company_documents`, `submission_documents`, `contractor_documents` for questionnaires) — functionally overlapping; worth a consolidation conversation, not urgent for QA.
 - **"Profile complete" check is shallow** (§3.2) — doesn't check expiry dates or full-field completeness.
+- **GC has two separate "projects" nav entries** whose purpose isn't obviously distinct to a user — see Open Question #4. Deliberately left as-is pending a product decision.
 
 ---
 
@@ -208,6 +223,7 @@ One AI feature exists: **AI-assisted questionnaire autofill.** Given a contracto
 | 1 | Is the legacy `prequalifications` flow still reachable/used, or fully dead code? | PRD authoring | Open |
 | 2 | Is "profile complete" = `company_name && gl_carrier` the intended bar, or should it check more fields/expiry? | PRD authoring | Open |
 | 3 | Does GC-owned project creation work under current Supabase RLS, or does it need a policy update? | PRD authoring | Open |
+| 4 | GC sidebar has two separate project lists — "My Projects" (invited onto by an Owner) and "Projects I Manage" (created by the GC itself, added for the CSV bulk-upload feature). Product flagged this as confusing/possibly redundant. Does a GC actually need to own/manage its own projects independent of an Owner, or should that capability (and its nav entry) not exist at all? | Manoj, 2026-08-20 | Open — deliberately left as-is pending this decision |
 
 ---
 
@@ -216,3 +232,4 @@ One AI feature exists: **AI-assisted questionnaire autofill.** Given a contracto
 | Date | Change |
 |---|---|
 | 2026-08-16 | Initial PRD drafted from full codebase review, ahead of QA test planning. |
+| 2026-08-20 | QuickBooks OAuth connection confirmed working end-to-end (§8); Stripe DB columns dropped. AI questionnaire autofill expanded to auto-gather company documents + submission history, and to never overwrite human-entered answers (§11). Mojo Admin can now embed a per-Owner Domo dashboard (§9). Added Open Question #4 on the GC's two overlapping project-list nav entries. |
