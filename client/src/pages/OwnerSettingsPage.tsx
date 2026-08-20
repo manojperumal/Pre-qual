@@ -3,7 +3,6 @@ import { useForm } from 'react-hook-form'
 import { useAuth } from '@/hooks/useAuth'
 import { useUpdateCompany } from '@/hooks/useCompany'
 import { CompanyLogoUpload } from '@/components/CompanyLogoUpload'
-import { BillingSettingsCard } from '@/components/BillingSettingsCard'
 import { supabase } from '@/lib/supabase'
 import { CheckCircle } from 'lucide-react'
 
@@ -192,13 +191,6 @@ export default function OwnerSettingsPage() {
           </button>
         </fieldset>
       </form>
-
-      <BillingSettingsCard
-        companyId={profile?.new_company_id}
-        billingMode={company?.billing_mode}
-        isAdmin={isAdmin}
-        inviteeLabel="General Contractors and Trades"
-      />
     </div>
   )
 }

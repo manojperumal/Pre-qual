@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useOwnerGCs, useOwnerTrades, useGCTrades } from '@/hooks/useProjects'
 import { isValidDomoEmbedUrl } from '@/lib/domoEmbed'
+import { BillingSettingsCard } from '@/components/BillingSettingsCard'
 import { Company } from '@/types'
 import { ArrowLeft, Users, HardHat, Wrench, ClipboardList, CheckCircle, Clock, LayoutDashboard } from 'lucide-react'
 import { format } from 'date-fns'
@@ -193,6 +194,15 @@ export default function MojoAdminCompanyDetailPage() {
           {company.type} · Billing: {company.billing_mode === 'platform_only' ? 'Platform only' : 'Pays for everyone'}
         </p>
       </div>
+
+      {(isOwner || isGC) && (
+        <BillingSettingsCard
+          companyId={company.id}
+          billingMode={company.billing_mode}
+          isAdmin
+          inviteeLabel={isOwner ? 'General Contractors and Trades' : 'Trades'}
+        />
+      )}
 
       {isOwner && <DomoDashboardCard company={company} />}
 

@@ -51,7 +51,7 @@ export function useUpdateBillingMode() {
       const { error } = await supabase.from('companies').update({ billing_mode: billingMode }).eq('id', companyId)
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['auth'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['mojo_admin_company'] }),
   })
 }
 
