@@ -183,7 +183,7 @@ export default function ProjectSubmissionPage() {
     })
   }
 
-  async function handleUpload(docType: SubmissionDocument['doc_type'], files: FileList) {
+  async function handleUpload(docType: SubmissionDocument['doc_type'], files: File[]) {
     if (!projectId || !profile?.id || !files.length) return
     setUploading(docType)
     try {
@@ -193,12 +193,11 @@ export default function ProjectSubmissionPage() {
         return
       }
 
-      const fileList = Array.from(files)
-      const results = await Promise.allSettled(fileList.map((file) => uploadOneFile(submissionId, docType, file)))
+      const results = await Promise.allSettled(files.map((file) => uploadOneFile(submissionId, docType, file)))
       const failures = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
       if (failures.length) {
         alert(
-          `${failures.length} of ${fileList.length} file(s) failed to upload: ` +
+          `${failures.length} of ${files.length} file(s) failed to upload: ` +
           failures.map((f) => f.reason?.message ?? 'Unknown error').join('; ')
         )
       }
@@ -381,8 +380,13 @@ export default function ProjectSubmissionPage() {
                     accept={doc.key === 'ptp_photos' ? 'image/*' : undefined}
                     disabled={uploading === doc.key}
                     onChange={(e) => {
-                      if (e.target.files?.length) handleUpload(doc.key, e.target.files)
+                      // Snapshot into a plain array before clearing the input —
+                      // e.target.files is a live FileList tied to the input,
+                      // and resetting e.target.value empties it immediately,
+                      // which would wipe it out from under the async upload.
+                      const files = Array.from(e.target.files ?? [])
                       e.target.value = ''
+                      if (files.length) handleUpload(doc.key, files)
                     }}
                   />
                   <span className="inline-flex items-center gap-1 text-xs btn-secondary py-1 px-2">
