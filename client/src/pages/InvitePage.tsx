@@ -43,6 +43,7 @@ export default function InvitePage() {
   const [copied, setCopied] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
   const [sentEmail, setSentEmail] = useState('')
+  const [qrError, setQrError] = useState<string | null>(null)
 
   const sendInvitation = useSendInvitation()
   const { data: invitations = [] } = useSentInvitations(profile?.id)
@@ -118,6 +119,7 @@ export default function InvitePage() {
 
   async function onGenerateQR(data: FormData) {
     if (!profile?.id) return
+    setQrError(null)
     const projectIds = routeProjectId ? [routeProjectId] : data.project_ids ?? []
     try {
       const result = await sendInvitation.mutateAsync({
@@ -130,9 +132,12 @@ export default function InvitePage() {
       const token = (result as any)?.invitation?.token || (result as any)?.token
       if (token) {
         setQrInviteUrl(`${window.location.origin}/invite/${token}`)
+      } else {
+        setQrError('Invitation was created, but no invite link was returned. Please try again.')
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to generate QR', err)
+      setQrError(err?.message || 'Failed to generate QR code. Please try again.')
     }
   }
 
@@ -366,6 +371,12 @@ export default function InvitePage() {
             <RoleAtCompanyField />
             <ProjectPicker />
 
+            {qrError && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                {qrError}
+              </div>
+            )}
+
             {!qrInviteUrl ? (
               <div className="text-center py-6">
                 <QrCode size={48} className="mx-auto text-gray-300 mb-4" />
@@ -397,7 +408,7 @@ export default function InvitePage() {
                     {copied ? 'Copied!' : 'Copy Link'}
                   </button>
                   <button
-                    onClick={() => { setQrInviteUrl(null) }}
+                    onClick={() => { setQrInviteUrl(null); setQrError(null) }}
                     className="btn-secondary inline-flex items-center gap-2 text-sm"
                   >
                     <QrCode size={15} />
