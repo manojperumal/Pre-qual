@@ -15,6 +15,7 @@ export interface Company {
   website: string | null
   logo_path: string | null
   billing_mode: BillingMode
+  domo_embed_url: string | null
   created_at: string
   updated_at: string
 }

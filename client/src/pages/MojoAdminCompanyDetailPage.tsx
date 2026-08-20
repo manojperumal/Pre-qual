@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useOwnerGCs, useOwnerTrades, useGCTrades } from '@/hooks/useProjects'
+import { isValidDomoEmbedUrl } from '@/lib/domoEmbed'
 import { Company } from '@/types'
-import { ArrowLeft, Users, HardHat, Wrench, ClipboardList, CheckCircle, Clock } from 'lucide-react'
+import { ArrowLeft, Users, HardHat, Wrench, ClipboardList, CheckCircle, Clock, LayoutDashboard } from 'lucide-react'
 import { format } from 'date-fns'
 
 const ANSWERED_STATUSES = ['submitted', 'approved', 'rejected', 'needs_more_info']
@@ -74,6 +76,64 @@ function useAssignmentStats(companyId: string | undefined) {
   })
 }
 
+function useSetDomoEmbedUrl() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ companyId, url }: { companyId: string; url: string | null }) => {
+      const { error } = await supabase.from('companies').update({ domo_embed_url: url }).eq('id', companyId)
+      if (error) throw error
+    },
+    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ['mojo_admin_company', vars.companyId] }),
+  })
+}
+
+function DomoDashboardCard({ company }: { company: Company }) {
+  const [url, setUrl] = useState(company.domo_embed_url ?? '')
+  const [error, setError] = useState<string | null>(null)
+  const setDomoEmbedUrl = useSetDomoEmbedUrl()
+
+  function handleSave() {
+    setError(null)
+    if (url.trim() && !isValidDomoEmbedUrl(url.trim())) {
+      setError('Must be a public Domo embed URL (https://*.domo.com/...)')
+      return
+    }
+    setDomoEmbedUrl.mutate({ companyId: company.id, url: url.trim() || null })
+  }
+
+  return (
+    <div className="card p-6">
+      <div className="flex items-center gap-2 mb-1">
+        <LayoutDashboard size={18} className="text-brand-600" />
+        <h2 className="text-base font-semibold text-gray-900">Domo Dashboard</h2>
+      </div>
+      <p className="text-sm text-gray-500 mb-4">
+        Paste a public Domo dashboard embed URL to show it on this Owner's home page. Leave blank to remove it.
+      </p>
+      <div className="flex gap-2">
+        <input
+          type="url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://public.domo.com/embed/..."
+          className="input-field flex-1"
+        />
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={setDomoEmbedUrl.isPending}
+          className="btn-primary text-sm px-4"
+        >
+          {setDomoEmbedUrl.isPending ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+      {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
+      {setDomoEmbedUrl.isError && <p className="text-sm text-red-600 mt-2">Failed to save. Please try again.</p>}
+      {setDomoEmbedUrl.isSuccess && !error && <p className="text-sm text-emerald-600 mt-2">Saved.</p>}
+    </div>
+  )
+}
+
 function StatTile({ icon, label, value, color, bg }: { icon: React.ReactNode; label: string; value: number; color: string; bg: string }) {
   return (
     <div className="card px-5 py-4 flex items-center gap-3">
@@ -133,6 +193,8 @@ export default function MojoAdminCompanyDetailPage() {
           {company.type} · Billing: {company.billing_mode === 'platform_only' ? 'Platform only' : 'Pays for everyone'}
         </p>
       </div>
+
+      {isOwner && <DomoDashboardCard company={company} />}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatTile icon={<Users size={20} />} label="Users" value={teamMembers.length} color="text-brand-600" bg="bg-brand-50" />

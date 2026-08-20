@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useProjects, useMyProjects, useTeamMembers, useCompanyProjects, useUpdateMemberRole, useOwnerGCs, useOwnerTrades } from '@/hooks/useProjects'
 import { useOwnerPendingSubmissions } from '@/hooks/useContractorProfile'
 import { getCompanyLogoUrl } from '@/hooks/useCompany'
+import { isValidDomoEmbedUrl } from '@/lib/domoEmbed'
 import { FolderOpen, HardHat, Wrench, ClipboardList, AlertTriangle, ChevronRight, Plus, Users } from 'lucide-react'
 import { format } from 'date-fns'
 
@@ -102,6 +103,19 @@ export default function OwnerDashboard() {
           )
         })}
       </div>
+
+      {/* Domo dashboard — set by Mojo admin */}
+      {profile?.company?.domo_embed_url && isValidDomoEmbedUrl(profile.company.domo_embed_url) && (
+        <div className="card overflow-hidden">
+          <iframe
+            src={profile.company.domo_embed_url}
+            title="Dashboard"
+            className="w-full border-0"
+            style={{ height: '600px' }}
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+        </div>
+      )}
 
       {/* Pending reviews */}
       {(pending.length > 0 || pendingLoading) && (
