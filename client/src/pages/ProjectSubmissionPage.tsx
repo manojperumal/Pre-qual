@@ -91,13 +91,16 @@ export default function ProjectSubmissionPage() {
   })
 
   const [uploading, setUploading] = useState<string | null>(null)
-  const [uploadedDocs, setUploadedDocs] = useState<Record<string, string>>({})
+  const [uploadedDocs, setUploadedDocs] = useState<Record<string, string[]>>({})
 
   useEffect(() => {
     if (!existingDocs?.length) return
     setUploadedDocs((prev) => {
       const next = { ...prev }
-      for (const d of existingDocs) next[d.doc_type] = d.file_name
+      for (const d of existingDocs) {
+        const list = next[d.doc_type] ?? []
+        if (!list.includes(d.file_name)) next[d.doc_type] = [...list, d.file_name]
+      }
       return next
     })
   }, [existingDocs])
@@ -143,46 +146,62 @@ export default function ProjectSubmissionPage() {
     }
   }
 
-  async function handleUpload(docType: SubmissionDocument['doc_type'], file: File) {
-    if (!projectId || !profile?.id) return
+  // A submission row must exist before we can record a document against it —
+  // if this is the contractor's first action on this project (no draft
+  // saved yet), create one now rather than uploading to a placeholder path
+  // that's never linked to anything.
+  async function ensureSubmissionId(): Promise<string | null> {
+    if (submission?.id) return submission.id
+    if (!projectId || !profile?.id || !contractorProfile) return null
+    const created = await upsert.mutateAsync({
+      project_id: projectId,
+      contractor_id: profile.id,
+      status: 'draft',
+      snapshot: contractorProfile as unknown as Record<string, unknown>,
+    })
+    return created.id
+  }
+
+  async function uploadOneFile(submissionId: string, docType: SubmissionDocument['doc_type'], file: File): Promise<void> {
+    const path = `${submissionId}/${docType}/${file.name}`
+    const { error: uploadError } = await supabase.storage
+      .from('prequal-documents')
+      .upload(path, file, { upsert: true })
+    if (uploadError) throw uploadError
+
+    const { error: insertError } = await supabase.from('submission_documents').insert({
+      submission_id: submissionId,
+      doc_type: docType,
+      file_name: file.name,
+      storage_path: path,
+    })
+    if (insertError) throw insertError
+
+    setUploadedDocs((prev) => {
+      const list = prev[docType] ?? []
+      return { ...prev, [docType]: list.includes(file.name) ? list : [...list, file.name] }
+    })
+  }
+
+  async function handleUpload(docType: SubmissionDocument['doc_type'], files: FileList) {
+    if (!projectId || !profile?.id || !files.length) return
     setUploading(docType)
     try {
-      // A submission row must exist before we can record a document against
-      // it — if this is the contractor's first action on this project (no
-      // draft saved yet), create one now rather than uploading to a
-      // placeholder path that's never linked to anything.
-      let submissionId = submission?.id
+      const submissionId = await ensureSubmissionId()
       if (!submissionId) {
-        if (!contractorProfile) {
-          alert('Your contractor profile is still loading — please try again in a moment.')
-          return
-        }
-        const created = await upsert.mutateAsync({
-          project_id: projectId,
-          contractor_id: profile.id,
-          status: 'draft',
-          snapshot: contractorProfile as unknown as Record<string, unknown>,
-        })
-        submissionId = created.id
+        alert('Your contractor profile is still loading — please try again in a moment.')
+        return
       }
 
-      const path = `${submissionId}/${docType}/${file.name}`
-      const { error: uploadError } = await supabase.storage
-        .from('prequal-documents')
-        .upload(path, file, { upsert: true })
-      if (uploadError) throw uploadError
-
-      const { error: insertError } = await supabase.from('submission_documents').insert({
-        submission_id: submissionId,
-        doc_type: docType,
-        file_name: file.name,
-        storage_path: path,
-      })
-      if (insertError) throw insertError
-
-      setUploadedDocs((prev) => ({ ...prev, [docType]: file.name }))
-    } catch (err: any) {
-      alert('Upload failed: ' + (err?.message ?? 'Please try again.'))
+      const fileList = Array.from(files)
+      const results = await Promise.allSettled(fileList.map((file) => uploadOneFile(submissionId, docType, file)))
+      const failures = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+      if (failures.length) {
+        alert(
+          `${failures.length} of ${fileList.length} file(s) failed to upload: ` +
+          failures.map((f) => f.reason?.message ?? 'Unknown error').join('; ')
+        )
+      }
     } finally {
       setUploading(null)
     }
@@ -344,25 +363,31 @@ export default function ProjectSubmissionPage() {
             <div key={doc.key} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
               <span className="text-sm text-gray-700">{doc.label}</span>
               <div className="flex items-center gap-2">
-                {uploadedDocs[doc.key] && (
-                  <span className="text-xs text-green-600 flex items-center gap-1">
-                    <CheckCircle size={12} />
-                    {uploadedDocs[doc.key]}
+                {(uploadedDocs[doc.key]?.length ?? 0) > 0 && (
+                  <span className="text-xs text-green-600 flex items-center gap-1 max-w-[220px]">
+                    <CheckCircle size={12} className="flex-shrink-0" />
+                    <span className="truncate">
+                      {doc.key === 'ptp_photos'
+                        ? `${uploadedDocs[doc.key]!.length} photo${uploadedDocs[doc.key]!.length !== 1 ? 's' : ''}`
+                        : uploadedDocs[doc.key]![uploadedDocs[doc.key]!.length - 1]}
+                    </span>
                   </span>
                 )}
                 <label className="cursor-pointer">
                   <input
                     type="file"
                     className="hidden"
+                    multiple={doc.key === 'ptp_photos'}
+                    accept={doc.key === 'ptp_photos' ? 'image/*' : undefined}
                     disabled={uploading === doc.key}
                     onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) handleUpload(doc.key, file)
+                      if (e.target.files?.length) handleUpload(doc.key, e.target.files)
+                      e.target.value = ''
                     }}
                   />
                   <span className="inline-flex items-center gap-1 text-xs btn-secondary py-1 px-2">
                     <Upload size={12} />
-                    {uploading === doc.key ? 'Uploading...' : 'Upload'}
+                    {uploading === doc.key ? 'Uploading...' : doc.key === 'ptp_photos' ? 'Upload Photos' : 'Upload'}
                   </span>
                 </label>
               </div>
