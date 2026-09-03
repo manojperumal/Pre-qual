@@ -111,7 +111,7 @@ router.get('/:assignmentId/available-documents', requireAuth, async (req: Reques
     res.status(404).json({ error: 'Assignment not found' })
     return
   }
-  if (assignment.assignee_id !== req.userId && assignment.assigned_by !== req.userId) {
+  if (!(await hasAssignmentAccess(assignment, req.userId!))) {
     res.status(403).json({ error: 'Access denied' })
     return
   }
@@ -140,6 +140,21 @@ async function resolveCompanyId(assignment: { company_id?: string | null; assign
   return profile?.new_company_id ?? null
 }
 
+// Assignments target a company (026) — assignee_id only gets stamped once
+// someone actually works on it, so checking just assignee_id/assigned_by
+// locks out every other admin/contributor at that company from an
+// assignment nobody has touched yet. Any member of the assigned company
+// (or the one who created it) should have access.
+async function hasAssignmentAccess(
+  assignment: { company_id?: string | null; assignee_id?: string | null; assigned_by?: string | null },
+  userId: string
+): Promise<boolean> {
+  if (assignment.assignee_id === userId || assignment.assigned_by === userId) return true
+  if (!assignment.company_id) return false
+  const { data: profile } = await supabaseAdmin.from('profiles').select('new_company_id').eq('id', userId).single()
+  return profile?.new_company_id === assignment.company_id
+}
+
 /**
  * POST /api/questionnaires/:assignmentId/ai-complete
  * Reads uploaded contractor documents and auto-fills questionnaire answers using Claude.
@@ -163,7 +178,7 @@ router.post('/:assignmentId/ai-complete', requireAuth, async (req: Request, res:
     return
   }
 
-  if (assignment.assignee_id !== req.userId && assignment.assigned_by !== req.userId) {
+  if (!(await hasAssignmentAccess(assignment, req.userId!))) {
     res.status(403).json({ error: 'Access denied' })
     return
   }

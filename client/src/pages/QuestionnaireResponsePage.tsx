@@ -42,7 +42,7 @@ export default function QuestionnaireResponsePage() {
   const upsertResponse = useUpsertResponse()
   const updateStatus = useUpdateAssignmentStatus()
   const aiComplete = useAICompleteQuestionnaire()
-  const { data: availableDocs } = useAvailableAIDocuments(assignmentId)
+  const { data: availableDocs, isError: availableDocsError } = useAvailableAIDocuments(assignmentId)
 
   const [answers, setAnswers] = useState<Record<string, { text?: string; options?: string[]; docName?: string; docPath?: string; companyComments?: string; mojoFeedback?: string; aiSuggested?: boolean }>>({})
 
@@ -282,6 +282,13 @@ export default function QuestionnaireResponsePage() {
           <p className="text-xs text-gray-500 mb-3">
             Mojo AI can fill in this questionnaire from your company's documents. Review the answers before submitting.
           </p>
+
+          {availableDocsError && (
+            <div className="mb-4 flex items-start gap-2 text-red-600 bg-red-50 rounded-lg px-3 py-2 text-xs">
+              <AlertCircle size={13} className="flex-shrink-0 mt-0.5" />
+              Couldn't check for documents already on file — try refreshing the page. You can still upload one below.
+            </div>
+          )}
 
           {hasDocsOnFile && (
             <div className="mb-4 bg-white/70 rounded-lg px-3 py-2.5 border border-brand-100">
