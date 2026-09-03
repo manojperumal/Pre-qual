@@ -1,6 +1,20 @@
 import { useCallback, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { Company } from '@/types'
+
+export type CompanyDocumentType = 'safety_manual' | 'coi' | 'w9' | 'loss_runs' | 'license' | 'sop' | 'other'
+
+export interface CompanyDocument {
+  id: string
+  company_id: string
+  document_type: CompanyDocumentType
+  document_name: string
+  storage_path: string
+  uploaded_by: string | null
+  created_at: string
+  uploader?: { full_name: string | null; email: string | null }
+}
 
 export function useUpdateCompany() {
   const [loading, setLoading] = useState(false)
@@ -74,70 +88,76 @@ export function useUploadCompanyLogo() {
   return { uploadLogo, loading, error }
 }
 
-export function useCompanyDocuments(companyId: string | null | undefined) {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+export function useCompanyDocumentsList(companyId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['company_documents', companyId],
+    enabled: !!companyId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('company_documents')
+        .select('*, uploader:profiles!uploaded_by(full_name, email)')
+        .eq('company_id', companyId!)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return data as CompanyDocument[]
+    },
+  })
+}
 
-  const uploadDocument = useCallback(async (
-    file: File,
-    documentType: 'safety_manual' | 'coi' | 'w9' | 'loss_runs' | 'license' | 'other',
-    uploadedBy: string
-  ) => {
-    if (!companyId) return null
-    setLoading(true)
-    setError(null)
+export function useUploadCompanyDocument() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      companyId,
+      file,
+      documentType,
+      uploadedBy,
+    }: {
+      companyId: string
+      file: File
+      documentType: CompanyDocumentType
+      uploadedBy: string
+    }) => {
+      const ext = file.name.split('.').pop()
+      const path = `company-docs/${companyId}/${documentType}-${Date.now()}.${ext}`
 
-    const ext = file.name.split('.').pop()
-    const path = `company-docs/${companyId}/${documentType}-${Date.now()}.${ext}`
+      const { error: uploadErr } = await supabase.storage.from('prequal-documents').upload(path, file)
+      if (uploadErr) throw uploadErr
 
-    const { error: uploadErr } = await supabase.storage
-      .from('prequal-documents')
-      .upload(path, file)
+      const { data, error: insertErr } = await supabase
+        .from('company_documents')
+        .insert({
+          company_id: companyId,
+          document_type: documentType,
+          document_name: file.name,
+          storage_path: path,
+          uploaded_by: uploadedBy,
+        })
+        .select()
+        .single()
+      if (insertErr) throw insertErr
+      return data as CompanyDocument
+    },
+    onSuccess: (data) => qc.invalidateQueries({ queryKey: ['company_documents', data.company_id] }),
+  })
+}
 
-    if (uploadErr) {
-      setError(uploadErr.message)
-      setLoading(false)
-      return null
-    }
+export function useDeleteCompanyDocument() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ companyId, documentId, storagePath }: { companyId: string; documentId: string; storagePath: string }) => {
+      await supabase.storage.from('prequal-documents').remove([storagePath])
+      const { error } = await supabase.from('company_documents').delete().eq('id', documentId)
+      if (error) throw error
+    },
+    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ['company_documents', vars.companyId] }),
+  })
+}
 
-    const { data, error: insertErr } = await supabase
-      .from('company_documents')
-      .insert({
-        company_id: companyId,
-        document_type: documentType,
-        document_name: file.name,
-        storage_path: path,
-        uploaded_by: uploadedBy,
-      })
-      .select()
-      .single()
-
-    setLoading(false)
-    if (insertErr) {
-      setError(insertErr.message)
-      return null
-    }
-    return data
-  }, [companyId])
-
-  const deleteDocument = useCallback(async (documentId: string, storagePath: string) => {
-    setLoading(true)
-    setError(null)
-
-    await supabase.storage.from('prequal-documents').remove([storagePath])
-
-    const { error: deleteErr } = await supabase
-      .from('company_documents')
-      .delete()
-      .eq('id', documentId)
-
-    setLoading(false)
-    if (deleteErr) {
-      setError(deleteErr.message)
-      return false
-    }
-    return true
+export function useCompanyDocumentUrl() {
+  return useCallback(async (storagePath: string) => {
+    const { data, error } = await supabase.storage.from('prequal-documents').createSignedUrl(storagePath, 300)
+    if (error || !data) throw error || new Error('Failed to create link')
+    return data.signedUrl
   }, [])
-
-  return { uploadDocument, deleteDocument, loading, error }
 }

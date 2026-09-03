@@ -40,6 +40,7 @@ import MojoAdminReviewQueuePage from '@/pages/MojoAdminReviewQueuePage'
 import OwnerSettingsPage from '@/pages/OwnerSettingsPage'
 import AskMojoPage from '@/pages/AskMojoPage'
 import AskMojoThreadPage from '@/pages/AskMojoThreadPage'
+import CompanyDocumentsPage from '@/pages/CompanyDocumentsPage'
 
 function RoleRedirect() {
   const { profile, loading } = useAuth()
@@ -130,6 +131,7 @@ export default function App() {
         <Route path="settings" element={<OwnerSettingsPage />} />
         <Route path="ask-mojo" element={<AskMojoPage />} />
         <Route path="ask-mojo/:threadId" element={<AskMojoThreadPage />} />
+        <Route path="documents" element={<CompanyDocumentsPage />} />
         <Route path="prequal/:id" element={<PrequalDetail />} />
         <Route path="questionnaires" element={<QuestionnairesPage />} />
         <Route path="questionnaires/new" element={<QuestionnaireBuilderPage />} />
@@ -159,6 +161,7 @@ export default function App() {
         <Route path="my-team" element={<MyTeamPage />} />
         <Route path="ask-mojo" element={<AskMojoPage />} />
         <Route path="ask-mojo/:threadId" element={<AskMojoThreadPage />} />
+        <Route path="documents" element={<CompanyDocumentsPage />} />
         <Route path="trades" element={<TradesPage />} />
         <Route path="projects/:projectId" element={<ProjectDetailPage />} />
         <Route path="projects/:projectId/submit" element={<ProjectSubmissionPage />} />
@@ -192,6 +195,7 @@ export default function App() {
         <Route path="my-team" element={<MyTeamPage />} />
         <Route path="ask-mojo" element={<AskMojoPage />} />
         <Route path="ask-mojo/:threadId" element={<AskMojoThreadPage />} />
+        <Route path="documents" element={<CompanyDocumentsPage />} />
         <Route path="projects/:projectId" element={<ProjectDetailPage />} />
         <Route path="projects/:projectId/submit" element={<ProjectSubmissionPage />} />
         <Route path="prequal/new" element={<PrequalForm />} />
