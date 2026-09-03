@@ -8,6 +8,7 @@ const CATEGORY_LABELS: Record<QuestionCategory, string> = {
   safety: 'Safety',
   ptp: 'PTP Program',
   bonding: 'Bonding',
+  financial: 'Financial Review',
   loss_runs: 'Loss Runs',
   compliance: 'Compliance',
 }

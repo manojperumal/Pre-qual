@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 // ─── Types ────────────────────────────────────────────────────────────────
 
 export type AnswerType = 'radio_yes_no' | 'radio_yes_no_comments' | 'multi_select' | 'document_upload' | 'text_area' | 'number'
-export type QuestionCategory = 'company_info' | 'insurance' | 'safety' | 'ptp' | 'bonding' | 'loss_runs' | 'compliance'
+export type QuestionCategory = 'company_info' | 'insurance' | 'safety' | 'ptp' | 'bonding' | 'financial' | 'loss_runs' | 'compliance'
 export type AssignmentStatus = 'pending' | 'in_progress' | 'submitted' | 'approved' | 'rejected' | 'needs_more_info'
 
 export interface Question {

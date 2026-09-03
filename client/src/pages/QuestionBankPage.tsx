@@ -9,6 +9,7 @@ const CATEGORIES: { value: QuestionCategory; label: string }[] = [
   { value: 'safety', label: 'Safety' },
   { value: 'ptp', label: 'PTP Program' },
   { value: 'bonding', label: 'Bonding' },
+  { value: 'financial', label: 'Financial Review' },
   { value: 'loss_runs', label: 'Loss Runs' },
   { value: 'compliance', label: 'Compliance' },
 ]
@@ -29,6 +30,7 @@ const CATEGORY_COLORS: Record<QuestionCategory, string> = {
   safety: 'bg-red-100 text-red-700',
   ptp: 'bg-orange-100 text-orange-700',
   bonding: 'bg-yellow-100 text-yellow-700',
+  financial: 'bg-emerald-100 text-emerald-700',
   loss_runs: 'bg-pink-100 text-pink-700',
   compliance: 'bg-green-100 text-green-700',
 }

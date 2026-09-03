@@ -6,6 +6,7 @@ export const CATEGORY_ORDER: QuestionCategory[] = [
   'safety',
   'ptp',
   'bonding',
+  'financial',
   'loss_runs',
   'compliance',
 ]
@@ -16,6 +17,7 @@ export const CATEGORY_LABELS: Record<QuestionCategory, string> = {
   safety: 'Safety',
   ptp: 'PTP Program',
   bonding: 'Bonding',
+  financial: 'Financial Review',
   loss_runs: 'Loss Runs',
   compliance: 'Compliance',
 }
@@ -26,6 +28,7 @@ export const CATEGORY_COLORS: Record<QuestionCategory, string> = {
   safety: 'bg-red-100 text-red-700',
   ptp: 'bg-orange-100 text-orange-700',
   bonding: 'bg-yellow-100 text-yellow-700',
+  financial: 'bg-emerald-100 text-emerald-700',
   loss_runs: 'bg-pink-100 text-pink-700',
   compliance: 'bg-green-100 text-green-700',
 }
