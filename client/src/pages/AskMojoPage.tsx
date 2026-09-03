@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useAskMojoThreads, useCreateAskMojoThread, AskMojoDocumentType } from '@/hooks/useAskMojo'
-import { Sparkles, Plus, FileText, CheckCircle2, X } from 'lucide-react'
+import { Sparkles, Plus, FileText, CheckCircle2, X, AlertCircle } from 'lucide-react'
 import { format } from 'date-fns'
 
 const DOCUMENT_TYPE_OPTIONS: { value: AskMojoDocumentType; label: string }[] = [
@@ -24,16 +24,22 @@ export default function AskMojoPage() {
   const [showNew, setShowNew] = useState(false)
   const [title, setTitle] = useState('')
   const [documentType, setDocumentType] = useState<AskMojoDocumentType>('safety_manual')
+  const [createError, setCreateError] = useState<string | null>(null)
 
   async function handleCreate() {
     if (!companyId || !profile?.id || !title.trim()) return
-    const thread = await createThread.mutateAsync({
-      company_id: companyId,
-      created_by: profile.id,
-      title: title.trim(),
-      document_type: documentType,
-    })
-    navigate(`${basePath}/ask-mojo/${thread.id}`)
+    setCreateError(null)
+    try {
+      const thread = await createThread.mutateAsync({
+        company_id: companyId,
+        created_by: profile.id,
+        title: title.trim(),
+        document_type: documentType,
+      })
+      navigate(`${basePath}/ask-mojo/${thread.id}`)
+    } catch (err: any) {
+      setCreateError(err?.message || 'Failed to start this document. Please try again.')
+    }
   }
 
   return (
@@ -85,6 +91,12 @@ export default function AskMojoPage() {
               ))}
             </select>
           </div>
+          {createError && (
+            <div className="flex items-start gap-2 text-red-600 bg-red-50 rounded-lg px-3 py-2 text-sm">
+              <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
+              {createError}
+            </div>
+          )}
           <div className="flex justify-end">
             <button
               onClick={handleCreate}
