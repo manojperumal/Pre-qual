@@ -249,8 +249,9 @@ export function useProjectMembers(projectId: string | undefined) {
 export interface OwnerContractorRow {
   memberId: string
   joinedAt: string
-  projectId: string
-  projectName: string
+  /** Null means this company accepted an invitation but isn't a member of any project yet. */
+  projectId: string | null
+  projectName: string | null
   startDate: string | null
   endDate: string | null
   contractorId: string
@@ -264,6 +265,54 @@ export interface OwnerContractorRow {
   submissionStatus: string | null
   /** Company name(s) of the GC(s) coordinating this contractor on this project — empty if invited directly. */
   gcCompanies: string[]
+}
+
+// Companies that accepted an invitation from senderId (of the given
+// recipient role) but aren't in `existingContractorIds` — i.e. not yet a
+// member of any of the sender's/coordinated projects, and so otherwise
+// invisible on the Trades/GCs roster despite having accepted.
+async function fetchEcosystemOnlyRows(
+  senderId: string,
+  recipientRole: 'gc' | 'trade',
+  existingContractorIds: Set<string>
+): Promise<OwnerContractorRow[]> {
+  const { data: invites, error } = await supabase
+    .from('invitations')
+    .select(
+      'accepted_by, accepted_profile:profiles!accepted_by(id, full_name, email, company_name, new_company_id, company:companies!new_company_id(id, name, city, state, logo_path))'
+    )
+    .eq('sender_id', senderId)
+    .eq('recipient_role', recipientRole)
+    .eq('status', 'accepted')
+    .not('accepted_by', 'is', null)
+  if (error) throw error
+
+  const seen = new Set<string>()
+  const rows: OwnerContractorRow[] = []
+  for (const inv of invites ?? []) {
+    const profile = (inv as any).accepted_profile
+    if (!profile || existingContractorIds.has(profile.id) || seen.has(profile.id)) continue
+    seen.add(profile.id)
+    rows.push({
+      memberId: `ecosystem-${profile.id}`,
+      joinedAt: '',
+      projectId: null,
+      projectName: null,
+      startDate: null,
+      endDate: null,
+      contractorId: profile.id,
+      contractorName: profile.full_name ?? null,
+      contractorEmail: profile.email ?? null,
+      companyId: profile.company?.id ?? null,
+      companyName: profile.company?.name ?? profile.company_name ?? null,
+      city: profile.company?.city ?? null,
+      state: profile.company?.state ?? null,
+      logoPath: profile.company?.logo_path ?? null,
+      submissionStatus: null,
+      gcCompanies: [],
+    })
+  }
+  return rows
 }
 
 const CONTRACTOR_MEMBER_SELECT =
@@ -283,52 +332,56 @@ export function useOwnerGCs(ownerId: string | undefined) {
         .select('id, name, start_date, end_date')
         .eq('owner_id', ownerId!)
       if (pErr) throw pErr
-      if (!projects?.length) return []
 
-      const projectIds = projects.map((p) => p.id)
+      const projectIds = (projects ?? []).map((p) => p.id)
 
-      const { data: members, error: mErr } = await supabase
-        .from('project_members')
-        .select(CONTRACTOR_MEMBER_SELECT)
-        .in('project_id', projectIds)
-      if (mErr) throw mErr
+      let memberRows: OwnerContractorRow[] = []
+      if (projectIds.length) {
+        const { data: members, error: mErr } = await supabase
+          .from('project_members')
+          .select(CONTRACTOR_MEMBER_SELECT)
+          .in('project_id', projectIds)
+        if (mErr) throw mErr
 
-      const gcMembers = (members ?? []).filter((m: any) => roleOf(m.profile) === 'gc')
-      if (!gcMembers.length) return []
+        const gcMembers = (members ?? []).filter((m: any) => roleOf(m.profile) === 'gc')
 
-      const { data: submissions } = await supabase
-        .from('project_submissions')
-        .select('project_id, contractor_id, status')
-        .in('project_id', projectIds)
+        const { data: submissions } = await supabase
+          .from('project_submissions')
+          .select('project_id, contractor_id, status')
+          .in('project_id', projectIds)
 
-      const subMap = new Map<string, string>()
-      for (const s of submissions ?? []) {
-        subMap.set(`${s.project_id}:${s.contractor_id}`, s.status)
+        const subMap = new Map<string, string>()
+        for (const s of submissions ?? []) {
+          subMap.set(`${s.project_id}:${s.contractor_id}`, s.status)
+        }
+
+        const projectMap = new Map((projects ?? []).map((p) => [p.id, p]))
+
+        memberRows = gcMembers.map((m: any): OwnerContractorRow => {
+          const project = projectMap.get(m.project_id)!
+          return {
+            memberId: m.id,
+            joinedAt: m.joined_at,
+            projectId: m.project_id,
+            projectName: project.name,
+            startDate: project.start_date ?? null,
+            endDate: project.end_date ?? null,
+            contractorId: m.user_id,
+            contractorName: m.profile?.full_name ?? null,
+            contractorEmail: m.profile?.email ?? null,
+            companyId: m.profile?.company?.id ?? null,
+            companyName: m.profile?.company?.name ?? m.profile?.company_name ?? null,
+            city: m.profile?.company?.city ?? null,
+            state: m.profile?.company?.state ?? null,
+            logoPath: m.profile?.company?.logo_path ?? null,
+            submissionStatus: subMap.get(`${m.project_id}:${m.user_id}`) ?? null,
+            gcCompanies: [],
+          }
+        })
       }
 
-      const projectMap = new Map(projects.map((p) => [p.id, p]))
-
-      return gcMembers.map((m: any): OwnerContractorRow => {
-        const project = projectMap.get(m.project_id)!
-        return {
-          memberId: m.id,
-          joinedAt: m.joined_at,
-          projectId: m.project_id,
-          projectName: project.name,
-          startDate: project.start_date ?? null,
-          endDate: project.end_date ?? null,
-          contractorId: m.user_id,
-          contractorName: m.profile?.full_name ?? null,
-          contractorEmail: m.profile?.email ?? null,
-          companyId: m.profile?.company?.id ?? null,
-          companyName: m.profile?.company?.name ?? m.profile?.company_name ?? null,
-          city: m.profile?.company?.city ?? null,
-          state: m.profile?.company?.state ?? null,
-          logoPath: m.profile?.company?.logo_path ?? null,
-          submissionStatus: subMap.get(`${m.project_id}:${m.user_id}`) ?? null,
-          gcCompanies: [],
-        }
-      })
+      const ecosystemRows = await fetchEcosystemOnlyRows(ownerId!, 'gc', new Set(memberRows.map((r) => r.contractorId)))
+      return [...memberRows, ...ecosystemRows]
     },
   })
 }
@@ -405,7 +458,9 @@ export function useOwnerTrades(ownerId: string | undefined) {
         .select('id')
         .eq('owner_id', ownerId!)
       if (pErr) throw pErr
-      return fetchTradeRows((projects ?? []).map((p) => p.id))
+      const memberRows = await fetchTradeRows((projects ?? []).map((p) => p.id))
+      const ecosystemRows = await fetchEcosystemOnlyRows(ownerId!, 'trade', new Set(memberRows.map((r) => r.contractorId)))
+      return [...memberRows, ...ecosystemRows]
     },
   })
 }
@@ -422,7 +477,9 @@ export function useGCTrades(gcUserId: string | undefined) {
         .eq('user_id', gcUserId!)
         .eq('role', 'gc')
       if (mErr) throw mErr
-      return fetchTradeRows((myMemberships ?? []).map((m) => m.project_id))
+      const memberRows = await fetchTradeRows((myMemberships ?? []).map((m) => m.project_id))
+      const ecosystemRows = await fetchEcosystemOnlyRows(gcUserId!, 'trade', new Set(memberRows.map((r) => r.contractorId)))
+      return [...memberRows, ...ecosystemRows]
     },
   })
 }

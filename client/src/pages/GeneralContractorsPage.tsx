@@ -118,7 +118,9 @@ export default function GeneralContractorsPage() {
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">{cityState(row.city, row.state)}</td>
                     <td className="px-6 py-4">
-                      {row.submissionStatus ? (
+                      {row.projectId === null ? (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Not on a project yet</span>
+                      ) : row.submissionStatus ? (
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[row.submissionStatus] ?? 'bg-gray-100 text-gray-600'}`}>
                           {row.submissionStatus.replace(/_/g, ' ')}
                         </span>
@@ -129,12 +131,16 @@ export default function GeneralContractorsPage() {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <Link
-                        to={`/owner/projects/${row.projectId}`}
-                        className="text-sm text-brand-600 hover:text-brand-700 font-medium"
-                      >
-                        {row.projectName}
-                      </Link>
+                      {row.projectId ? (
+                        <Link
+                          to={`/owner/projects/${row.projectId}`}
+                          className="text-sm text-brand-600 hover:text-brand-700 font-medium"
+                        >
+                          {row.projectName}
+                        </Link>
+                      ) : (
+                        <span className="text-sm text-gray-400 italic">—</span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">

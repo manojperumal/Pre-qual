@@ -407,7 +407,7 @@ router.post('/accept', requireAuth, async (req: Request, res: Response): Promise
   // Mark accepted
   const { error: updateErr } = await supabaseAdmin
     .from('invitations')
-    .update({ status: 'accepted' })
+    .update({ status: 'accepted', accepted_by: req.userId })
     .eq('id', invitation.id)
 
   if (updateErr) {
