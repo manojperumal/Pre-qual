@@ -7,6 +7,7 @@ import questionnairesRouter from './routes/questionnaires.js'
 import adminRouter from './routes/admin.js'
 import paymentsRouter from './routes/payments.js'
 import quickbooksAuthRouter from './routes/quickbooksAuth.js'
+import askMojoRouter from './routes/askMojo.js'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 3001
@@ -47,6 +48,7 @@ app.use('/api/questionnaires', questionnairesRouter)
 app.use('/api/admin', adminRouter)
 app.use('/api/payments', paymentsRouter)
 app.use('/api/quickbooks/oauth', quickbooksAuthRouter)
+app.use('/api/ask-mojo', askMojoRouter)
 
 // Health check
 app.get('/api/health', (_req, res) => {

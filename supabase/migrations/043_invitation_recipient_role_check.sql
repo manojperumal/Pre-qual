@@ -1,5 +1,5 @@
 -- ============================================================
--- 042: Widen invitations.recipient_role check constraint
+-- 043: Widen invitations.recipient_role check constraint
 -- ============================================================
 -- The original constraint (001_initial_schema.sql) only allowed 'gc' or
 -- 'trade'. Team-member invites ('gc_member', 'owner_member',
