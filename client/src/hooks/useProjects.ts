@@ -122,9 +122,10 @@ export function useCreateProject() {
         .select()
         .single()
       if (error) throw error
-      await supabase
+      const { error: memberError } = await supabase
         .from('project_members')
         .insert({ project_id: project.id, user_id: ownerId, role: 'owner' })
+      if (memberError) throw memberError
       return project as Project
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
@@ -158,9 +159,10 @@ export function useBulkCreateProjects() {
         .select()
       if (error) throw error
 
-      await supabase
+      const { error: memberError } = await supabase
         .from('project_members')
         .insert((projects ?? []).map((p) => ({ project_id: p.id, user_id: ownerId, role: 'owner' })))
+      if (memberError) throw memberError
 
       return projects as Project[]
     },
