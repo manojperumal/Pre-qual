@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { useProjectMembers, useUpdateProject, useSetProjectPrimaryContact } from '@/hooks/useProjects'
+import { useProjectMembers, useUpdateProject, useSetProjectPrimaryContact, useGCTrades, useAddExistingTradeToProject } from '@/hooks/useProjects'
 import { useProjects } from '@/hooks/useProjects'
 import { useProjectSubmissions } from '@/hooks/useContractorProfile'
 import { useProjectAssignments, useExemptAssignment, AssignmentStatus } from '@/hooks/useQuestionnaires'
-import { Users, UserPlus, ChevronRight, Pencil, X, Check, Calendar, ClipboardList, Star, MapPin } from 'lucide-react'
+import { Users, UserPlus, ChevronRight, Pencil, X, Check, Calendar, ClipboardList, Star, MapPin, Wrench } from 'lucide-react'
 import { format } from 'date-fns'
 import { useForm } from 'react-hook-form'
 import { roleLabel } from '@/lib/roleLabels'
@@ -39,8 +39,11 @@ export default function ProjectDetailPage() {
   const exemptAssignment = useExemptAssignment()
   const updateProject = useUpdateProject()
   const setPrimaryContact = useSetProjectPrimaryContact()
+  const addExistingTrade = useAddExistingTradeToProject()
 
   const [editing, setEditing] = useState(false)
+  const [showAddExisting, setShowAddExisting] = useState(false)
+  const [addExistingError, setAddExistingError] = useState<string | null>(null)
 
   const project = projects.find((p) => p.id === projectId)
 
@@ -48,6 +51,22 @@ export default function ProjectDetailPage() {
   const projectsListPath = role === 'owner' ? '/owner/projects' : role === 'gc' ? '/gc' : '/trade'
   const invitePath = `/${role}/projects/${projectId}/invite`
   const submissionBasePath = role === 'gc' ? `/gc/projects/${projectId}/submissions` : `/owner/projects/${projectId}/submissions`
+
+  const { data: gcTradeRows = [] } = useGCTrades(role === 'gc' ? profile?.id : undefined)
+  const memberUserIds = new Set(members.map((m: any) => m.user_id))
+  const existingTradeOptions = Array.from(
+    new Map(gcTradeRows.filter((r) => !memberUserIds.has(r.contractorId)).map((r) => [r.contractorId, r])).values()
+  )
+
+  async function handleAddExisting(userId: string) {
+    if (!projectId) return
+    setAddExistingError(null)
+    try {
+      await addExistingTrade.mutateAsync({ projectId, userId })
+    } catch (err: any) {
+      setAddExistingError(err?.message || 'Failed to add this trade. Please try again.')
+    }
+  }
 
   const { register, handleSubmit, reset } = useForm({
     defaultValues: {
@@ -251,13 +270,48 @@ export default function ProjectDetailPage() {
             <Users size={16} className="text-gray-400" />
             <h2 className="text-base font-semibold text-gray-900">Members</h2>
           </div>
-          {(role === 'owner' || role === 'gc') && (
-            <Link to={invitePath} className="btn-primary text-sm py-1.5 px-3 inline-flex items-center gap-1">
-              <UserPlus size={14} />
-              Invite Member
-            </Link>
-          )}
+          <div className="flex items-center gap-2">
+            {role === 'gc' && existingTradeOptions.length > 0 && (
+              <button
+                onClick={() => setShowAddExisting((v) => !v)}
+                className="btn-secondary text-sm py-1.5 px-3 inline-flex items-center gap-1"
+              >
+                <Wrench size={14} />
+                Add Existing Trade
+              </button>
+            )}
+            {(role === 'owner' || role === 'gc') && (
+              <Link to={invitePath} className="btn-primary text-sm py-1.5 px-3 inline-flex items-center gap-1">
+                <UserPlus size={14} />
+                Invite Member
+              </Link>
+            )}
+          </div>
         </div>
+
+        {showAddExisting && (
+          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 space-y-2">
+            <p className="text-xs font-medium text-gray-600">Add a trade already in your roster to this project</p>
+            {addExistingError && <p className="text-xs text-red-600">{addExistingError}</p>}
+            <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg bg-white max-h-56 overflow-y-auto">
+              {existingTradeOptions.map((row) => (
+                <div key={row.contractorId} className="flex items-center justify-between px-3 py-2">
+                  <div>
+                    <p className="text-sm text-gray-900">{row.contractorName || row.contractorEmail || '—'}</p>
+                    {row.companyName && <p className="text-xs text-gray-500">{row.companyName}</p>}
+                  </div>
+                  <button
+                    onClick={() => handleAddExisting(row.contractorId)}
+                    disabled={addExistingTrade.isPending}
+                    className="text-xs text-brand-600 hover:text-brand-700 font-medium flex-shrink-0"
+                  >
+                    Add
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {isLoading ? (
           <div className="flex justify-center items-center py-16">

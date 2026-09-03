@@ -248,6 +248,24 @@ export function useProjectMembers(projectId: string | undefined) {
   })
 }
 
+// Attach a trade already in the caller's roster (per useGCTrades) to
+// another project, without sending a fresh invitation. RLS (050) only
+// allows this for a GC adding a trade it already coordinates elsewhere.
+export function useAddExistingTradeToProject() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ projectId, userId }: { projectId: string; userId: string }) => {
+      const { error } = await supabase.from('project_members').insert({ project_id: projectId, user_id: userId, role: 'trade' })
+      if (error) throw error
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['project_members', vars.projectId] })
+      qc.invalidateQueries({ queryKey: ['gc_trades'] })
+      qc.invalidateQueries({ queryKey: ['owner_trades'] })
+    },
+  })
+}
+
 export interface OwnerContractorRow {
   memberId: string
   joinedAt: string
