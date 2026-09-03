@@ -191,6 +191,11 @@ router.post('/:assignmentId/ai-complete', requireAuth, async (req: Request, res:
     .order('order_index')
 
   if (questionsErr || !qqList?.length) {
+    console.error('[ai-complete] questionnaire_questions query failed or empty:', {
+      questionnaireId: assignment.questionnaire_id,
+      questionsErr,
+      rowCount: qqList?.length ?? 0,
+    })
     res.status(400).json({ error: 'No questions found for this questionnaire' })
     return
   }
