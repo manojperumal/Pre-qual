@@ -251,7 +251,7 @@ export default function ProjectDetailPage() {
             <Users size={16} className="text-gray-400" />
             <h2 className="text-base font-semibold text-gray-900">Members</h2>
           </div>
-          {role === 'owner' && (
+          {(role === 'owner' || role === 'gc') && (
             <Link to={invitePath} className="btn-primary text-sm py-1.5 px-3 inline-flex items-center gap-1">
               <UserPlus size={14} />
               Invite Member
@@ -267,7 +267,7 @@ export default function ProjectDetailPage() {
           <div className="text-center py-12 text-gray-500">
             <Users size={28} className="mx-auto mb-2 text-gray-300" />
             <p className="text-sm">No members yet</p>
-            {role === 'owner' && (
+            {(role === 'owner' || role === 'gc') && (
               <Link to={invitePath} className="btn-primary mt-3 inline-flex text-sm">Invite someone</Link>
             )}
           </div>
