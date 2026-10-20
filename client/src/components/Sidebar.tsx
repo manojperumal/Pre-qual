@@ -77,7 +77,7 @@ export function Sidebar() {
     <aside className="w-56 flex-shrink-0 bg-[#111827] flex flex-col min-h-screen">
       {/* Logo */}
       <div className="px-5 py-5 border-b border-white/10">
-        <MojoLogo size="md" subtitle="Pre-qualification" />
+        <MojoLogo size="md" subtitle="Contractor Pre-Qualification & Lifecycle Management" />
       </div>
 
       {/* Company branding */}
