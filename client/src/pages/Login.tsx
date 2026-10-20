@@ -46,7 +46,7 @@ export default function Login() {
     <div className="min-h-screen bg-[#111827] flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-8">
-          <MojoLogo size="lg" subtitle="Pre-Qualification Platform" />
+          <MojoLogo size="lg" subtitle="Contractor Pre-Qualification & Lifecycle Management" />
         </div>
 
         <div className="card p-8 rounded-xl shadow-xl">

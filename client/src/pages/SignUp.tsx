@@ -131,7 +131,7 @@ export default function SignUp() {
     <div className="min-h-screen bg-[#111827] flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-lg">
         <div className="flex justify-center mb-8">
-          <MojoLogo size="lg" subtitle="Pre-Qualification Platform" />
+          <MojoLogo size="lg" subtitle="Contractor Pre-Qualification & Lifecycle Management" />
         </div>
 
         <div className="card p-8 rounded-xl shadow-xl">
