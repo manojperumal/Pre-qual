@@ -44,7 +44,7 @@ export default function QuestionnaireResponsePage() {
   const aiComplete = useAICompleteQuestionnaire()
   const { data: availableDocs, isError: availableDocsError } = useAvailableAIDocuments(assignmentId)
 
-  const [answers, setAnswers] = useState<Record<string, { text?: string; options?: string[]; docName?: string; docPath?: string; companyComments?: string; mojoFeedback?: string; aiSuggested?: boolean }>>({})
+  const [answers, setAnswers] = useState<Record<string, { text?: string; options?: string[]; docName?: string; docPath?: string; companyComments?: string; mojoFeedback?: string; aiSuggested?: boolean; needsClarification?: boolean }>>({})
 
   const [saving, setSaving] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -80,6 +80,7 @@ export default function QuestionnaireResponsePage() {
         companyComments: r.company_comments ?? undefined,
         mojoFeedback: r.mojo_feedback ?? undefined,
         aiSuggested: r.ai_suggested ?? false,
+        needsClarification: r.needs_clarification ?? false,
       }
     }
     setAnswers(init)
@@ -97,6 +98,8 @@ export default function QuestionnaireResponsePage() {
   }
 
   const visibleQQList = qqList.filter(isConditionMet)
+  const flaggedIndexMap = new Map(visibleQQList.map((qq, i) => [qq.id, i]))
+  const flaggedQuestions = visibleQQList.filter(qq => answers[qq.question_id]?.needsClarification)
 
   function hasAnswer(qq: typeof qqList[number]): boolean {
     const a = answers[qq.question_id]
@@ -282,6 +285,34 @@ export default function QuestionnaireResponsePage() {
         )}
       </div>
 
+      {/* Sent back for clarification */}
+      {assignment.status === 'needs_more_info' && (
+        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <p className="flex items-center gap-1.5 text-sm font-semibold text-amber-800 mb-1">
+            <Info size={14} /> The reviewer sent this back for clarification
+          </p>
+          {assignment.reviewer_notes && (
+            <p className="text-sm text-amber-800 mb-2">{assignment.reviewer_notes}</p>
+          )}
+          {flaggedQuestions.length > 0 && (
+            <div className="mt-2">
+              <p className="text-xs font-medium text-amber-700 mb-1.5">
+                {flaggedQuestions.length} question{flaggedQuestions.length !== 1 ? 's' : ''} need{flaggedQuestions.length === 1 ? 's' : ''} your attention:
+              </p>
+              <ul className="space-y-1">
+                {flaggedQuestions.map((qq, i) => (
+                  <li key={qq.id}>
+                    <a href={`#q-${qq.id}`} className="text-xs text-amber-800 underline hover:text-amber-900">
+                      {flaggedIndexMap.get(qq.id)! + 1}. {qq.question?.question_text}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Progress */}
       <div className="mb-6">
         <div className="flex w-full bg-gray-200 rounded-full h-2 overflow-hidden">
@@ -463,7 +494,7 @@ export default function QuestionnaireResponsePage() {
 
       {/* Questions, grouped by category */}
       {(() => {
-        const indexMap = new Map(visibleQQList.map((qq, i) => [qq.id, i]))
+        const indexMap = flaggedIndexMap
         const groups = groupByCategory(visibleQQList, (qq) => qq.question?.category)
         return (
           <div className="space-y-8">
@@ -481,12 +512,21 @@ export default function QuestionnaireResponsePage() {
                     const a = answers[q.id] ?? {}
 
                     return (
-                      <div key={qq.id} className={`bg-white rounded-xl shadow-sm border p-5 ${a.aiSuggested ? 'border-brand-200' : 'border-gray-200'}`}>
+                      <div
+                        key={qq.id}
+                        id={`q-${qq.id}`}
+                        className={`bg-white rounded-xl shadow-sm border p-5 scroll-mt-4 ${a.needsClarification ? 'border-amber-300' : a.aiSuggested ? 'border-brand-200' : 'border-gray-200'}`}
+                      >
                         <div className="flex items-start justify-between gap-2 mb-1">
                           <p className="text-sm font-semibold text-gray-800">
                             {idx + 1}. {q.question_text}
                             {qq.is_required && <span className="text-red-500 ml-1">*</span>}
                           </p>
+                {a.needsClarification && (
+                  <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full flex-shrink-0">
+                    <Info size={11} /> Needs your attention
+                  </span>
+                )}
                 {a.aiSuggested && (
                   <span className="inline-flex items-center gap-1 text-xs text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full flex-shrink-0">
                     <Sparkles size={11} /> AI
