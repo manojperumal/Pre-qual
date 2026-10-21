@@ -55,13 +55,13 @@ export default function QuestionnaireResponsePage() {
   const [selectedDocType, setSelectedDocType] = useState('safety_manual')
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiSuccess, setAiSuccess] = useState(false)
-  const [excludedDocPaths, setExcludedDocPaths] = useState<Set<string>>(new Set())
+  const [excludedDocIndexes, setExcludedDocIndexes] = useState<Set<number>>(new Set())
 
-  function toggleDocExcluded(path: string) {
-    setExcludedDocPaths(prev => {
+  function toggleDocExcluded(index: number) {
+    setExcludedDocIndexes(prev => {
       const next = new Set(prev)
-      if (next.has(path)) next.delete(path)
-      else next.add(path)
+      if (next.has(index)) next.delete(index)
+      else next.add(index)
       return next
     })
   }
@@ -161,7 +161,7 @@ export default function QuestionnaireResponsePage() {
   }
 
   const hasExistingDocumentAnswers = qqList.some(qq => qq.question?.answer_type === 'document_upload' && answers[qq.question_id]?.docPath)
-  const includedOnFileDocs = (availableDocs?.documents ?? []).filter(d => !excludedDocPaths.has(d.path))
+  const includedOnFileDocs = (availableDocs?.documents ?? []).filter((_, i) => !excludedDocIndexes.has(i))
   const hasDocsOnFile = includedOnFileDocs.length > 0
   const canRunAI = uploadedDocs.length > 0 || hasExistingDocumentAnswers || hasDocsOnFile
 
@@ -173,7 +173,11 @@ export default function QuestionnaireResponsePage() {
     setAiSuccess(false)
     setAiMessage(null)
     try {
-      const data = await aiComplete.mutateAsync({ assignmentId, documentPaths: uploadedDocs, excludedDocumentPaths: Array.from(excludedDocPaths) })
+      const excludedPaths = (availableDocs?.documents ?? [])
+        .filter((_, i) => excludedDocIndexes.has(i))
+        .map(d => d.path)
+        .filter(Boolean)
+      const data = await aiComplete.mutateAsync({ assignmentId, documentPaths: uploadedDocs, excludedDocumentPaths: excludedPaths })
       if (data.responses?.length) {
         setAnswers(prev => {
           const next = { ...prev }
@@ -338,15 +342,15 @@ export default function QuestionnaireResponsePage() {
                 Documents already on file — pick which ones to use:
               </p>
               <ul className="space-y-1 max-h-48 overflow-y-auto">
-                {availableDocs!.documents.map((d) => {
-                  const checked = !excludedDocPaths.has(d.path)
+                {availableDocs!.documents.map((d, i) => {
+                  const checked = !excludedDocIndexes.has(i)
                   return (
-                    <li key={d.path}>
+                    <li key={`${d.path || d.name}-${i}`}>
                       <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={checked}
-                          onChange={() => toggleDocExcluded(d.path)}
+                          onChange={() => toggleDocExcluded(i)}
                           className="flex-shrink-0"
                         />
                         <FileText size={11} className={`flex-shrink-0 ${checked ? 'text-brand-400' : 'text-gray-300'}`} />
