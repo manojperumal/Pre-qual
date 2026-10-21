@@ -199,9 +199,14 @@ export default function QuestionnaireResponsePage() {
         setAiMessage(data.message)
       } else {
         setAiSuccess(true)
+        const notes: string[] = []
         if (data.documents_truncated) {
-          setAiMessage(`Used the ${data.documents_used} most recent documents on file — some older ones were skipped to keep the request manageable.`)
+          notes.push(`Used the ${data.documents_used} most recent documents on file — some older ones were skipped to keep the request manageable.`)
         }
+        if (data.documents_skipped?.length) {
+          notes.push(`Couldn't read: ${data.documents_skipped.join(', ')} — the file may be corrupted or mislabeled.`)
+        }
+        if (notes.length) setAiMessage(notes.join(' '))
       }
     } catch (err: any) {
       setAiError(err.message ?? 'AI completion failed')

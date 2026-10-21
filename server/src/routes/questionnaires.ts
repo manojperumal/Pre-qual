@@ -39,6 +39,28 @@ interface GatheredDoc {
 // relevant.
 const MAX_AUTO_DOCUMENTS = 25
 
+// A file's extension is just a hint from whoever named it — someone can
+// rename a HEIC screenshot to ".jpg" or hand us a mislabeled export.
+// Claude rejects the whole request if an "image" block's bytes don't
+// actually decode as that image type, so we verify the real file
+// signature before trusting the extension, and skip (rather than send)
+// anything that doesn't match.
+function matchesImageSignature(buffer: Buffer, mimeType: string): boolean {
+  if (buffer.length < 12) return false
+  switch (mimeType) {
+    case 'image/jpeg':
+      return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff
+    case 'image/png':
+      return buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47
+    case 'image/gif':
+      return buffer.toString('ascii', 0, 3) === 'GIF'
+    case 'image/webp':
+      return buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP'
+    default:
+      return false
+  }
+}
+
 /**
  * Automatically collects every document already on file for a company that
  * could plausibly answer a questionnaire — its shared document library
@@ -278,6 +300,7 @@ router.post('/:assignmentId/ai-complete', requireAuth, async (req: Request, res:
 
   // Download documents from Supabase Storage and convert to base64
   const documentContents: Array<{ name: string; type: string; base64: string; mimeType: string }> = []
+  const skippedDocNames: string[] = []
 
   for (const doc of allDocs) {
     try {
@@ -315,6 +338,12 @@ router.post('/:assignmentId/ai-complete', requireAuth, async (req: Request, res:
 
       if (!mimeType) {
         console.warn(`[ai-complete] Unsupported file type for ${doc.name}, skipping`)
+        skippedDocNames.push(doc.name)
+        continue
+      }
+      if (mimeType.startsWith('image/') && !matchesImageSignature(Buffer.from(arrayBuffer), mimeType)) {
+        console.warn(`[ai-complete] ${doc.name} has a ${mimeType} extension but its contents don't match — skipping (likely a mislabeled or corrupted file)`)
+        skippedDocNames.push(doc.name)
         continue
       }
       documentContents.push({ name: doc.name, type: doc.type, base64, mimeType })
@@ -527,6 +556,7 @@ ${questionsText}`,
     responses: savedResponses ?? [],
     documents_used: allDocs.length,
     documents_truncated: autoDocsTruncated,
+    documents_skipped: skippedDocNames,
   })
 })
 
