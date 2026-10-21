@@ -55,6 +55,16 @@ export default function QuestionnaireResponsePage() {
   const [selectedDocType, setSelectedDocType] = useState('safety_manual')
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiSuccess, setAiSuccess] = useState(false)
+  const [excludedDocPaths, setExcludedDocPaths] = useState<Set<string>>(new Set())
+
+  function toggleDocExcluded(path: string) {
+    setExcludedDocPaths(prev => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }
 
   const responsesKey = existingResponses.map(r => `${r.question_id}:${r.updated_at}`).join(',')
 
@@ -151,7 +161,8 @@ export default function QuestionnaireResponsePage() {
   }
 
   const hasExistingDocumentAnswers = qqList.some(qq => qq.question?.answer_type === 'document_upload' && answers[qq.question_id]?.docPath)
-  const hasDocsOnFile = (availableDocs?.documents.length ?? 0) > 0
+  const includedOnFileDocs = (availableDocs?.documents ?? []).filter(d => !excludedDocPaths.has(d.path))
+  const hasDocsOnFile = includedOnFileDocs.length > 0
   const canRunAI = uploadedDocs.length > 0 || hasExistingDocumentAnswers || hasDocsOnFile
 
   const [aiMessage, setAiMessage] = useState<string | null>(null)
@@ -162,7 +173,7 @@ export default function QuestionnaireResponsePage() {
     setAiSuccess(false)
     setAiMessage(null)
     try {
-      const data = await aiComplete.mutateAsync({ assignmentId, documentPaths: uploadedDocs })
+      const data = await aiComplete.mutateAsync({ assignmentId, documentPaths: uploadedDocs, excludedDocumentPaths: Array.from(excludedDocPaths) })
       if (data.responses?.length) {
         setAnswers(prev => {
           const next = { ...prev }
@@ -321,24 +332,35 @@ export default function QuestionnaireResponsePage() {
             </div>
           )}
 
-          {hasDocsOnFile && (
+          {(availableDocs?.documents.length ?? 0) > 0 && (
             <div className="mb-4 bg-white/70 rounded-lg px-3 py-2.5 border border-brand-100">
               <p className="text-xs font-medium text-gray-700 mb-1.5">
-                {availableDocs!.documents.length} document{availableDocs!.documents.length !== 1 ? 's' : ''} already on file will be used automatically:
+                Documents already on file — pick which ones to use:
               </p>
-              <ul className="space-y-1">
-                {availableDocs!.documents.slice(0, 6).map((d, i) => (
-                  <li key={i} className="flex items-center gap-1.5 text-xs text-gray-500">
-                    <FileText size={11} className="text-brand-400 flex-shrink-0" />
-                    <span className="truncate">{d.name}</span>
-                    <span className="text-gray-300">·</span>
-                    <span className="text-gray-400 flex-shrink-0">{d.source}</span>
-                  </li>
-                ))}
-                {availableDocs!.documents.length > 6 && (
-                  <li className="text-xs text-gray-400">+ {availableDocs!.documents.length - 6} more</li>
-                )}
+              <ul className="space-y-1 max-h-48 overflow-y-auto">
+                {availableDocs!.documents.map((d) => {
+                  const checked = !excludedDocPaths.has(d.path)
+                  return (
+                    <li key={d.path}>
+                      <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleDocExcluded(d.path)}
+                          className="flex-shrink-0"
+                        />
+                        <FileText size={11} className={`flex-shrink-0 ${checked ? 'text-brand-400' : 'text-gray-300'}`} />
+                        <span className={`truncate ${checked ? '' : 'text-gray-400 line-through'}`}>{d.name}</span>
+                        <span className="text-gray-300">·</span>
+                        <span className="text-gray-400 flex-shrink-0">{d.source}</span>
+                      </label>
+                    </li>
+                  )
+                })}
               </ul>
+              <p className="text-[11px] text-gray-400 mt-1.5">
+                {includedOnFileDocs.length} of {availableDocs!.documents.length} selected
+              </p>
             </div>
           )}
 

@@ -687,6 +687,7 @@ export function useMarkResponseMojoReviewed() {
 }
 
 export interface AvailableDocument {
+  path: string
   name: string
   type: string
   source: string
@@ -721,9 +722,11 @@ export function useAICompleteQuestionnaire() {
     mutationFn: async ({
       assignmentId,
       documentPaths,
+      excludedDocumentPaths,
     }: {
       assignmentId: string
       documentPaths: Array<{ path: string; type: string; name: string }>
+      excludedDocumentPaths?: string[]
     }) => {
       const { data: sessionData } = await supabase.auth.getSession()
       const token = sessionData.session?.access_token
@@ -734,7 +737,7 @@ export function useAICompleteQuestionnaire() {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ document_paths: documentPaths }),
+        body: JSON.stringify({ document_paths: documentPaths, excluded_document_paths: excludedDocumentPaths ?? [] }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))

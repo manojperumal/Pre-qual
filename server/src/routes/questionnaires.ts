@@ -149,7 +149,7 @@ router.get('/:assignmentId/available-documents', requireAuth, async (req: Reques
 
   const { docs, truncated } = await gatherCompanyDocuments(companyId)
   res.json({
-    documents: docs.map((d) => ({ name: d.name, type: d.type, source: d.source })),
+    documents: docs.map((d) => ({ path: d.path, name: d.name, type: d.type, source: d.source })),
     truncated,
   })
 })
@@ -187,9 +187,11 @@ async function hasAssignmentAccess(
  */
 router.post('/:assignmentId/ai-complete', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const { assignmentId } = req.params
-  const { document_paths = [] } = req.body as {
+  const { document_paths = [], excluded_document_paths = [] } = req.body as {
     document_paths: Array<{ path: string; type: string; name: string }>
+    excluded_document_paths?: string[]
   }
+  const excludedPaths = new Set(excluded_document_paths)
 
   // Fetch assignment + verify access
   const { data: assignment, error: assignmentErr } = await supabaseAdmin
@@ -263,6 +265,7 @@ router.post('/:assignmentId/ai-complete', requireAuth, async (req: Request, res:
     const { docs: autoDocs, truncated } = await gatherCompanyDocuments(companyId)
     autoDocsTruncated = truncated
     for (const d of autoDocs) {
+      if (excludedPaths.has(d.path)) continue
       if (allDocs.some((existing) => existing.path === d.path)) continue
       allDocs.push(d)
     }
