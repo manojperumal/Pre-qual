@@ -115,6 +115,7 @@ export interface Response {
   mojo_reviewed_at: string | null
   mojo_reviewed_by: string | null
   needs_clarification: boolean
+  review_status: 'pending' | 'approved' | 'rejected'
   ai_suggested: boolean
   created_at: string
   updated_at: string
@@ -766,6 +767,7 @@ export function useUpsertResponse() {
       company_comments?: string | null
       mojo_feedback?: string | null
       needs_clarification?: boolean
+      review_status?: 'pending' | 'approved' | 'rejected'
       ai_suggested?: boolean | null
     }) => {
       const { data, error } = await supabase

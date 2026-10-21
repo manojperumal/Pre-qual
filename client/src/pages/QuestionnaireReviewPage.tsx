@@ -50,6 +50,7 @@ export default function QuestionnaireReviewPage() {
   const [acting, setActing] = useState(false)
   const [mojoFeedback, setMojoFeedback] = useState<Record<string, string>>({})
   const [needsClarification, setNeedsClarification] = useState<Record<string, boolean>>({})
+  const [reviewStatus, setReviewStatus] = useState<Record<string, 'pending' | 'approved' | 'rejected'>>({})
 
   const responseMap = Object.fromEntries((responses as Response[]).map(r => [r.question_id, r]))
 
@@ -67,12 +68,15 @@ export default function QuestionnaireReviewPage() {
   useEffect(() => {
     const feedback: Record<string, string> = {}
     const clarification: Record<string, boolean> = {}
+    const status: Record<string, 'pending' | 'approved' | 'rejected'> = {}
     for (const r of responses as Response[]) {
       if (r.mojo_feedback) feedback[r.question_id] = r.mojo_feedback
       if (r.needs_clarification) clarification[r.question_id] = true
+      status[r.question_id] = r.review_status ?? 'pending'
     }
     setMojoFeedback(feedback)
     setNeedsClarification(clarification)
+    setReviewStatus(status)
   }, [(responses as Response[]).length])
 
   const basePath = profile?.role === 'trade'
@@ -117,6 +121,26 @@ export default function QuestionnaireReviewPage() {
 
   function toggleClarification(questionId: string) {
     setNeedsClarification(prev => ({ ...prev, [questionId]: !prev[questionId] }))
+  }
+
+  async function setQuestionReviewStatus(questionId: string, status: 'pending' | 'approved' | 'rejected') {
+    if (!assignmentId) return
+    const existing = responseMap[questionId]
+    if (!existing) return
+    const next = reviewStatus[questionId] === status ? 'pending' : status
+    setReviewStatus(prev => ({ ...prev, [questionId]: next }))
+    await upsertResponse.mutateAsync({
+      assignment_id: assignmentId,
+      question_id: questionId,
+      answer_text: existing.answer_text,
+      answer_options: existing.answer_options,
+      document_path: existing.document_path,
+      document_name: existing.document_name,
+      company_comments: existing.company_comments,
+      mojo_feedback: existing.mojo_feedback,
+      needs_clarification: existing.needs_clarification,
+      review_status: next,
+    })
   }
 
   async function handleGenerateSummary() {
@@ -235,31 +259,76 @@ export default function QuestionnaireReviewPage() {
                     const r = responseMap[q.id]
 
                     const flagged = needsClarification[q.id] ?? false
+                    const qStatus = reviewStatus[q.id] ?? 'pending'
 
                     return (
-                      <div key={qq.id} className={`bg-white rounded-xl shadow-sm border p-5 ${flagged ? 'border-amber-300' : 'border-gray-200'}`}>
+                      <div
+                        key={qq.id}
+                        className={`bg-white rounded-xl shadow-sm border p-5 ${
+                          qStatus === 'rejected' ? 'border-red-300' : qStatus === 'approved' ? 'border-emerald-300' : flagged ? 'border-amber-300' : 'border-gray-200'
+                        }`}
+                      >
                         <div className="flex items-start justify-between gap-3 mb-3">
                           <p className="text-sm font-semibold text-gray-800">
                             {idx + 1}. {q.question_text}
                           </p>
-                          {canAct ? (
-                            <button
-                              type="button"
-                              onClick={() => toggleClarification(q.id)}
-                              className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full flex-shrink-0 ${
-                                flagged ? 'bg-amber-100 text-amber-700' : 'text-gray-400 hover:bg-gray-100'
-                              }`}
-                            >
-                              <Flag size={12} />
-                              {flagged ? 'Flagged' : 'Flag'}
-                            </button>
-                          ) : (
-                            flagged && (
-                              <span className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-amber-100 text-amber-700 flex-shrink-0">
-                                <Flag size={12} /> Clarification requested
-                              </span>
-                            )
-                          )}
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {canAct && r ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => setQuestionReviewStatus(q.id, 'approved')}
+                                  title="Approve this answer"
+                                  className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${
+                                    qStatus === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'text-gray-400 hover:bg-gray-100'
+                                  }`}
+                                >
+                                  <ThumbsUp size={12} />
+                                  {qStatus === 'approved' ? 'Approved' : 'Approve'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setQuestionReviewStatus(q.id, 'rejected')}
+                                  title="Reject this answer"
+                                  className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${
+                                    qStatus === 'rejected' ? 'bg-red-100 text-red-700' : 'text-gray-400 hover:bg-gray-100'
+                                  }`}
+                                >
+                                  <XCircle size={12} />
+                                  {qStatus === 'rejected' ? 'Rejected' : 'Reject'}
+                                </button>
+                              </>
+                            ) : (
+                              qStatus !== 'pending' && (
+                                <span
+                                  className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${
+                                    qStatus === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                                  }`}
+                                >
+                                  {qStatus === 'approved' ? <ThumbsUp size={12} /> : <XCircle size={12} />}
+                                  {qStatus === 'approved' ? 'Approved' : 'Rejected'}
+                                </span>
+                              )
+                            )}
+                            {canAct ? (
+                              <button
+                                type="button"
+                                onClick={() => toggleClarification(q.id)}
+                                className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${
+                                  flagged ? 'bg-amber-100 text-amber-700' : 'text-gray-400 hover:bg-gray-100'
+                                }`}
+                              >
+                                <Flag size={12} />
+                                {flagged ? 'Flagged' : 'Flag'}
+                              </button>
+                            ) : (
+                              flagged && (
+                                <span className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-amber-100 text-amber-700">
+                                  <Flag size={12} /> Clarification requested
+                                </span>
+                              )
+                            )}
+                          </div>
                         </div>
 
               {!r ? (

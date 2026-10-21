@@ -45,7 +45,7 @@ export default function QuestionnaireResponsePage() {
   const aiComplete = useAICompleteQuestionnaire()
   const { data: availableDocs, isError: availableDocsError } = useAvailableAIDocuments(assignmentId)
 
-  const [answers, setAnswers] = useState<Record<string, { text?: string; options?: string[]; docName?: string; docPath?: string; companyComments?: string; mojoFeedback?: string; aiSuggested?: boolean; needsClarification?: boolean }>>({})
+  const [answers, setAnswers] = useState<Record<string, { text?: string; options?: string[]; docName?: string; docPath?: string; companyComments?: string; mojoFeedback?: string; aiSuggested?: boolean; needsClarification?: boolean; reviewStatus?: 'pending' | 'approved' | 'rejected' }>>({})
 
   const [saving, setSaving] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -82,6 +82,7 @@ export default function QuestionnaireResponsePage() {
         mojoFeedback: r.mojo_feedback ?? undefined,
         aiSuggested: r.ai_suggested ?? false,
         needsClarification: r.needs_clarification ?? false,
+        reviewStatus: r.review_status ?? 'pending',
       }
     }
     setAnswers(init)
@@ -516,13 +517,25 @@ export default function QuestionnaireResponsePage() {
                       <div
                         key={qq.id}
                         id={`q-${qq.id}`}
-                        className={`bg-white rounded-xl shadow-sm border p-5 scroll-mt-4 ${a.needsClarification ? 'border-amber-300' : a.aiSuggested ? 'border-brand-200' : 'border-gray-200'}`}
+                        className={`bg-white rounded-xl shadow-sm border p-5 scroll-mt-4 ${
+                          a.reviewStatus === 'rejected' ? 'border-red-300' : a.reviewStatus === 'approved' ? 'border-emerald-300' : a.needsClarification ? 'border-amber-300' : a.aiSuggested ? 'border-brand-200' : 'border-gray-200'
+                        }`}
                       >
                         <div className="flex items-start justify-between gap-2 mb-1">
                           <p className="text-sm font-semibold text-gray-800">
                             {idx + 1}. {q.question_text}
                             {qq.is_required && <span className="text-red-500 ml-1">*</span>}
                           </p>
+                {a.reviewStatus === 'approved' && (
+                  <span className="inline-flex items-center gap-1 text-xs text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex-shrink-0">
+                    <CheckCircle2 size={11} /> Approved
+                  </span>
+                )}
+                {a.reviewStatus === 'rejected' && (
+                  <span className="inline-flex items-center gap-1 text-xs text-red-700 bg-red-100 px-2 py-0.5 rounded-full flex-shrink-0">
+                    <AlertCircle size={11} /> Rejected
+                  </span>
+                )}
                 {a.needsClarification && (
                   <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full flex-shrink-0">
                     <Info size={11} /> Needs your attention
