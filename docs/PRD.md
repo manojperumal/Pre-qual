@@ -2,7 +2,7 @@
 
 > **Status:** Living document — update this alongside feature work, don't let it drift.
 > **Audience:** QA, Engineering, Product.
-> **Last updated:** 2026-08-20
+> **Last updated:** 2026-10-21
 > **Maintainer:** Manoj Perumal
 
 ---
@@ -21,8 +21,8 @@ Mojo (the platform operator) sits behind every transaction as a neutral biller a
 |---|---|---|
 | **Owner** | Project developer/owner | Create projects, invite GCs/Trades, set billing mode, review/approve submissions & questionnaires, manage own team |
 | **GC (General Contractor)** | Coordinates trades on an owner's project | Invited by an Owner; invites/manages Trades on projects they coordinate; reviews Trade submissions; can also own/manage their own projects (see §4.1 note) |
-| **Trade** | Subcontractor | Invited by an Owner or GC; completes contractor profile, submits pre-qualification per project, answers assigned questionnaires |
-| **Team member (Admin / Contributor)** | Anyone invited into an existing company | *Admin*: full access to their company's projects/team. *Contributor*: only the projects/assignments they're explicitly on. This is orthogonal to Owner/GC/Trade — every company has its own admin/contributor split. |
+| **Trade** | Subcontractor | Invited by an Owner or GC; completes organization profile, submits pre-qualification per project, answers assigned questionnaires |
+| **Team member (Admin / Contributor)** | Anyone invited into an existing company | *Admin*: full access to their company's projects/team, and the only one who can edit the Organization profile. *Contributor*: only the projects/assignments they're explicitly on, and can view (but not edit) the Organization profile. This is orthogonal to Owner/GC/Trade — every company has its own admin/contributor split. |
 | **Mojo Admin** | Internal Mojo staff | Platform-wide visibility across all companies; manual billing overrides; impersonation; global question bank management; independent review queue for flagged answers |
 
 **Important internal distinction:** a user's "effective role" is `profile.company_type ?? profile.role` — the codebase is mid-migration from an older single-table model (`role`, `company_name` directly on `profiles`) to a proper multi-tenant model (`companies` table + `new_company_id` + `company_type`). Both fields currently exist; `company_type` is the source of truth. `user_role` (admin/contributor) is a separate axis — a person's permission level *within* their own company, not their company's type.
@@ -36,19 +36,28 @@ Mojo (the platform operator) sits behind every transaction as a neutral biller a
 ### 3.1 Company record
 Every non-Mojo user belongs to a `companies` row: `name`, `type` (owner/gc/trade), address/city/state/zip, phone, website, logo, `billing_mode` (see §8), and (in progress) `quickbooks_customer_id`.
 
-### 3.2 Contractor Profile (5-step wizard)
-Trades (and GCs, who can also be pre-qualified) fill out a contractor profile:
+### 3.2 Organization Profile vs. My Account (recently split)
+The company-level profile and an individual's personal account used to be the same page and the same nav link ("My Profile"). **They are now two distinct destinations:**
 
+- **Organization** — the last item in the sidebar for every role (Owner/GC/Trade). This is the company-wide profile: the 5-step Contractor Profile wizard for GC/Trade, or the company-info form for Owner. **Admin-editable, contributor-viewable**: a non-admin sees every step/field but all inputs and save actions are disabled, with a banner explaining only a company admin can make changes; they can still freely browse all steps read-only (Back/Next are never disabled).
+- **My Account** — reached only via clicking the user's name/avatar in the top-right corner. A personal page (full name, read-only email/role, change-password form) that has nothing to do with the company.
+
+The 5-step Contractor Profile wizard itself (GC/Trade):
 1. **Company Info** — name, address, trade type, years in business, license #s, employee count
-2. **Insurance** — GL (carrier/policy/limits/expiry), Workers' Comp (carrier/policy/limits/expiry), Umbrella (optional)
-3. **Safety Record** — EMR, OSHA recordable incidents (up to 5 years), total hours worked (up to 3 years), TRIR, DART rate
-4. **PTP Program** — whether they have a Pre-Task Planning program, plus description
-5. **Bonding** — bonding company, single/aggregate limits
+2. **Insurance** — GL (carrier/policy/limits/expiry), Workers' Comp (carrier/policy/limits/expiry), Umbrella (optional). **Can now attach the actual COI file** directly on this step (writes into the shared `company_documents` library, type `coi`).
+3. **Safety Record** — EMR, OSHA recordable incidents (up to 5 years), total hours worked (up to 3 years), TRIR, DART rate. **Can now attach a Safety Manual / OSHA logs file** directly on this step (`company_documents`, type `safety_manual`).
+4. **PTP Program** — whether they have a Pre-Task Planning program, plus description. **Can now attach the PTP Program Plan file** (`company_documents`, type `ptp_plan`, new).
+5. **Bonding** — bonding company, single/aggregate limits. **Can now attach a Bonding Document file** (`company_documents`, type `bond`, new).
 
 **"Profile complete" is currently defined narrowly** as `company_name && gl_carrier` being present — i.e. a profile can be flagged "complete" while insurance is expired, safety fields are blank, etc. **QA note:** confirm with product whether this is the intended completeness bar, or whether it should validate more fields / expiry dates.
 
-### 3.3 Company documents
-A shared, company-level document library — Safety Manual, COI, W-9, Loss Runs, License, Other. Distinct from two other document tables in the schema (see §11 Known Gaps).
+### 3.3 Company documents (Document Library) — now a genuinely unified pool
+A shared, company-level document library — Safety Manual, COI, W-9, Loss Runs, License, SOP, PTP Program Plan, Bonding Document, Other. As of this update, **three previously-separate sources all feed the same `company_documents` table/bucket**, and are therefore all available to questionnaire AI-complete (§11):
+1. Manual uploads via the Document Library page itself
+2. Files attached directly on the Organization profile's Insurance/Safety/PTP/Bonding steps (§3.2, new)
+3. **Published** Ask Mojo drafts (§11a) — and now also **unpublished Ask Mojo reference documents**, uploaded mid-draft to ground a thread, even before the thread is published
+
+Distinct from `submission_documents` (per-project pre-qual uploads, §6) and `contractor_documents` (an older, unrelated table) — see §12 Known Gaps.
 
 ---
 
@@ -59,6 +68,7 @@ Owners (and, per a recent change, GCs) can create projects individually or via C
 - Fields: name, description, address, start date, end date
 - CSV bulk upload: downloadable template (available directly from the Projects list, not just inside the upload flow), per-row validation preview (missing name / invalid date format) before import, batch insert
 - **Note:** GC project-creation is a newly added capability — GCs previously could only join projects an Owner invited them to. QA should specifically test that a GC creating "Projects I Manage" doesn't unexpectedly appear in / conflict with an Owner's own project list, and that QuickBooks/Supabase RLS permits a GC-owned project insert (this hasn't been confirmed against the live RLS policy, which lives in Supabase and isn't in the repo).
+- GCs can now also **add an existing trade from their ecosystem directly to a specific project** from the Projects I Manage / project detail page, rather than only via a fresh invitation.
 
 ### 4.2 Project membership
 Companies join a project via invitation acceptance (`project_members` table, role = owner/gc/trade per member). A project can have exactly one coordinating GC (assumption baked into billing logic — see §8) plus any number of Trades.
@@ -74,6 +84,7 @@ Companies join a project via invitation acceptance (`project_members` table, rol
 - Invitations expire after **7 days** and can be linked to zero, one, or multiple projects (`invitation_projects` join table).
 - Acceptance sets the acceptor's company on team-member invites, and inserts `project_members` for every linked project.
 - Sender gets a notification when their invite is accepted (§10).
+- Invited GCs/Trades the sender has an ongoing relationship with are now listed directly on the GCs/Trades pages (not only visible via the Recent Invitations panel), including projects they're on.
 
 **QA test matrix suggestion:** every combination of {Owner, GC} × {invites GC, invites Trade, invites team member} × {email, QR} × {expired token, already-accepted token, wrong-email acceptance}.
 
@@ -87,7 +98,7 @@ Companies join a project via invitation acceptance (`project_members` table, rol
 
 ### 6.1 Submission flow (current model)
 A Trade (or GC submitting as a contractor) on a project:
-1. Completes their contractor profile (§3.2) — shared across all projects, not per-project
+1. Completes their Organization profile (§3.2) — shared across all projects, not per-project
 2. Uploads project-specific documents: COI, OSHA 300 Log, OSHA 301 Log, OSHA Citations, 5-Year Loss Runs, and (if they have a PTP program) PTP Photos
 3. Saves as **draft** or **submits** — submission takes a snapshot of the profile at that moment
 4. Auto-flagged if: no PTP program (`flagged_no_ptp`), or EMR > 1.0 (`flagged_high_emr`)
@@ -103,12 +114,12 @@ The governing Owner/GC sees the full profile snapshot, uploaded docs, risk flags
 
 ## 7. Questionnaires
 
-A more flexible, configurable system alongside the fixed contractor profile — for anything Owners/GCs want to ask beyond the standard fields.
+A more flexible, configurable system alongside the fixed Organization profile — for anything Owners/GCs want to ask beyond the standard fields.
 
 ### 7.1 Question Bank
-Reusable question definitions: category (company info / insurance / safety / PTP / bonding / loss runs / compliance), answer type (yes/no, yes/no + comments, multi-select, document upload, text area, number), hint text, required flag, and whether it's global (system-wide) or company-custom.
+Reusable question definitions: category (company info / insurance / safety / PTP / bonding / loss runs / compliance / financial review), answer type (yes/no, yes/no + comments, multi-select, document upload, text area, number), hint text, required flag, and whether it's global (system-wide) or company-custom.
 
-- Seeded with ~30 base questions + 78 detailed safety-program questions
+- Seeded with ~30 base questions + 78 detailed safety-program questions, plus a newer Financial Review category
 - **`requires_mojo_review`** flag — routes an individual answer to Mojo's own review queue regardless of the Owner/GC's decision (global questions: Mojo-only toggle; company questions: any company admin)
 - **Conditional logic** — a question in a given questionnaire can depend on another question's answer (show/hide)
 - **File type restriction** — document-upload questions can restrict allowed file types
@@ -128,10 +139,20 @@ Assignments target a company, not an individual — any admin/contributor there 
 ### 7.4 Response lifecycle
 `pending → in_progress → submitted → approved | rejected | needs_more_info`
 
-Each answer can carry respondent-facing comments and internal Mojo feedback. Answers can be **AI-suggested** (§9) — QA should verify AI-suggested answers are clearly distinguishable from human-entered ones in the review UI.
+Each answer can carry respondent-facing comments and internal Mojo feedback, and shows a live **AI vs. manual vs. pending** answer breakdown while the respondent works through it. Answers can be **AI-suggested** (§11) — visibly marked as such everywhere they're displayed, and the mark clears the moment a human edits that answer.
 
 ### 7.5 Mojo review queue
 Independent of the main approve/reject decision — any answer flagged `requires_mojo_review` surfaces in a separate Mojo Admin queue, regardless of what the Owner/GC decided on the questionnaire as a whole.
+
+### 7.6 Review tooling (new) — three independent layers of reviewer feedback
+A reviewer (Owner/GC) now has three distinct, independently-usable tools when reviewing a submitted questionnaire, in addition to the existing overall decision:
+
+1. **Overall decision** (unchanged mechanism, relabeled for clarity): **Accept** / **Send Back for Clarification** / **Reject** at the whole-questionnaire level, setting `questionnaire_assignments.status`.
+2. **Per-question Approve/Reject** (`questionnaire_responses.review_status`: pending/approved/rejected) — a reviewer can approve or reject each individual answer with one click (click again to undo back to pending), independent of the overall decision. The contractor sees the same Approved/Rejected badge on their own response page.
+3. **Per-question "needs clarification" flag** (`questionnaire_responses.needs_clarification`) with its own note (reuses the `mojo_feedback` field) — lets a reviewer mark specific answers as needing more info without changing the overall status. When the assignment is sent back, the contractor's response page shows a banner with the reviewer's overall note plus a jump-link list of exactly which questions were flagged, each with an amber border and a "Needs your attention" badge.
+4. **Per-question note thread (audit trail)** — a new, separate, append-only thread (`questionnaire_response_notes`) on every question, open to both parties (the contractor's whole company and whoever assigned it). Each note shows its author, their role, and a timestamp. This is distinct from the single-value `company_comments`/`mojo_feedback` fields, which only ever hold the latest value with no history — the note thread is a genuine back-and-forth conversation log. Collapsible per question, shown on both the review page and the response page.
+
+**AI Summary (new):** at the top of the review page, a reviewer can click "Generate Summary" to have Claude read every question/answer for that submission on demand (not persisted — regenerated each time) and return two bullet lists: **"Pay closer attention to"** (risk flags, missing info, concerning or inconsistent answers) and **"Overall summary"** (a concise read of how the contractor answered as a whole). This is purely advisory — it doesn't change any data, just helps a reviewer triage before deciding.
 
 ---
 
@@ -174,49 +195,69 @@ QA should verify links inside notifications route to the correct role-prefixed p
 
 ## 11. AI Features
 
-One AI feature exists: **AI-assisted questionnaire autofill.** Given a contractor's documents, an LLM (Claude) proposes answers for a questionnaire, with a strict "only answer from what's actually in the documents, never guess" instruction, plus an internal confidence/source note for Mojo review. PDFs, Word docs, and images are all supported (PDFs and images sent natively; Word docs text-extracted first).
+### 11a. Ask Mojo (AI document drafting)
+A chat-based tool (any role/company) for drafting safety manuals, SOPs, and similar documents from scratch or from an uploaded reference document, with a running "current draft" per thread. A company admin can **publish** a finished draft directly into the Document Library (§3.3). Reference documents uploaded mid-thread (before publishing) are now also automatically available to questionnaire AI-complete below, not just the final published document.
 
-**Document sources — this was recently expanded.** AI-complete no longer only looks at documents manually re-uploaded for that one request. It now automatically pulls in, for the responding company:
-1. That company's shared document library (Safety Manual, COI, W-9, Loss Runs, License — from company profile/settings)
+### 11b. AI-assisted questionnaire autofill ("Complete with AI")
+Given a contractor's documents, an LLM (Claude) proposes answers for a questionnaire, with a strict "only answer from what's actually in the documents, never guess" instruction, plus an internal confidence/source note for Mojo review. PDFs, Word docs, images (JPEG/PNG/GIF/WEBP), and CSV/plain-text files are all supported — PDFs and images are sent natively, Word docs are text-extracted first, and CSV/text files are now sent as plain text (previously, any non-PDF/Word file was mistakenly sent to Claude mislabeled as a JPEG image, which failed outright on anything else, including CSVs).
+
+**Document sources are now a single, genuinely unified pool.** AI-complete automatically pulls in, for the responding company:
+1. The company's shared Document Library (§3.3) — including files attached directly on the Organization profile, and Ask Mojo drafts/reference documents
 2. Everything uploaded to any of that company's own project pre-qualification submissions (COI, OSHA logs, Loss Runs, PTP Photos), across every user at the company
 3. Answers already given to other document-upload questions within the same questionnaire
 4. Anything manually uploaded for this specific AI-complete request (still supported, for one-off documents not otherwise on file)
 
-The contractor sees what's already on file (with its source) before running AI-complete, so they know what they don't need to re-upload. Capped at 25 auto-included documents (newest first) to bound cost/context — if truncated, the UI says so rather than silently dropping older documents.
+**The contractor can now pick and choose which on-file documents to use** before running AI-complete — the "already on file" list is a checklist (all checked by default); unchecking a document excludes it from that run. Capped at 25 auto-included documents (newest first) to bound cost/context — if truncated, the UI says so rather than silently dropping older documents.
 
-**AI answers never overwrite a human-entered answer.** If a person has already typed/selected an answer to a question (whether from scratch or editing a prior AI suggestion), AI-complete skips that question entirely — both in what it asks Claude to answer and, as a second safety check, in what it's willing to save. This was a real gap until recently (an AI-complete run used to silently overwrite manual answers) — QA should regression-test this specifically: manually answer a question, then run AI-complete, and confirm that answer is untouched.
+**Mislabeled/corrupted files are now skipped, not fatal.** If a file's extension says it's an image but its actual bytes don't match (a renamed screenshot, a corrupted upload, etc.), the server verifies the real file signature (JPEG/PNG/GIF/WEBP magic bytes) before sending it to Claude, skips anything that doesn't match, and reports which file(s) were skipped back to the UI — previously, one bad file failed the entire AI-complete request with an opaque "Could not process image" error.
+
+**AI answers never overwrite a human-entered answer.** If a person has already typed/selected an answer to a question (whether from scratch or editing a prior AI suggestion), AI-complete skips that question entirely — both in what it asks Claude to answer and, as a second safety check, in what it's willing to save.
 
 **QA priorities for this feature:**
-- Verify it never fabricates an answer when the source document doesn't actually contain the needed info (this is the stated design intent — test it directly with a document that's missing the relevant field)
-- Verify AI-suggested answers are visibly marked as such, not indistinguishable from human answers, in every place answers are displayed (assignment page, review page)
-- Verify a human-entered answer is never overwritten by a later AI-complete run (see above)
-- Test with malformed/corrupted uploads of each supported type (PDF, .doc, .docx, image)
-- **Not yet tested end-to-end against a live case** as of this writing — the document-gathering logic and human-answer protection are implemented and typecheck clean, but no real assignment has been run through the full flow yet to confirm actual answer accuracy against real documents.
+- Verify it never fabricates an answer when the source document doesn't actually contain the needed info
+- Verify AI-suggested answers are visibly marked as such everywhere answers are displayed, and the mark clears on edit
+- Verify a human-entered answer is never overwritten by a later AI-complete run
+- Test with malformed/corrupted uploads of each supported type (PDF, .doc, .docx, image, CSV, text)
+- Verify unchecking a document in the "on file" list actually excludes it from the AI request (not just the display)
+
+### 11c. AI review summary
+See §7.6 — an on-demand, non-persisted bullet-point summary for a reviewer, generated by the same underlying model.
 
 ---
 
-## 12. Known Gaps / In-Progress Work
+## 12. Dashboards & Analytics
+
+- **Owner/GC/Trade dashboards** now include charts (submission trend, status breakdown, questionnaire/project-status breakdown) alongside the existing stat cards, built with Recharts. **These currently run on placeholder data** (`client/src/lib/dummyAnalytics.ts`) — not yet wired to real queries. Every dashboard stat card is clickable (links to the relevant list page, or scrolls to the relevant section on the same page) — "drillable" by design.
+- **Safety Scorecard** (Owner only, sidebar: Safety Scorecard) — a new dedicated page modeled on an external scorecard dashboard: Project/Subcontractor/Month filters, speedometer-style gauges (banded red/amber/green with a needle) for an overall Safety Score and for five categories (Pre Task Plan, Observation, Responsiveness, Kudos, WPS), each with its own MoM trend chart, a by-subcontractor bar chart, and an overview table. **Also running entirely on placeholder data** (`client/src/lib/dummyScorecard.ts`) — not yet connected to real tracking data (PTP submissions, observations, kudos, WPS, responsiveness logs), which doesn't exist yet as a data source anywhere else in the app. Every gauge/card is drillable (scrolls to its detail table).
+
+**This section is explicitly flagged for product/engineering follow-up:** both the dashboard charts and the Safety Scorecard are UI/UX work built ahead of the real data pipeline, specifically so stakeholders could react to the layout and design before committing engineering time to the underlying queries and (for the Scorecard) an entirely new tracking data model. **Do not test these for data accuracy** — there is none yet by design. Do test layout, responsiveness, and that every drillable card/gauge navigates or scrolls correctly.
+
+---
+
+## 13. Known Gaps / In-Progress Work
 
 - **QuickBooks migration:** OAuth connection confirmed working against a live sandbox. **The actual charge call is not yet verified** — this is the one remaining piece before billing can be called done. See §8.
-- **AI questionnaire autofill:** document-gathering expansion and human-answer protection are built but not yet run against a real live case end-to-end. See §11.
+- **Dashboard charts and Safety Scorecard run on placeholder data** — see §12. Needs real reporting queries (dashboards) and an entirely new tracking data model (Scorecard categories) before they reflect reality.
 - **No subscription auto-renewal** (§8) — by design for now, not a bug.
 - **Legacy `prequalifications` model** — unclear if still in scope; confirm with engineering before writing test cases against it.
-- **Three separate document tables** (`company_documents`, `submission_documents`, `contractor_documents` for questionnaires) — functionally overlapping; worth a consolidation conversation, not urgent for QA.
+- **Multiple document tables** (`company_documents`, `submission_documents`, `contractor_documents` for questionnaires) — `company_documents` is now the unified hub for the Document Library/Organization profile/Ask Mojo (§3.3), but `submission_documents` (per-project pre-qual uploads) and the older `contractor_documents` table remain separate and functionally overlapping; worth a further consolidation conversation, not urgent for QA.
 - **"Profile complete" check is shallow** (§3.2) — doesn't check expiry dates or full-field completeness.
 - **GC has two separate "projects" nav entries** whose purpose isn't obviously distinct to a user — see Open Question #4. Deliberately left as-is pending a product decision.
+- **Reviewer-side access to the three new per-question review tools (§7.6) and the AI summary (§11c) is currently scoped to whoever is a member of the assignee's company, or the specific person who created the assignment** — another admin at the *reviewing* (Owner/GC) company who didn't personally create the assignment may not see it. This mirrors a pre-existing limitation in the underlying access check and wasn't widened as part of this work; flag if a demo needs multiple reviewer-side admins on the same assignment.
 
 ---
 
-## 13. Out of Scope (not built, don't test for)
+## 14. Out of Scope (not built, don't test for)
 
 - Payment processor auto-retry/dunning on failed/expired subscriptions
 - Any GC-to-GC or Trade-to-Trade invitation (only Owner→GC/Trade and GC→Trade exist)
 - Multi-currency billing (USD only)
 - Mobile app (web-responsive only)
+- Real data behind the dashboard charts or Safety Scorecard (§12) — UI/UX only for now
 
 ---
 
-## 14. Open Questions (log new ones here as they come up)
+## 15. Open Questions (log new ones here as they come up)
 
 | # | Question | Raised by | Status |
 |---|---|---|---|
@@ -224,12 +265,15 @@ The contractor sees what's already on file (with its source) before running AI-c
 | 2 | Is "profile complete" = `company_name && gl_carrier` the intended bar, or should it check more fields/expiry? | PRD authoring | Open |
 | 3 | Does GC-owned project creation work under current Supabase RLS, or does it need a policy update? | PRD authoring | Open |
 | 4 | GC sidebar has two separate project lists — "My Projects" (invited onto by an Owner) and "Projects I Manage" (created by the GC itself, added for the CSV bulk-upload feature). Product flagged this as confusing/possibly redundant. Does a GC actually need to own/manage its own projects independent of an Owner, or should that capability (and its nav entry) not exist at all? | Manoj, 2026-08-20 | Open — deliberately left as-is pending this decision |
+| 5 | What should actually drive the Safety Scorecard's five categories (Pre Task Plan, Observation, Responsiveness, Kudos, WPS)? There's no existing data source for any of them — this needs a product decision on what to track and how it's captured (manual entry? a new submission type? an integration?) before the Scorecard can move off placeholder data. | Manoj, 2026-10-21 | Open |
+| 6 | Should another admin at the reviewing (Owner/GC) company — not just whoever created the assignment — be able to see and use the per-question review tools (§7.6)? Current access check only recognizes the assignee's company or the literal creator. | PRD authoring | Open |
 
 ---
 
-## 15. Change Log
+## 16. Change Log
 
 | Date | Change |
 |---|---|
 | 2026-08-16 | Initial PRD drafted from full codebase review, ahead of QA test planning. |
 | 2026-08-20 | QuickBooks OAuth connection confirmed working end-to-end (§8); Stripe DB columns dropped. AI questionnaire autofill expanded to auto-gather company documents + submission history, and to never overwrite human-entered answers (§11). Mojo Admin can now embed a per-Owner Domo dashboard (§9). Added Open Question #4 on the GC's two overlapping project-list nav entries. |
+| 2026-10-21 | **Organization vs. My Account split** (§3.2): company profile moved to its own last-in-sidebar "Organization" page (admin-edit/contributor-view), personal account moved to a new "My Account" page behind the top-right avatar. **Document unification** (§3.3, §11b): Organization profile can now attach files directly (COI/safety manual/PTP plan/bond, two new document types); Ask Mojo reference documents (not just published drafts) now feed AI-complete; AI-complete lets the contractor pick/exclude on-file documents before running; CSV/text files and genuinely-validated images are now handled correctly (previously any non-PDF/Word file was mis-sent as a JPEG, breaking on CSVs and silently risking corrupted-image crashes). **Reviewer tooling** (§7.6, §11c): added an on-demand AI review summary, per-question Approve/Reject, a per-question "needs clarification" flag with contractor-facing banner/badges, and a full per-question note audit trail visible to both parties. **Dashboards & Safety Scorecard** (§12, new section): added charts to Owner/GC/Trade dashboards and a new speedometer-gauge Safety Scorecard page, both intentionally built on placeholder data ahead of the real reporting/tracking pipeline; made all dashboard/scorecard stat cards drillable. Added Open Questions #5 and #6. |
