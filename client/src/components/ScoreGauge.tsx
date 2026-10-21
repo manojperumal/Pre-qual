@@ -4,37 +4,75 @@ interface ScoreGaugeProps {
   size?: number
 }
 
-// Semi-circle gauge with red/amber/green bands and a needle, drawn as plain SVG
-// (no chart library needed for a fixed 3-band dial).
-export function ScoreGauge({ value, max = 100, size = 160 }: ScoreGaugeProps) {
+// Speedometer-style gauge: a thick banded arc (red -> amber -> green) with
+// tick marks and a needle pointing at the current value.
+export function ScoreGauge({ value, max = 100, size = 180 }: ScoreGaugeProps) {
   const cx = size / 2
   const cy = size / 2
-  const r = size / 2 - 10
+  const strokeWidth = size * 0.1
+  const r = size / 2 - strokeWidth
+
   const clamped = Math.max(0, Math.min(max, value))
   const pct = clamped / max
 
-  const polarToCartesian = (angleDeg: number) => {
-    const angleRad = (angleDeg * Math.PI) / 180
-    return { x: cx + r * Math.cos(angleRad), y: cy - r * Math.sin(angleRad) }
+  // Gauge sweeps from 180deg (left, min) to 0deg (right, max), measured the
+  // standard math way (counter-clockwise), then flipped for screen's y-down axis.
+  const pointAt = (angleDeg: number, radius: number) => {
+    const rad = (angleDeg * Math.PI) / 180
+    return { x: cx + radius * Math.cos(rad), y: cy - radius * Math.sin(rad) }
   }
 
-  const arcPath = (startDeg: number, endDeg: number) => {
-    const start = polarToCartesian(startDeg)
-    const end = polarToCartesian(endDeg)
-    const largeArc = startDeg - endDeg > 180 ? 1 : 0
-    return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 0 ${end.x} ${end.y}`
+  const bandArc = (fromPct: number, toPct: number) => {
+    const startAngle = 180 - fromPct * 180
+    const endAngle = 180 - toPct * 180
+    const start = pointAt(startAngle, r)
+    const end = pointAt(endAngle, r)
+    const largeArc = startAngle - endAngle > 180 ? 1 : 0
+    return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y}`
   }
+
+  const bands = [
+    { from: 0, to: 0.45, color: '#ef4444' },
+    { from: 0.45, to: 0.75, color: '#f59e0b' },
+    { from: 0.75, to: 1, color: '#10b981' },
+  ]
+
+  const ticks = [0, 0.25, 0.5, 0.75, 1]
 
   const needleAngle = 180 - pct * 180
-  const needleTip = polarToCartesian(needleAngle)
+  const needleLen = r - strokeWidth / 2 - 2
+  const needleTip = pointAt(needleAngle, needleLen)
+  const needleBaseA = pointAt(needleAngle + 90, 3)
+  const needleBaseB = pointAt(needleAngle - 90, 3)
+
+  const height = size / 2 + strokeWidth + 8
 
   return (
-    <svg width={size} height={size / 2 + 20} viewBox={`0 0 ${size} ${size / 2 + 20}`}>
-      <path d={arcPath(180, 120)} stroke="#ef4444" strokeWidth={12} fill="none" strokeLinecap="round" />
-      <path d={arcPath(120, 60)} stroke="#f59e0b" strokeWidth={12} fill="none" />
-      <path d={arcPath(60, 0)} stroke="#10b981" strokeWidth={12} fill="none" strokeLinecap="round" />
-      <line x1={cx} y1={cy} x2={needleTip.x} y2={needleTip.y} stroke="#111827" strokeWidth={2.5} strokeLinecap="round" />
-      <circle cx={cx} cy={cy} r={4} fill="#111827" />
+    <svg width={size} height={height} viewBox={`0 0 ${size} ${height}`}>
+      {bands.map((b) => (
+        <path
+          key={b.color}
+          d={bandArc(b.from, b.to)}
+          stroke={b.color}
+          strokeWidth={strokeWidth}
+          fill="none"
+        />
+      ))}
+
+      {ticks.map((t) => {
+        const angle = 180 - t * 180
+        const inner = pointAt(angle, r - strokeWidth / 2 - 4)
+        const outer = pointAt(angle, r + strokeWidth / 2 + 2)
+        return (
+          <line key={t} x1={inner.x} y1={inner.y} x2={outer.x} y2={outer.y} stroke="#ffffff" strokeWidth={2} />
+        )
+      })}
+
+      <polygon
+        points={`${needleTip.x},${needleTip.y} ${needleBaseA.x},${needleBaseA.y} ${needleBaseB.x},${needleBaseB.y}`}
+        fill="#1f2937"
+      />
+      <circle cx={cx} cy={cy} r={6} fill="#1f2937" stroke="#fff" strokeWidth={1.5} />
     </svg>
   )
 }
