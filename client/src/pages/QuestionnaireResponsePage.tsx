@@ -88,24 +88,31 @@ export default function QuestionnaireResponsePage() {
 
   const visibleQQList = qqList.filter(isConditionMet)
 
-  const answeredCount = visibleQQList.filter(qq => {
+  function hasAnswer(qq: typeof qqList[number]): boolean {
     const a = answers[qq.question_id]
     if (!a) return false
     if (a.text && a.text.trim()) return true
     if (a.options && a.options.length > 0) return true
     if (a.docPath) return true
     return false
-  }).length
+  }
+
+  const answeredQQList = visibleQQList.filter(hasAnswer)
+  const answeredCount = answeredQQList.length
+  const aiAnsweredCount = answeredQQList.filter(qq => answers[qq.question_id]?.aiSuggested).length
+  const manualAnsweredCount = answeredCount - aiAnsweredCount
+  const pendingCount = visibleQQList.length - answeredCount
+  const aiAnsweredPercent = visibleQQList.length ? Math.round((aiAnsweredCount / visibleQQList.length) * 100) : 0
 
   function setTextAnswer(questionId: string, value: string) {
-    setAnswers(prev => ({ ...prev, [questionId]: { ...prev[questionId], text: value } }))
+    setAnswers(prev => ({ ...prev, [questionId]: { ...prev[questionId], text: value, aiSuggested: false } }))
   }
 
   function toggleOption(questionId: string, option: string) {
     setAnswers(prev => {
       const cur = prev[questionId]?.options ?? []
       const next = cur.includes(option) ? cur.filter(o => o !== option) : [...cur, option]
-      return { ...prev, [questionId]: { ...prev[questionId], options: next } }
+      return { ...prev, [questionId]: { ...prev[questionId], options: next, aiSuggested: false } }
     })
   }
 
@@ -119,7 +126,7 @@ export default function QuestionnaireResponsePage() {
     }
     setAnswers(prev => ({
       ...prev,
-      [questionId]: { ...prev[questionId], docPath: path, docName: file.name },
+      [questionId]: { ...prev[questionId], docPath: path, docName: file.name, aiSuggested: false },
     }))
   }
 
@@ -201,6 +208,7 @@ export default function QuestionnaireResponsePage() {
           document_path: a.docPath ?? null,
           document_name: a.docName ?? null,
           company_comments: a.companyComments ?? null,
+          ai_suggested: a.aiSuggested ?? false,
         })
       }
     } finally {
@@ -255,14 +263,37 @@ export default function QuestionnaireResponsePage() {
       </div>
 
       {/* Progress */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="flex-1 bg-gray-200 rounded-full h-2">
-          <div
-            className="bg-brand-600 h-2 rounded-full transition-all"
-            style={{ width: visibleQQList.length ? `${(answeredCount / visibleQQList.length) * 100}%` : '0%' }}
-          />
+      <div className="mb-6">
+        <div className="flex w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+          {visibleQQList.length > 0 && (
+            <>
+              <div
+                className="bg-brand-600 h-2 transition-all"
+                style={{ width: `${(aiAnsweredCount / visibleQQList.length) * 100}%` }}
+                title={`${aiAnsweredCount} answered by AI`}
+              />
+              <div
+                className="bg-emerald-500 h-2 transition-all"
+                style={{ width: `${(manualAnsweredCount / visibleQQList.length) * 100}%` }}
+                title={`${manualAnsweredCount} answered manually`}
+              />
+            </>
+          )}
         </div>
-        <span className="text-xs text-gray-500 whitespace-nowrap">{answeredCount} / {visibleQQList.length} answered</span>
+        <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-brand-600 inline-block" />
+            {aiAnsweredCount} answered by AI ({aiAnsweredPercent}%)
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+            {manualAnsweredCount} answered manually
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-gray-300 inline-block" />
+            {pendingCount} pending
+          </span>
+        </div>
       </div>
 
       {/* Due date */}

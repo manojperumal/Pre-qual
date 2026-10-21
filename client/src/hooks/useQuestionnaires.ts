@@ -761,6 +761,7 @@ export function useUpsertResponse() {
       document_name?: string | null
       company_comments?: string | null
       mojo_feedback?: string | null
+      ai_suggested?: boolean | null
     }) => {
       const { data, error } = await supabase
         .from('questionnaire_responses')
