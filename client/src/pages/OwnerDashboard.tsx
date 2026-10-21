@@ -4,8 +4,24 @@ import { useProjects, useMyProjects, useTeamMembers, useCompanyProjects, useUpda
 import { useOwnerPendingSubmissions } from '@/hooks/useContractorProfile'
 import { getCompanyLogoUrl } from '@/hooks/useCompany'
 import { isValidDomoEmbedUrl } from '@/lib/domoEmbed'
+import { submissionTrend, projectsByStatus, complianceBreakdown } from '@/lib/dummyAnalytics'
 import { FolderOpen, HardHat, Wrench, ClipboardList, AlertTriangle, ChevronRight, Plus, Users } from 'lucide-react'
 import { format } from 'date-fns'
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from 'recharts'
 
 const STATUS_COLORS: Record<string, string> = {
   submitted: 'bg-blue-100 text-blue-700',
@@ -102,6 +118,75 @@ export default function OwnerDashboard() {
             <div key={s.label}>{inner}</div>
           )
         })}
+      </div>
+
+      {/* Analytics — TODO: wire these charts to real data once reporting queries exist */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="card p-5 lg:col-span-2">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-gray-900">Submission Trend</h2>
+            <span className="text-xs text-gray-400">Last 6 months</span>
+          </div>
+          <ResponsiveContainer width="100%" height={240}>
+            <AreaChart data={submissionTrend} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="submittedGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#3B6CF5" stopOpacity={0.25} />
+                  <stop offset="100%" stopColor="#3B6CF5" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="approvedGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#10b981" stopOpacity={0.25} />
+                  <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 12, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={28} />
+              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }} />
+              <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" iconSize={8} />
+              <Area type="monotone" dataKey="submitted" name="Submitted" stroke="#3B6CF5" strokeWidth={2} fill="url(#submittedGradient)" />
+              <Area type="monotone" dataKey="approved" name="Approved" stroke="#10b981" strokeWidth={2} fill="url(#approvedGradient)" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="card p-5">
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">Compliance Breakdown</h2>
+          <ResponsiveContainer width="100%" height={180}>
+            <PieChart>
+              <Pie data={complianceBreakdown} dataKey="value" nameKey="name" innerRadius={48} outerRadius={70} paddingAngle={3}>
+                {complianceBreakdown.map((entry) => (
+                  <Cell key={entry.name} fill={entry.color} stroke="none" />
+                ))}
+              </Pie>
+              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="space-y-1.5 mt-2">
+            {complianceBreakdown.map((entry) => (
+              <div key={entry.name} className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5 text-gray-600">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: entry.color }} />
+                  {entry.name}
+                </span>
+                <span className="font-medium text-gray-900">{entry.value}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="card p-5 lg:col-span-3">
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">Projects by Status</h2>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={projectsByStatus} margin={{ top: 0, right: 0, left: -20, bottom: 0 }} barSize={36}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="status" tick={{ fontSize: 12, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 12, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
+              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }} cursor={{ fill: '#f8fafc' }} />
+              <Bar dataKey="count" name="Projects" fill="#3B6CF5" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       {/* Domo dashboard — set by Mojo admin */}
