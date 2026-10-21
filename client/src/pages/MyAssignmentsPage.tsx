@@ -86,7 +86,7 @@ export default function MyAssignmentsPage() {
                             to={actionPath}
                             className="text-sm text-brand-600 hover:text-brand-700 font-medium"
                           >
-                            {isFillOut ? 'Fill Out' : 'View'}
+                            {isFillOut ? 'Edit' : 'Open'}
                           </Link>
                         )}
                       </td>
