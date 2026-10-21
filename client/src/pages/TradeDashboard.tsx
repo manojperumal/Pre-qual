@@ -188,7 +188,7 @@ export default function TradeDashboard() {
 
       {/* Pending invites alert */}
       {pendingInvites.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div id="pending-invites" className="bg-blue-50 border border-blue-200 rounded-lg p-4 scroll-mt-4">
           <div className="flex items-center gap-2 mb-3">
             <Mail size={16} className="text-blue-600" />
             <h3 className="text-sm font-semibold text-blue-800">
@@ -223,11 +223,11 @@ export default function TradeDashboard() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         {[
-          { label: 'Projects', value: myProjects.length, color: 'text-brand-600', bg: 'bg-brand-50', icon: <FolderOpen size={18} />, to: undefined },
-          { label: 'Approved', value: approvedCount, color: approvedCount > 0 ? 'text-green-600' : 'text-gray-500', bg: approvedCount > 0 ? 'bg-green-50' : 'bg-gray-50', icon: <CheckCircle size={18} />, to: undefined },
-          { label: 'Needs Action', value: needsActionCount, color: needsActionCount > 0 ? 'text-orange-600' : 'text-gray-500', bg: needsActionCount > 0 ? 'bg-orange-50' : 'bg-gray-50', icon: <AlertCircle size={18} />, to: undefined },
-          { label: 'Pending Invites', value: pendingInvites.length, color: pendingInvites.length > 0 ? 'text-blue-600' : 'text-gray-500', bg: pendingInvites.length > 0 ? 'bg-blue-50' : 'bg-gray-50', icon: <Mail size={18} />, to: undefined },
-          { label: 'Pending Questionnaires', value: pendingQuestionnaires, color: pendingQuestionnaires > 0 ? 'text-blue-600' : 'text-gray-500', bg: pendingQuestionnaires > 0 ? 'bg-blue-50' : 'bg-gray-50', icon: <ClipboardList size={18} />, to: '/trade/assignments' },
+          { label: 'Projects', value: myProjects.length, color: 'text-brand-600', bg: 'bg-brand-50', icon: <FolderOpen size={18} />, to: '/trade/my-projects', scrollTo: undefined },
+          { label: 'Approved', value: approvedCount, color: approvedCount > 0 ? 'text-green-600' : 'text-gray-500', bg: approvedCount > 0 ? 'bg-green-50' : 'bg-gray-50', icon: <CheckCircle size={18} />, to: undefined, scrollTo: 'my-projects' },
+          { label: 'Needs Action', value: needsActionCount, color: needsActionCount > 0 ? 'text-orange-600' : 'text-gray-500', bg: needsActionCount > 0 ? 'bg-orange-50' : 'bg-gray-50', icon: <AlertCircle size={18} />, to: undefined, scrollTo: 'my-projects' },
+          { label: 'Pending Invites', value: pendingInvites.length, color: pendingInvites.length > 0 ? 'text-blue-600' : 'text-gray-500', bg: pendingInvites.length > 0 ? 'bg-blue-50' : 'bg-gray-50', icon: <Mail size={18} />, to: undefined, scrollTo: pendingInvites.length > 0 ? 'pending-invites' : undefined },
+          { label: 'Pending Questionnaires', value: pendingQuestionnaires, color: pendingQuestionnaires > 0 ? 'text-blue-600' : 'text-gray-500', bg: pendingQuestionnaires > 0 ? 'bg-blue-50' : 'bg-gray-50', icon: <ClipboardList size={18} />, to: '/trade/assignments', scrollTo: undefined },
         ].map((s) => {
           const inner = (
             <>
@@ -240,11 +240,26 @@ export default function TradeDashboard() {
               </div>
             </>
           )
-          return s.to ? (
-            <Link key={s.label} to={s.to} className="card px-5 py-4 flex items-center gap-3 hover:shadow-md transition-shadow">
-              {inner}
-            </Link>
-          ) : (
+          if (s.to) {
+            return (
+              <Link key={s.label} to={s.to} className="card px-5 py-4 flex items-center gap-3 hover:shadow-md transition-shadow">
+                {inner}
+              </Link>
+            )
+          }
+          if (s.scrollTo) {
+            return (
+              <button
+                key={s.label}
+                type="button"
+                onClick={() => document.getElementById(s.scrollTo!)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                className="card px-5 py-4 flex items-center gap-3 hover:shadow-md transition-shadow text-left"
+              >
+                {inner}
+              </button>
+            )
+          }
+          return (
             <div key={s.label} className="card px-5 py-4 flex items-center gap-3">
               {inner}
             </div>
@@ -322,7 +337,7 @@ export default function TradeDashboard() {
       </div>
 
       {/* My Projects */}
-      <div>
+      <div id="my-projects" className="scroll-mt-4">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">My Projects</h2>
         {projectsLoading ? (
           <div className="flex justify-center items-center py-8">

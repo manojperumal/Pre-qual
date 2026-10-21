@@ -34,17 +34,27 @@ interface ScorecardCategorySectionProps {
 
 export function ScorecardCategorySection({ title, score, max = 100, trend, byContractor, projectName = 'Downtown Tower' }: ScorecardCategorySectionProps) {
   const sorted = [...byContractor].sort((a, b) => b.score - a.score)
+  const slug = title.toLowerCase().replace(/\s+/g, '-')
+  const tableId = `${slug}-overview`
+
+  function scrollToTable() {
+    document.getElementById(tableId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   return (
-    <div className="space-y-4">
+    <div id={slug} className="space-y-4 scroll-mt-4">
       <div className="bg-[#111827] text-white text-sm font-semibold px-4 py-2 rounded-md">{title}</div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="card p-5 flex flex-col items-center justify-center">
+        <button
+          type="button"
+          onClick={scrollToTable}
+          className="card p-5 flex flex-col items-center justify-center hover:shadow-md transition-shadow text-left"
+        >
           <p className="text-xs text-gray-500 mb-1">{title} Score</p>
           <ScoreGauge value={score} max={max} />
           <p className="text-3xl font-bold text-gray-900 -mt-1">{score}</p>
-        </div>
+        </button>
 
         <div className="card p-5">
           <p className="text-xs text-gray-500 mb-2">MoM {title} Score</p>
@@ -78,7 +88,7 @@ export function ScorecardCategorySection({ title, score, max = 100, trend, byCon
           </ResponsiveContainer>
         </div>
 
-        <div className="card overflow-hidden">
+        <div id={tableId} className="card overflow-hidden scroll-mt-4">
           <div className="px-5 py-3 border-b border-gray-200">
             <p className="text-xs font-medium text-gray-500">{title} Scorecard Overview</p>
           </div>

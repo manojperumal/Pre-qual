@@ -61,8 +61,12 @@ export default function OwnerDashboard() {
     { label: 'Active Projects', value: projects.length, icon: <FolderOpen size={20} />, color: 'text-brand-600', bg: 'bg-brand-50', to: '/owner/projects' },
     { label: 'General Contractors', value: uniqueGCs, icon: <HardHat size={20} />, color: 'text-indigo-600', bg: 'bg-indigo-50', to: '/owner/general-contractors' },
     { label: 'Trades', value: uniqueTrades, icon: <Wrench size={20} />, color: 'text-purple-600', bg: 'bg-purple-50', to: '/owner/trades' },
-    { label: 'Pending Reviews', value: pending.length, icon: <ClipboardList size={20} />, color: pending.length > 0 ? 'text-amber-600' : 'text-gray-500', bg: pending.length > 0 ? 'bg-amber-50' : 'bg-gray-50', to: null },
+    { label: 'Pending Reviews', value: pending.length, icon: <ClipboardList size={20} />, color: pending.length > 0 ? 'text-amber-600' : 'text-gray-500', bg: pending.length > 0 ? 'bg-amber-50' : 'bg-gray-50', to: null, scrollTo: 'needs-review' },
   ]
+
+  function scrollToSection(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   return (
     <div className="space-y-8">
@@ -102,7 +106,7 @@ export default function OwnerDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((s) => {
           const inner = (
-            <div className={`card px-5 py-4 flex items-center gap-4 ${s.to ? 'hover:shadow-md transition-shadow cursor-pointer' : ''}`}>
+            <div className="card px-5 py-4 flex items-center gap-4 hover:shadow-md transition-shadow cursor-pointer">
               <div className={`w-10 h-10 rounded-lg ${s.bg} flex items-center justify-center flex-shrink-0`}>
                 <span className={s.color}>{s.icon}</span>
               </div>
@@ -112,11 +116,15 @@ export default function OwnerDashboard() {
               </div>
             </div>
           )
-          return s.to ? (
-            <Link key={s.label} to={s.to}>{inner}</Link>
-          ) : (
-            <div key={s.label}>{inner}</div>
-          )
+          if (s.to) return <Link key={s.label} to={s.to}>{inner}</Link>
+          if (s.scrollTo) {
+            return (
+              <button key={s.label} type="button" className="text-left" onClick={() => scrollToSection(s.scrollTo!)}>
+                {inner}
+              </button>
+            )
+          }
+          return <div key={s.label}>{inner}</div>
         })}
       </div>
 
@@ -204,7 +212,7 @@ export default function OwnerDashboard() {
 
       {/* Pending reviews */}
       {(pending.length > 0 || pendingLoading) && (
-        <div className="card overflow-hidden">
+        <div id="needs-review" className="card overflow-hidden scroll-mt-4">
           <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
             <AlertTriangle size={16} className="text-amber-500" />
             <h2 className="text-base font-semibold text-gray-900">Needs Review</h2>

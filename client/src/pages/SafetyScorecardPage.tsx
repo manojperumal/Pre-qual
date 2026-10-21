@@ -66,11 +66,15 @@ export default function SafetyScorecardPage() {
 
       {/* Overall Safety Score + MoM trend */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="card p-5 flex flex-col items-center justify-center">
+        <button
+          type="button"
+          onClick={() => document.getElementById('subcontractor-scorecard')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          className="card p-5 flex flex-col items-center justify-center hover:shadow-md transition-shadow text-left"
+        >
           <p className="text-xs text-gray-500 mb-1">Safety Score</p>
           <ScoreGauge value={safetyScore} />
           <p className="text-3xl font-bold text-gray-900 -mt-1">{safetyScore}</p>
-        </div>
+        </button>
         <div className="card p-5">
           <p className="text-xs text-gray-500 mb-2">Safety Score MoM</p>
           <ResponsiveContainer width="100%" height={180}>
@@ -87,7 +91,7 @@ export default function SafetyScorecardPage() {
       </div>
 
       {/* Subcontractor Scorecard (drill) */}
-      <div className="card overflow-hidden">
+      <div id="subcontractor-scorecard" className="card overflow-hidden scroll-mt-4">
         <div className="px-5 py-3 border-b border-gray-200">
           <p className="text-sm font-semibold text-gray-900">Subcontractor Scorecard (Drill)</p>
         </div>

@@ -192,9 +192,9 @@ export default function GCDashboard() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Projects', value: myProjects.length, color: 'text-brand-600', bg: 'bg-brand-50', icon: <FolderOpen size={18} />, to: undefined },
-          { label: 'Trades Invited', value: invitations.filter((i) => i.recipient_role === 'trade').length, color: 'text-purple-600', bg: 'bg-purple-50', icon: <UserPlus size={18} />, to: undefined },
-          { label: 'Pending Invites', value: pendingInvites, color: pendingInvites > 0 ? 'text-amber-600' : 'text-gray-500', bg: pendingInvites > 0 ? 'bg-amber-50' : 'bg-gray-50', icon: <Clock size={18} />, to: undefined },
+          { label: 'Projects', value: myProjects.length, color: 'text-brand-600', bg: 'bg-brand-50', icon: <FolderOpen size={18} />, to: '/gc/my-projects' },
+          { label: 'Trades Invited', value: invitations.filter((i) => i.recipient_role === 'trade').length, color: 'text-purple-600', bg: 'bg-purple-50', icon: <UserPlus size={18} />, to: '/gc/trades' },
+          { label: 'Pending Invites', value: pendingInvites, color: pendingInvites > 0 ? 'text-amber-600' : 'text-gray-500', bg: pendingInvites > 0 ? 'bg-amber-50' : 'bg-gray-50', icon: <Clock size={18} />, to: '/gc/invite' },
           { label: 'Pending Questionnaires', value: pendingQuestionnaires, color: pendingQuestionnaires > 0 ? 'text-blue-600' : 'text-gray-500', bg: pendingQuestionnaires > 0 ? 'bg-blue-50' : 'bg-gray-50', icon: <ClipboardList size={18} />, to: '/gc/assignments' },
         ].map((s) => {
           const inner = (
