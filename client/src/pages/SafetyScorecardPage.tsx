@@ -33,7 +33,6 @@ export default function SafetyScorecardPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Safety Scorecard</h1>
         <p className="mt-1 text-sm text-gray-500">Ongoing tracking of safety performance across all trades</p>
-        <p className="mt-1 text-xs text-amber-600">Showing sample data — this will connect to live tracking data soon.</p>
       </div>
 
       {/* Filters */}
