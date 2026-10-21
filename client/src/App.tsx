@@ -42,6 +42,7 @@ import AskMojoPage from '@/pages/AskMojoPage'
 import AskMojoThreadPage from '@/pages/AskMojoThreadPage'
 import CompanyDocumentsPage from '@/pages/CompanyDocumentsPage'
 import MyAccountPage from '@/pages/MyAccountPage'
+import SafetyScorecardPage from '@/pages/SafetyScorecardPage'
 
 function RoleRedirect() {
   const { profile, loading } = useAuth()
@@ -125,6 +126,7 @@ export default function App() {
         <Route path="projects/:projectId" element={<ProjectDetailPage />} />
         <Route path="projects/:projectId/invite" element={<InvitePage />} />
         <Route path="projects/:projectId/submissions/:submissionId" element={<SubmissionReviewPage />} />
+        <Route path="scorecard" element={<SafetyScorecardPage />} />
         <Route path="general-contractors" element={<GeneralContractorsPage />} />
         <Route path="general-contractors/:contractorId" element={<GCProfileViewPage />} />
         <Route path="trades" element={<TradesPage />} />

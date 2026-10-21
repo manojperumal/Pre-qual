@@ -16,6 +16,7 @@ import {
   Users,
   Settings,
   Sparkles,
+  ShieldCheck,
 } from 'lucide-react'
 
 interface NavItem {
@@ -27,6 +28,7 @@ interface NavItem {
 const ROLE_NAV: Record<string, NavItem[]> = {
   owner: [
     { label: 'Dashboard', to: '/owner', icon: <LayoutDashboard size={18} /> },
+    { label: 'Safety Scorecard', to: '/owner/scorecard', icon: <ShieldCheck size={18} /> },
     { label: 'Projects', to: '/owner/projects', icon: <FolderOpen size={18} /> },
     { label: 'General Contractors', to: '/owner/general-contractors', icon: <HardHat size={18} /> },
     { label: 'Trades', to: '/owner/trades', icon: <Wrench size={18} /> },
