@@ -12,6 +12,7 @@ import {
   type AssignmentStatus,
   type Response,
 } from '@/hooks/useQuestionnaires'
+import { QuestionNoteThread } from '@/components/QuestionNoteThread'
 import { supabase } from '@/lib/supabase'
 import { groupByCategory, CATEGORY_COLORS } from '@/lib/questionCategories'
 
@@ -325,6 +326,8 @@ export default function QuestionnaireReviewPage() {
                             )}
                           </div>
                         )}
+
+                        {assignmentId && <QuestionNoteThread assignmentId={assignmentId} questionId={q.id} />}
                       </div>
                     )
                   })}

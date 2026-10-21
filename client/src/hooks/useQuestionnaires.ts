@@ -810,3 +810,56 @@ export function useGenerateReviewSummary() {
     },
   })
 }
+
+export interface ResponseNote {
+  id: string
+  assignment_id: string
+  question_id: string
+  author_id: string
+  note: string
+  created_at: string
+  author?: { full_name: string | null; email: string | null; role: string | null } | null
+}
+
+// Per-question note thread (audit trail) — distinct from the single-value
+// company_comments/mojo_feedback fields, this keeps every note anyone on
+// either side has left, with who and when.
+export function useResponseNotes(assignmentId: string | undefined, questionId: string | undefined) {
+  return useQuery({
+    queryKey: ['response_notes', assignmentId, questionId],
+    enabled: !!assignmentId && !!questionId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('questionnaire_response_notes')
+        .select('*, author:profiles!author_id(full_name, email, role)')
+        .eq('assignment_id', assignmentId!)
+        .eq('question_id', questionId!)
+        .order('created_at', { ascending: true })
+      if (error) throw error
+      return data as ResponseNote[]
+    },
+  })
+}
+
+export function useAddResponseNote() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: { assignmentId: string; questionId: string; authorId: string; note: string }) => {
+      const { data, error } = await supabase
+        .from('questionnaire_response_notes')
+        .insert({
+          assignment_id: vars.assignmentId,
+          question_id: vars.questionId,
+          author_id: vars.authorId,
+          note: vars.note,
+        })
+        .select('*, author:profiles!author_id(full_name, email, role)')
+        .single()
+      if (error) throw error
+      return data as ResponseNote
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['response_notes', data.assignment_id, data.question_id] })
+    },
+  })
+}

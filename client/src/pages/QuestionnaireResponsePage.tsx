@@ -14,6 +14,7 @@ import {
 } from '@/hooks/useQuestionnaires'
 import { supabase } from '@/lib/supabase'
 import { groupByCategory, CATEGORY_COLORS } from '@/lib/questionCategories'
+import { QuestionNoteThread } from '@/components/QuestionNoteThread'
 
 const DOCUMENT_TYPE_OPTIONS = [
   { value: 'safety_manual', label: 'Safety Manual' },
@@ -707,6 +708,8 @@ export default function QuestionnaireResponsePage() {
                             <p className="text-xs text-amber-800">{a.mojoFeedback}</p>
                           </div>
                         )}
+
+                        {assignmentId && <QuestionNoteThread assignmentId={assignmentId} questionId={q.id} />}
                       </div>
                     )
                   })}
