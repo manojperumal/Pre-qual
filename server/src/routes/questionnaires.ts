@@ -299,7 +299,24 @@ router.post('/:assignmentId/ai-complete', requireAuth, async (req: Request, res:
         ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         : nameLower.endsWith('.doc')
         ? 'application/msword'
-        : 'image/jpeg'
+        : nameLower.endsWith('.csv')
+        ? 'text/csv'
+        : nameLower.endsWith('.txt')
+        ? 'text/plain'
+        : nameLower.endsWith('.png')
+        ? 'image/png'
+        : nameLower.endsWith('.gif')
+        ? 'image/gif'
+        : nameLower.endsWith('.webp')
+        ? 'image/webp'
+        : nameLower.endsWith('.jpg') || nameLower.endsWith('.jpeg')
+        ? 'image/jpeg'
+        : null
+
+      if (!mimeType) {
+        console.warn(`[ai-complete] Unsupported file type for ${doc.name}, skipping`)
+        continue
+      }
       documentContents.push({ name: doc.name, type: doc.type, base64, mimeType })
     } catch (err) {
       console.warn(`[ai-complete] Error processing document ${doc.name}:`, err)
@@ -371,6 +388,12 @@ router.post('/:assignmentId/ai-complete', requireAuth, async (req: Request, res:
           text: `[Word Document — ${doc.name}: could not extract text]`,
         })
       }
+    } else if (doc.mimeType === 'text/csv' || doc.mimeType === 'text/plain') {
+      const text = Buffer.from(doc.base64, 'base64').toString('utf-8')
+      contentBlocks.push({
+        type: 'text',
+        text: `[${doc.mimeType === 'text/csv' ? 'CSV' : 'Text'} File Content — ${doc.name}]\n${text}`,
+      })
     } else {
       contentBlocks.push({
         type: 'image',
