@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useContractorProfile, useUpsertContractorProfile } from '@/hooks/useContractorProfile'
 import { useUpdateCompany } from '@/hooks/useCompany'
 import { CompanyLogoUpload } from '@/components/CompanyLogoUpload'
+import { CompanyDocumentField } from '@/components/CompanyDocumentField'
 import { ContractorProfile } from '@/types'
 import { CheckCircle } from 'lucide-react'
 
@@ -284,6 +285,15 @@ export default function ContractorProfilePage() {
           </div>
 
           </fieldset>
+
+          <CompanyDocumentField
+            companyId={profile?.new_company_id}
+            uploadedBy={profile?.id}
+            documentType="coi"
+            label="Certificate of Insurance (COI)"
+            isAdmin={isAdmin}
+          />
+
           <div className="flex justify-between pt-2">
             <div className="flex gap-2">
               <button type="button" onClick={() => setStep(0)} className="btn-secondary">Back</button>
@@ -348,6 +358,15 @@ export default function ContractorProfilePage() {
           </div>
 
           </fieldset>
+
+          <CompanyDocumentField
+            companyId={profile?.new_company_id}
+            uploadedBy={profile?.id}
+            documentType="safety_manual"
+            label="Safety Manual / OSHA Logs"
+            isAdmin={isAdmin}
+          />
+
           <div className="flex justify-between pt-2">
             <div className="flex gap-2">
               <button type="button" onClick={() => setStep(1)} className="btn-secondary">Back</button>
@@ -408,6 +427,15 @@ export default function ContractorProfilePage() {
           )}
 
           </fieldset>
+
+          <CompanyDocumentField
+            companyId={profile?.new_company_id}
+            uploadedBy={profile?.id}
+            documentType="ptp_plan"
+            label="PTP Program Plan"
+            isAdmin={isAdmin}
+          />
+
           <div className="flex justify-between pt-2">
             <div className="flex gap-2">
               <button type="button" onClick={() => setStep(2)} className="btn-secondary">Back</button>
@@ -439,6 +467,15 @@ export default function ContractorProfilePage() {
             </div>
           </div>
           </fieldset>
+
+          <CompanyDocumentField
+            companyId={profile?.new_company_id}
+            uploadedBy={profile?.id}
+            documentType="bond"
+            label="Bonding Document"
+            isAdmin={isAdmin}
+          />
+
           <div className="flex justify-between pt-2">
             <div className="flex gap-2">
               <button type="button" onClick={() => setStep(3)} className="btn-secondary">Back</button>

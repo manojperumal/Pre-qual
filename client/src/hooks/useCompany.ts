@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { Company } from '@/types'
 
-export type CompanyDocumentType = 'safety_manual' | 'coi' | 'w9' | 'loss_runs' | 'license' | 'sop' | 'other'
+export type CompanyDocumentType = 'safety_manual' | 'coi' | 'w9' | 'loss_runs' | 'license' | 'sop' | 'ptp_plan' | 'bond' | 'other'
 
 export interface CompanyDocument {
   id: string

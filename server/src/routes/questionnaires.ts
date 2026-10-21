@@ -17,6 +17,9 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   license: 'License',
   loss_runs: 'Loss Runs',
   ptp_photos: 'PTP Photos',
+  ptp_plan: 'PTP Program Plan',
+  bond: 'Bonding Document',
+  sop: 'Standard Operating Procedure',
   other: 'Supporting Document',
 }
 
@@ -58,6 +61,28 @@ async function gatherCompanyDocuments(companyId: string): Promise<{ docs: Gather
 
   for (const d of companyDocs ?? []) {
     docs.push({ path: d.storage_path, bucket: 'prequal-documents', type: d.document_type, name: d.document_name, source: 'Company document library' })
+  }
+
+  // Ask Mojo reference documents — files uploaded to ground an in-progress
+  // drafting thread. These aren't in company_documents until the thread is
+  // published, but they're already real source material the contractor
+  // gave us, so AI-complete should be able to read them too.
+  const { data: threadIds } = await supabaseAdmin
+    .from('ask_mojo_threads')
+    .select('id')
+    .eq('company_id', companyId)
+
+  const askMojoThreadIds = (threadIds ?? []).map((t) => t.id)
+  if (askMojoThreadIds.length) {
+    const { data: referenceDocs } = await supabaseAdmin
+      .from('ask_mojo_reference_documents')
+      .select('storage_path, file_name, created_at')
+      .in('thread_id', askMojoThreadIds)
+      .order('created_at', { ascending: false })
+
+    for (const d of referenceDocs ?? []) {
+      docs.push({ path: d.storage_path, bucket: 'prequal-documents', type: 'other', name: d.file_name, source: 'Ask Mojo reference document' })
+    }
   }
 
   // Every profile at this company, so we can pull in documents any of

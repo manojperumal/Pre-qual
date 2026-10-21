@@ -17,6 +17,8 @@ const DOCUMENT_TYPE_OPTIONS: { value: CompanyDocumentType; label: string }[] = [
   { value: 'w9', label: 'W-9' },
   { value: 'loss_runs', label: 'Loss Runs' },
   { value: 'license', label: 'License' },
+  { value: 'ptp_plan', label: 'PTP Program Plan' },
+  { value: 'bond', label: 'Bonding Document' },
   { value: 'other', label: 'Other' },
 ]
 
