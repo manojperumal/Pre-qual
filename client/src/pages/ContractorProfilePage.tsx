@@ -56,6 +56,7 @@ export default function ContractorProfilePage() {
 
   const effectiveRole = profile?.company_type ?? profile?.role
   const dashPath = effectiveRole === 'gc' ? '/gc' : '/trade'
+  const isAdmin = profile?.user_role === 'admin'
 
   // Step 1: Company Info
   const companyForm = useForm<Partial<ContractorProfile>>()
@@ -108,12 +109,12 @@ export default function ContractorProfilePage() {
   }
 
   async function handleNext(data: Partial<ContractorProfile>) {
-    await saveStep(data)
+    if (isAdmin) await saveStep(data)
     if (step < STEPS.length - 1) setStep(step + 1)
   }
 
   async function handleSubmit(data: Partial<ContractorProfile>) {
-    await saveStep(data)
+    if (isAdmin) await saveStep(data)
     navigate(dashPath)
   }
 
@@ -131,11 +132,17 @@ export default function ContractorProfilePage() {
         <Link to={dashPath} className="text-sm text-brand-600 hover:text-brand-700 mb-2 inline-block">
           ← Back to Dashboard
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Contractor Profile</h1>
-        <p className="text-sm text-gray-500 mt-1">Complete your profile to submit pre-qualifications</p>
+        <h1 className="text-2xl font-bold text-gray-900">Organization Profile</h1>
+        <p className="text-sm text-gray-500 mt-1">Your company's pre-qualification profile</p>
       </div>
 
       <StepIndicator current={step} total={STEPS.length} />
+
+      {!isAdmin && (
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-700 text-sm">
+          You can view your company's profile here. Only a company admin can make changes.
+        </div>
+      )}
 
       {saved && (
         <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2 text-sm">
@@ -148,6 +155,7 @@ export default function ContractorProfilePage() {
       {step === 0 && (
         <form onSubmit={companyForm.handleSubmit(handleNext)} className="card p-6 space-y-4">
           <h2 className="text-base font-semibold text-gray-900">Company Information</h2>
+          <fieldset disabled={!isAdmin} className="space-y-4 disabled:opacity-60">
 
           <CompanyLogoUpload
             companyId={profile?.new_company_id}
@@ -193,8 +201,9 @@ export default function ContractorProfilePage() {
               <input className="input-field" {...companyForm.register('license_numbers')} />
             </div>
           </div>
+          </fieldset>
           <div className="flex justify-between pt-2">
-            <button type="button" onClick={companyForm.handleSubmit(saveStep)} className="btn-secondary">
+            <button type="button" onClick={companyForm.handleSubmit(saveStep)} disabled={!isAdmin} className="btn-secondary">
               Save Draft
             </button>
             <button type="submit" className="btn-primary">Next</button>
@@ -206,6 +215,7 @@ export default function ContractorProfilePage() {
       {step === 1 && (
         <form onSubmit={insuranceForm.handleSubmit(handleNext)} className="card p-6 space-y-6">
           <h2 className="text-base font-semibold text-gray-900">Insurance</h2>
+          <fieldset disabled={!isAdmin} className="space-y-6 disabled:opacity-60">
 
           <div>
             <h3 className="text-sm font-medium text-gray-700 mb-3">General Liability</h3>
@@ -273,10 +283,11 @@ export default function ContractorProfilePage() {
             </div>
           </div>
 
+          </fieldset>
           <div className="flex justify-between pt-2">
             <div className="flex gap-2">
               <button type="button" onClick={() => setStep(0)} className="btn-secondary">Back</button>
-              <button type="button" onClick={insuranceForm.handleSubmit(saveStep)} className="btn-secondary">Save Draft</button>
+              <button type="button" onClick={insuranceForm.handleSubmit(saveStep)} disabled={!isAdmin} className="btn-secondary">Save Draft</button>
             </div>
             <button type="submit" className="btn-primary">Next</button>
           </div>
@@ -287,6 +298,8 @@ export default function ContractorProfilePage() {
       {step === 2 && (
         <form onSubmit={safetyForm.handleSubmit(handleNext)} className="card p-6 space-y-4">
           <h2 className="text-base font-semibold text-gray-900">Safety Record</h2>
+          <fieldset disabled={!isAdmin} className="space-y-4 disabled:opacity-60">
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label">EMR Value</label>
@@ -334,10 +347,11 @@ export default function ContractorProfilePage() {
             </div>
           </div>
 
+          </fieldset>
           <div className="flex justify-between pt-2">
             <div className="flex gap-2">
               <button type="button" onClick={() => setStep(1)} className="btn-secondary">Back</button>
-              <button type="button" onClick={safetyForm.handleSubmit(saveStep)} className="btn-secondary">Save Draft</button>
+              <button type="button" onClick={safetyForm.handleSubmit(saveStep)} disabled={!isAdmin} className="btn-secondary">Save Draft</button>
             </div>
             <button type="submit" className="btn-primary">Next</button>
           </div>
@@ -348,6 +362,8 @@ export default function ContractorProfilePage() {
       {step === 3 && (
         <form onSubmit={ptpForm.handleSubmit(handleNext)} className="card p-6 space-y-4">
           <h2 className="text-base font-semibold text-gray-900">PTP Program</h2>
+          <fieldset disabled={!isAdmin} className="space-y-4 disabled:opacity-60">
+
           <div>
             <label className="label">Do you have a Pre-Task Planning (PTP) program?</label>
             <div className="flex gap-4 mt-2">
@@ -391,10 +407,11 @@ export default function ContractorProfilePage() {
             </div>
           )}
 
+          </fieldset>
           <div className="flex justify-between pt-2">
             <div className="flex gap-2">
               <button type="button" onClick={() => setStep(2)} className="btn-secondary">Back</button>
-              <button type="button" onClick={ptpForm.handleSubmit(saveStep)} className="btn-secondary">Save Draft</button>
+              <button type="button" onClick={ptpForm.handleSubmit(saveStep)} disabled={!isAdmin} className="btn-secondary">Save Draft</button>
             </div>
             <button type="submit" className="btn-primary">Next</button>
           </div>
@@ -405,6 +422,8 @@ export default function ContractorProfilePage() {
       {step === 4 && (
         <form onSubmit={bondingForm.handleSubmit(handleSubmit)} className="card p-6 space-y-4">
           <h2 className="text-base font-semibold text-gray-900">Bonding</h2>
+          <fieldset disabled={!isAdmin} className="space-y-4 disabled:opacity-60">
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <label className="label">Bonding Company</label>
@@ -419,12 +438,13 @@ export default function ContractorProfilePage() {
               <input className="input-field" type="number" {...bondingForm.register('bonding_aggregate', { valueAsNumber: true })} />
             </div>
           </div>
+          </fieldset>
           <div className="flex justify-between pt-2">
             <div className="flex gap-2">
               <button type="button" onClick={() => setStep(3)} className="btn-secondary">Back</button>
-              <button type="button" onClick={bondingForm.handleSubmit(saveStep)} className="btn-secondary">Save Draft</button>
+              <button type="button" onClick={bondingForm.handleSubmit(saveStep)} disabled={!isAdmin} className="btn-secondary">Save Draft</button>
             </div>
-            <button type="submit" className="btn-primary" disabled={upsert.isPending}>
+            <button type="submit" className="btn-primary" disabled={upsert.isPending || !isAdmin}>
               {upsert.isPending ? 'Saving...' : 'Submit Profile'}
             </button>
           </div>

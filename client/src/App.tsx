@@ -41,6 +41,7 @@ import OwnerSettingsPage from '@/pages/OwnerSettingsPage'
 import AskMojoPage from '@/pages/AskMojoPage'
 import AskMojoThreadPage from '@/pages/AskMojoThreadPage'
 import CompanyDocumentsPage from '@/pages/CompanyDocumentsPage'
+import MyAccountPage from '@/pages/MyAccountPage'
 
 function RoleRedirect() {
   const { profile, loading } = useAuth()
@@ -129,6 +130,7 @@ export default function App() {
         <Route path="trades" element={<TradesPage />} />
         <Route path="my-team" element={<MyTeamPage />} />
         <Route path="settings" element={<OwnerSettingsPage />} />
+        <Route path="account" element={<MyAccountPage />} />
         <Route path="ask-mojo" element={<AskMojoPage />} />
         <Route path="ask-mojo/:threadId" element={<AskMojoThreadPage />} />
         <Route path="documents" element={<CompanyDocumentsPage />} />
@@ -154,6 +156,7 @@ export default function App() {
         <Route index element={<GCDashboard />} />
         <Route path="invite" element={<InvitePage />} />
         <Route path="profile" element={<ContractorProfilePage />} />
+        <Route path="account" element={<MyAccountPage />} />
         <Route path="my-projects" element={<MyProjectsPage />} />
         <Route path="projects" element={<ProjectsListPage />} />
         <Route path="projects/new" element={<CreateProjectPage />} />
@@ -192,6 +195,7 @@ export default function App() {
         <Route index element={<TradeDashboard />} />
         <Route path="invite" element={<InvitePage />} />
         <Route path="profile" element={<ContractorProfilePage />} />
+        <Route path="account" element={<MyAccountPage />} />
         <Route path="my-projects" element={<MyProjectsPage />} />
         <Route path="my-team" element={<MyTeamPage />} />
         <Route path="ask-mojo" element={<AskMojoPage />} />

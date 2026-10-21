@@ -12,8 +12,8 @@ export function UserMenu() {
 
   const effectiveRole = profile?.company_type ?? profile?.role
   const basePath = effectiveRole === 'owner' ? '/owner' : effectiveRole === 'gc' ? '/gc' : '/trade'
-  const profilePath = effectiveRole === 'owner' ? `${basePath}/settings` : `${basePath}/profile`
-  const profileLabel = effectiveRole === 'owner' ? 'Settings' : 'My Profile'
+  const profilePath = `${basePath}/account`
+  const profileLabel = 'My Account'
 
   const initials =
     profile?.full_name

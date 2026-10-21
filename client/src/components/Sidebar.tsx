@@ -7,7 +7,6 @@ import clsx from 'clsx'
 import {
   LayoutDashboard,
   LogOut,
-  User,
   FolderOpen,
   HardHat,
   Wrench,
@@ -36,11 +35,10 @@ const ROLE_NAV: Record<string, NavItem[]> = {
     { label: 'Document Library', to: '/owner/documents', icon: <FolderOpen size={18} /> },
     { label: 'Questionnaires', to: '/owner/questionnaires', icon: <FileText size={18} /> },
     { label: 'Question Bank', to: '/owner/question-bank', icon: <Database size={18} /> },
-    { label: 'Settings', to: '/owner/settings', icon: <Settings size={18} /> },
+    { label: 'Organization', to: '/owner/settings', icon: <Settings size={18} /> },
   ],
   gc: [
     { label: 'Dashboard', to: '/gc', icon: <LayoutDashboard size={18} /> },
-    { label: 'My Profile', to: '/gc/profile', icon: <User size={18} /> },
     { label: 'My Projects', to: '/gc/my-projects', icon: <FolderOpen size={18} /> },
     { label: 'Projects I Manage', to: '/gc/projects', icon: <HardHat size={18} /> },
     { label: 'My Team', to: '/gc/my-team', icon: <Users size={18} /> },
@@ -49,15 +47,16 @@ const ROLE_NAV: Record<string, NavItem[]> = {
     { label: 'Trades', to: '/gc/trades', icon: <Wrench size={18} /> },
     { label: 'Questionnaires', to: '/gc/questionnaires', icon: <FileText size={18} /> },
     { label: 'My Assignments', to: '/gc/assignments', icon: <ClipboardList size={18} /> },
+    { label: 'Organization', to: '/gc/profile', icon: <Settings size={18} /> },
   ],
   trade: [
     { label: 'Dashboard', to: '/trade', icon: <LayoutDashboard size={18} /> },
-    { label: 'My Profile', to: '/trade/profile', icon: <User size={18} /> },
     { label: 'My Projects', to: '/trade/my-projects', icon: <FolderOpen size={18} /> },
     { label: 'My Team', to: '/trade/my-team', icon: <Users size={18} /> },
     { label: 'Ask Mojo', to: '/trade/ask-mojo', icon: <Sparkles size={18} /> },
     { label: 'Document Library', to: '/trade/documents', icon: <FolderOpen size={18} /> },
     { label: 'My Assignments', to: '/trade/assignments', icon: <ClipboardList size={18} /> },
+    { label: 'Organization', to: '/trade/profile', icon: <Settings size={18} /> },
   ],
 }
 

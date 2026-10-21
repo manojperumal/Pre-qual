@@ -3,12 +3,7 @@ import { useForm } from 'react-hook-form'
 import { useAuth } from '@/hooks/useAuth'
 import { useUpdateCompany } from '@/hooks/useCompany'
 import { CompanyLogoUpload } from '@/components/CompanyLogoUpload'
-import { supabase } from '@/lib/supabase'
 import { CheckCircle } from 'lucide-react'
-
-interface AccountForm {
-  full_name: string
-}
 
 interface CompanyForm {
   name: string
@@ -28,11 +23,8 @@ export default function OwnerSettingsPage() {
   const [logoPath, setLogoPath] = useState<string | null | undefined>(company?.logo_path)
   useEffect(() => setLogoPath(company?.logo_path), [company?.logo_path])
 
-  const [accountSaved, setAccountSaved] = useState(false)
   const [companySaved, setCompanySaved] = useState(false)
-  const [accountError, setAccountError] = useState<string | null>(null)
 
-  const accountForm = useForm<AccountForm>({ defaultValues: { full_name: profile?.full_name ?? '' } })
   const companyForm = useForm<CompanyForm>({
     defaultValues: {
       name: company?.name ?? '',
@@ -46,10 +38,6 @@ export default function OwnerSettingsPage() {
   })
 
   useEffect(() => {
-    accountForm.reset({ full_name: profile?.full_name ?? '' })
-  }, [profile?.full_name])
-
-  useEffect(() => {
     companyForm.reset({
       name: company?.name ?? '',
       address: company?.address ?? '',
@@ -60,18 +48,6 @@ export default function OwnerSettingsPage() {
       website: company?.website ?? '',
     })
   }, [company])
-
-  async function onSaveAccount(data: AccountForm) {
-    if (!profile?.id) return
-    setAccountError(null)
-    const { error } = await supabase.from('profiles').update({ full_name: data.full_name }).eq('id', profile.id)
-    if (error) {
-      setAccountError(error.message)
-      return
-    }
-    setAccountSaved(true)
-    setTimeout(() => setAccountSaved(false), 2000)
-  }
 
   async function onSaveCompany(data: CompanyForm) {
     if (!profile?.new_company_id) return
@@ -93,44 +69,13 @@ export default function OwnerSettingsPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage your account and company information</p>
+        <h1 className="text-2xl font-bold text-gray-900">Organization</h1>
+        <p className="text-sm text-gray-500 mt-1">Your company's profile, shared across everyone on your account</p>
       </div>
-
-      {/* Account */}
-      <form onSubmit={accountForm.handleSubmit(onSaveAccount)} className="card p-6 space-y-4">
-        <h2 className="text-base font-semibold text-gray-900">Your Account</h2>
-
-        {accountError && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">{accountError}</div>
-        )}
-        {accountSaved && (
-          <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2 text-sm">
-            <CheckCircle size={16} />
-            Saved
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="label">Full Name</label>
-            <input className="input-field" {...accountForm.register('full_name')} />
-          </div>
-          <div>
-            <label className="label">Email</label>
-            <input className="input-field bg-gray-50 text-gray-500" value={profile?.email ?? ''} disabled />
-          </div>
-        </div>
-
-        <button type="submit" disabled={accountForm.formState.isSubmitting} className="btn-primary text-sm">
-          Save Account
-        </button>
-      </form>
 
       {/* Company */}
       <form onSubmit={companyForm.handleSubmit(onSaveCompany)} className="card p-6 space-y-4">
         <h2 className="text-base font-semibold text-gray-900">Company Information</h2>
-        <p className="text-xs text-gray-500 -mt-2">Shared across everyone on your company's account</p>
 
         {companyError && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">{companyError}</div>
@@ -143,7 +88,7 @@ export default function OwnerSettingsPage() {
         )}
         {!isAdmin && (
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-700 text-sm">
-            Only company admins can edit this information.
+            You can view your company's profile here. Only a company admin can make changes.
           </div>
         )}
 
