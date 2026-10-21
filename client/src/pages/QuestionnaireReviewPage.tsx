@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { ChevronRight, ThumbsUp, XCircle, MessageSquare } from 'lucide-react'
+import { ChevronRight, ThumbsUp, XCircle, MessageSquare, Sparkles, AlertTriangle, Flag } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import {
   useAssignment,
@@ -8,6 +8,7 @@ import {
   useAssignmentResponses,
   useUpdateAssignmentStatus,
   useUpsertResponse,
+  useGenerateReviewSummary,
   type AssignmentStatus,
   type Response,
 } from '@/hooks/useQuestionnaires'
@@ -42,10 +43,12 @@ export default function QuestionnaireReviewPage() {
   const { data: responses = [] } = useAssignmentResponses(assignmentId)
   const updateStatus = useUpdateAssignmentStatus()
   const upsertResponse = useUpsertResponse()
+  const generateSummary = useGenerateReviewSummary()
 
   const [notes, setNotes] = useState('')
   const [acting, setActing] = useState(false)
   const [mojoFeedback, setMojoFeedback] = useState<Record<string, string>>({})
+  const [needsClarification, setNeedsClarification] = useState<Record<string, boolean>>({})
 
   const responseMap = Object.fromEntries((responses as Response[]).map(r => [r.question_id, r]))
 
@@ -59,13 +62,16 @@ export default function QuestionnaireReviewPage() {
 
   const visibleQQList = qqList.filter(isConditionMet)
 
-  // Init mojo feedback from saved responses
+  // Init mojo feedback + clarification flags from saved responses
   useEffect(() => {
-    const init: Record<string, string> = {}
+    const feedback: Record<string, string> = {}
+    const clarification: Record<string, boolean> = {}
     for (const r of responses as Response[]) {
-      if (r.mojo_feedback) init[r.question_id] = r.mojo_feedback
+      if (r.mojo_feedback) feedback[r.question_id] = r.mojo_feedback
+      if (r.needs_clarification) clarification[r.question_id] = true
     }
-    setMojoFeedback(init)
+    setMojoFeedback(feedback)
+    setNeedsClarification(clarification)
   }, [(responses as Response[]).length])
 
   const basePath = profile?.role === 'trade'
@@ -78,20 +84,22 @@ export default function QuestionnaireReviewPage() {
     if (!assignmentId || !profile) return
     setActing(true)
     try {
-      // Save mojo feedback for any question that has it
-      for (const [questionId, feedback] of Object.entries(mojoFeedback)) {
-        if (!feedback.trim()) continue
-        const existing = responseMap[questionId]
-        if (!existing) continue
+      // Save mojo feedback / clarification flag for any question whose
+      // reviewer state has changed from what's already saved.
+      for (const existing of Object.values(responseMap)) {
+        const feedback = mojoFeedback[existing.question_id] ?? ''
+        const flagged = needsClarification[existing.question_id] ?? false
+        if (feedback === (existing.mojo_feedback ?? '') && flagged === existing.needs_clarification) continue
         await upsertResponse.mutateAsync({
           assignment_id: assignmentId,
-          question_id: questionId,
+          question_id: existing.question_id,
           answer_text: existing.answer_text,
           answer_options: existing.answer_options,
           document_path: existing.document_path,
           document_name: existing.document_name,
           company_comments: existing.company_comments,
-          mojo_feedback: feedback,
+          mojo_feedback: feedback || null,
+          needs_clarification: flagged,
         })
       }
       await updateStatus.mutateAsync({
@@ -104,6 +112,15 @@ export default function QuestionnaireReviewPage() {
     } finally {
       setActing(false)
     }
+  }
+
+  function toggleClarification(questionId: string) {
+    setNeedsClarification(prev => ({ ...prev, [questionId]: !prev[questionId] }))
+  }
+
+  async function handleGenerateSummary() {
+    if (!assignmentId) return
+    await generateSummary.mutateAsync(assignmentId)
   }
 
   async function getDocUrl(path: string) {
@@ -142,6 +159,61 @@ export default function QuestionnaireReviewPage() {
         </span>
       </div>
 
+      {/* AI summary */}
+      {isReviewer && (
+        <div className="mb-8 bg-gradient-to-br from-brand-50 to-indigo-50 border border-brand-200 rounded-xl p-5">
+          <div className="flex items-center justify-between gap-3 mb-1">
+            <div className="flex items-center gap-2">
+              <Sparkles size={18} className="text-brand-600" />
+              <h2 className="text-sm font-semibold text-gray-900">AI Summary</h2>
+            </div>
+            <button
+              onClick={handleGenerateSummary}
+              disabled={generateSummary.isPending}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 text-white rounded-lg text-xs font-medium hover:bg-brand-700 disabled:opacity-50"
+            >
+              <Sparkles size={13} />
+              {generateSummary.isPending ? 'Analyzing…' : generateSummary.data ? 'Regenerate' : 'Generate Summary'}
+            </button>
+          </div>
+
+          {!generateSummary.data && !generateSummary.isPending && !generateSummary.error && (
+            <p className="text-xs text-gray-500 mt-2">
+              Let Mojo AI read every question and answer here and call out what deserves a closer look before you decide.
+            </p>
+          )}
+
+          {generateSummary.error && (
+            <p className="text-xs text-red-600 mt-2">{(generateSummary.error as Error).message}</p>
+          )}
+
+          {generateSummary.data && (
+            <div className="mt-3 space-y-4">
+              {generateSummary.data.attention.length > 0 && (
+                <div>
+                  <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 mb-1.5">
+                    <AlertTriangle size={13} /> Pay closer attention to
+                  </p>
+                  <ul className="space-y-1 list-disc list-inside">
+                    {generateSummary.data.attention.map((item, i) => (
+                      <li key={i} className="text-sm text-gray-700">{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <div>
+                <p className="text-xs font-semibold text-gray-700 mb-1.5">Overall summary</p>
+                <ul className="space-y-1 list-disc list-inside">
+                  {generateSummary.data.summary.map((item, i) => (
+                    <li key={i} className="text-sm text-gray-700">{item}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Responses, grouped by category */}
       {(() => {
         const indexMap = new Map(visibleQQList.map((qq, i) => [qq.id, i]))
@@ -161,11 +233,33 @@ export default function QuestionnaireReviewPage() {
                     const idx = indexMap.get(qq.id) ?? 0
                     const r = responseMap[q.id]
 
+                    const flagged = needsClarification[q.id] ?? false
+
                     return (
-                      <div key={qq.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-                        <p className="text-sm font-semibold text-gray-800 mb-3">
-                          {idx + 1}. {q.question_text}
-                        </p>
+                      <div key={qq.id} className={`bg-white rounded-xl shadow-sm border p-5 ${flagged ? 'border-amber-300' : 'border-gray-200'}`}>
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <p className="text-sm font-semibold text-gray-800">
+                            {idx + 1}. {q.question_text}
+                          </p>
+                          {canAct ? (
+                            <button
+                              type="button"
+                              onClick={() => toggleClarification(q.id)}
+                              className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full flex-shrink-0 ${
+                                flagged ? 'bg-amber-100 text-amber-700' : 'text-gray-400 hover:bg-gray-100'
+                              }`}
+                            >
+                              <Flag size={12} />
+                              {flagged ? 'Flagged' : 'Flag'}
+                            </button>
+                          ) : (
+                            flagged && (
+                              <span className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-amber-100 text-amber-700 flex-shrink-0">
+                                <Flag size={12} /> Clarification requested
+                              </span>
+                            )
+                          )}
+                        </div>
 
               {!r ? (
                 <p className="text-sm text-gray-400 italic">No answer provided</p>
@@ -214,6 +308,23 @@ export default function QuestionnaireReviewPage() {
                         ) : (
                           <p className="text-sm text-gray-700 whitespace-pre-wrap">{r.answer_text || <span className="italic text-gray-400">—</span>}</p>
                         )}
+
+                        {q.answer_type !== 'radio_yes_no_comments' && (flagged || mojoFeedback[q.id]) && (
+                          <div className="bg-amber-50 border border-amber-100 rounded-lg p-3 mt-3">
+                            <p className="text-xs font-medium text-amber-700 mb-1">Note for Contractor</p>
+                            {canAct ? (
+                              <textarea
+                                rows={2}
+                                value={mojoFeedback[q.id] ?? ''}
+                                onChange={e => setMojoFeedback(prev => ({ ...prev, [q.id]: e.target.value }))}
+                                placeholder="What needs clarification here?"
+                                className="w-full bg-white border border-amber-200 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400"
+                              />
+                            ) : (
+                              <p className="text-sm text-amber-800">{mojoFeedback[q.id] || <span className="italic text-amber-400">No note yet</span>}</p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -241,14 +352,14 @@ export default function QuestionnaireReviewPage() {
               disabled={acting}
               className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
             >
-              <ThumbsUp size={15} /> Approve
+              <ThumbsUp size={15} /> Accept
             </button>
             <button
               onClick={() => act('needs_more_info')}
               disabled={acting}
               className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 disabled:opacity-50"
             >
-              <MessageSquare size={15} /> Request More Info
+              <MessageSquare size={15} /> Send Back for Clarification
             </button>
             <button
               onClick={() => act('rejected')}

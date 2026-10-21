@@ -203,6 +203,131 @@ async function hasAssignmentAccess(
 }
 
 /**
+ * POST /api/questionnaires/:assignmentId/review-summary
+ * Generates an on-demand AI summary of a submitted questionnaire's answers
+ * for a reviewer (Owner/GC): which questions deserve a closer look, plus
+ * an overall bullet-point summary. Not persisted — regenerated each time
+ * a reviewer asks for it.
+ */
+router.post('/:assignmentId/review-summary', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const { assignmentId } = req.params
+
+  const { data: assignment, error: assignmentErr } = await supabaseAdmin
+    .from('questionnaire_assignments')
+    .select('assignee_id, assigned_by, company_id, status, questionnaire:questionnaires(name)')
+    .eq('id', assignmentId)
+    .single()
+
+  if (assignmentErr || !assignment) {
+    res.status(404).json({ error: 'Assignment not found' })
+    return
+  }
+  if (!(await hasAssignmentAccess(assignment, req.userId!))) {
+    res.status(403).json({ error: 'Access denied' })
+    return
+  }
+
+  const { data: fullAssignment } = await supabaseAdmin
+    .from('questionnaire_assignments')
+    .select('questionnaire_id')
+    .eq('id', assignmentId)
+    .single()
+
+  const { data: qqListFinal, error: qqErr } = await supabaseAdmin
+    .from('questionnaire_questions')
+    .select('*, question:question_bank!questionnaire_questions_question_id_fkey(*)')
+    .eq('questionnaire_id', fullAssignment?.questionnaire_id)
+    .order('order_index')
+
+  if (qqErr || !qqListFinal?.length) {
+    res.status(400).json({ error: 'No questions found for this questionnaire' })
+    return
+  }
+
+  const { data: responses } = await supabaseAdmin
+    .from('questionnaire_responses')
+    .select('*')
+    .eq('assignment_id', assignmentId)
+
+  const responseMap = new Map((responses ?? []).map((r) => [r.question_id, r]))
+
+  const qaText = qqListFinal
+    .map((qq: any, i: number) => {
+      const q = qq.question
+      if (!q) return null
+      const r = responseMap.get(q.id)
+      let answer = '(no answer provided)'
+      if (r) {
+        if (r.answer_text) answer = r.answer_text
+        else if (r.answer_options?.length) answer = r.answer_options.join(', ')
+        else if (r.document_path) answer = `Document uploaded: ${r.document_name ?? r.document_path}`
+        if (r.company_comments) answer += `\nComments: ${r.company_comments}`
+      }
+      return `Q${i + 1}: ${q.question_text}\nA${i + 1}: ${answer}`
+    })
+    .filter(Boolean)
+    .join('\n\n')
+
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+
+  const submitSummaryTool: Anthropic.Tool = {
+    name: 'submit_review_summary',
+    description: 'Submit a structured review summary of a submitted pre-qualification questionnaire.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        attention: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Bullet points calling out specific questions/answers the reviewer should pay closer attention to (risk flags, missing info, inconsistent or concerning answers). Each bullet should name the specific question or topic. Empty array if nothing stands out.',
+        },
+        summary: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Bullet points giving an overall summary of how this contractor answered the questionnaire as a whole.',
+        },
+      },
+      required: ['attention', 'summary'],
+    },
+  }
+
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2000,
+      tools: [submitSummaryTool],
+      tool_choice: { type: 'tool', name: 'submit_review_summary' },
+      messages: [
+        {
+          role: 'user',
+          content: `You are a pre-qualification specialist helping a reviewer (Owner or General Contractor) quickly assess a contractor's completed pre-qualification questionnaire "${(assignment as any).questionnaire?.name ?? ''}" before approving it.
+
+Below are the questions and the contractor's submitted answers. Produce:
+1. "attention" — bullet points flagging specific questions/answers the reviewer should look at more closely: missing answers, "no" answers to safety/compliance questions, low/concerning values (e.g. high EMR, no PTP program), missing documents, or anything inconsistent. If everything looks fine, return an empty array.
+2. "summary" — a concise bullet-point overview of the contractor's answers as a whole (their safety posture, insurance standing, experience, etc.)
+
+Keep each bullet short (one sentence). Base everything strictly on the answers given — do not speculate beyond what's stated.
+
+Questionnaire responses:
+${qaText}`,
+        },
+      ],
+    })
+
+    const toolUse = message.content.find((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
+    if (!toolUse) {
+      res.status(502).json({ error: 'AI did not return a summary' })
+      return
+    }
+    const input = toolUse.input as { attention?: string[]; summary?: string[] }
+    res.json({ attention: input.attention ?? [], summary: input.summary ?? [] })
+  } catch (err: any) {
+    console.error('[review-summary] Anthropic call failed:', err)
+    res.status(500).json({ error: err?.message ?? 'AI summary failed' })
+  }
+})
+
+/**
  * POST /api/questionnaires/:assignmentId/ai-complete
  * Reads uploaded contractor documents and auto-fills questionnaire answers using Claude.
  * Body: { document_paths: Array<{ path: string; type: string; name: string }> }

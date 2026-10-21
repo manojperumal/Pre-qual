@@ -114,6 +114,7 @@ export interface Response {
   mojo_feedback: string | null
   mojo_reviewed_at: string | null
   mojo_reviewed_by: string | null
+  needs_clarification: boolean
   ai_suggested: boolean
   created_at: string
   updated_at: string
@@ -764,6 +765,7 @@ export function useUpsertResponse() {
       document_name?: string | null
       company_comments?: string | null
       mojo_feedback?: string | null
+      needs_clarification?: boolean
       ai_suggested?: boolean | null
     }) => {
       const { data, error } = await supabase
@@ -776,6 +778,35 @@ export function useUpsertResponse() {
     },
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['responses', data.assignment_id] })
+    },
+  })
+}
+
+export interface ReviewSummary {
+  attention: string[]
+  summary: string[]
+}
+
+// AI-generated review summary for a reviewer (Owner/GC) looking at a
+// submitted questionnaire — not persisted, generated on demand.
+export function useGenerateReviewSummary() {
+  return useMutation({
+    mutationFn: async (assignmentId: string): Promise<ReviewSummary> => {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      const apiUrl = import.meta.env.VITE_API_URL || ''
+      const res = await fetch(`${apiUrl}/api/questionnaires/${assignmentId}/review-summary`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as any).error || 'Failed to generate summary')
+      }
+      return res.json()
     },
   })
 }
