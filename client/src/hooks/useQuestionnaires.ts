@@ -350,7 +350,7 @@ export function useQuestionnaireQuestions(questionnaireId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('questionnaire_questions')
-        .select('*, question:question_bank(*)')
+        .select('*, question:question_bank!questionnaire_questions_question_id_fkey(*)')
         .eq('questionnaire_id', questionnaireId!)
         .order('order_index')
       if (error) throw error

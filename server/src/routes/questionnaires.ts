@@ -186,7 +186,7 @@ router.post('/:assignmentId/ai-complete', requireAuth, async (req: Request, res:
   // Fetch questionnaire questions
   const { data: qqList, error: questionsErr } = await supabaseAdmin
     .from('questionnaire_questions')
-    .select('*, question:question_bank(*)')
+    .select('*, question:question_bank!questionnaire_questions_question_id_fkey(*)')
     .eq('questionnaire_id', assignment.questionnaire_id)
     .order('order_index')
 
