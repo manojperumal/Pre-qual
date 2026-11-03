@@ -27,6 +27,7 @@ export interface Check {
 }
 
 export interface ModuleContent {
+  title?: L10n
   segments: Segment[]
   checks: Check[]
   delta?: { segments: Segment[]; checks: Check[] }
@@ -353,4 +354,25 @@ export const PROJECT_SECTION_TEMPLATE: Record<string, TemplateModule> = {
 export const ATTESTATION_STATEMENT: Record<Lang, string> = {
   en: 'I confirm that I personally completed this site orientation, that I understood the content, and that I will follow these rules on site. I know I can stop unsafe work and ask questions at any time.',
   es: 'Confirmo que completé personalmente esta orientación de la obra, que entendí el contenido y que seguiré estas reglas en la obra. Sé que puedo detener un trabajo inseguro y hacer preguntas en cualquier momento.',
+}
+
+// Worker-facing titles per language (the module's internal title stays English).
+const TITLES_ES: Record<string, string> = {
+  'Welcome and your safety rights': 'Bienvenida y sus derechos de seguridad',
+  'Hazard awareness and housekeeping': 'Reconocimiento de peligros y orden',
+  'PPE basics': 'Conceptos básicos de EPP',
+  'Reporting injuries, incidents and near misses': 'Reporte de lesiones, incidentes y casi accidentes',
+  'Site-specific hazards': 'Peligros específicos de la obra',
+  'Emergency procedures and muster points': 'Procedimientos de emergencia y puntos de reunión',
+  'PPE requirements on this site': 'Requisitos de EPP en esta obra',
+  'Fall protection': 'Protección contra caídas',
+  'Lockout / tagout': 'Bloqueo y etiquetado',
+  'Hot work': 'Trabajo en caliente',
+  'Confined space': 'Espacios confinados',
+  'Incident reporting on this site': 'Reporte de incidentes en esta obra',
+  'Stop-work authority on this site': 'Autoridad para detener el trabajo en esta obra',
+}
+
+for (const t of [...BASELINE_TEMPLATE, ...Object.values(PROJECT_SECTION_TEMPLATE)]) {
+  ;(t.content as ModuleContent & { title?: L10n }).title = { en: t.title, es: TITLES_ES[t.title] ?? t.title }
 }

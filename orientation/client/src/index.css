@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-[#F3F4F6] text-[#0A0A0A] antialiased;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-md shadow-sm bg-brand-500 hover:bg-brand-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-[#0A0A0A] bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md shadow-sm hover:bg-red-700 disabled:opacity-50 transition-colors;
+  }
+  .input-field {
+    @apply block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 bg-white focus:outline-none focus:ring-brand-500 focus:border-brand-500 sm:text-sm;
+  }
+  .label {
+    @apply block text-sm font-medium text-gray-800 mb-1;
+  }
+  .card {
+    @apply bg-white rounded-lg border border-gray-200 shadow-sm;
+  }
+
+  /* Worker flow: large type and tap targets for tired hands and small screens (NFR accessibility). */
+  .w-btn {
+    @apply flex w-full min-h-[56px] items-center justify-center gap-2 rounded-xl px-5 text-lg font-semibold text-white bg-brand-500 active:bg-brand-700 disabled:opacity-50 shadow-sm;
+  }
+  .w-btn-ghost {
+    @apply flex w-full min-h-[56px] items-center justify-center gap-2 rounded-xl px-5 text-lg font-semibold text-gray-900 bg-white border-2 border-gray-300 active:bg-gray-100 disabled:opacity-50;
+  }
+  .w-input {
+    @apply block w-full min-h-[56px] rounded-xl border-2 border-gray-300 bg-white px-4 text-lg focus:border-brand-500 focus:outline-none;
+  }
+  .w-label {
+    @apply mb-1.5 block text-base font-semibold text-gray-900;
+  }
+}

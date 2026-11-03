@@ -7,6 +7,7 @@ import { useProjects } from '@/hooks/useProjects'
 import { ProjectSubmission, SubmissionDocument } from '@/types'
 import { AlertTriangle, CheckCircle, ChevronRight, FileText, ThumbsUp, MessageSquare, XCircle } from 'lucide-react'
 import { format } from 'date-fns'
+import OrientationComplianceCard from '@/components/OrientationComplianceCard'
 
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-700',
@@ -55,11 +56,11 @@ export default function SubmissionReviewPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('project_submissions')
-        .select('*, contractor:profiles!contractor_id(full_name, company_name, email)')
+        .select('*, contractor:profiles!contractor_id(full_name, company_name, email, new_company_id)')
         .eq('id', submissionId!)
         .single()
       if (error) throw error
-      return data as ProjectSubmission & { contractor: { full_name: string; company_name: string; email: string } }
+      return data as ProjectSubmission & { contractor: { full_name: string; company_name: string; email: string; new_company_id: string | null } }
     },
   })
 
@@ -175,6 +176,8 @@ export default function SubmissionReviewPage() {
           </div>
         )}
       </div>
+
+      <OrientationComplianceCard companyId={submission.contractor?.new_company_id} projectId={projectId} />
 
       {/* Profile snapshot */}
       {Object.keys(snap).length > 0 && (
