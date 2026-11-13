@@ -4,6 +4,7 @@ import { ChevronRight, CheckCircle, XCircle, AlertTriangle, HardHat } from 'luci
 import { format } from 'date-fns'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import OrientationComplianceCard from '@/components/OrientationComplianceCard'
 
 function useProfile(userId: string | undefined) {
   return useQuery({
@@ -12,7 +13,7 @@ function useProfile(userId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, company_name, email')
+        .select('id, full_name, company_name, email, new_company_id')
         .eq('id', userId!)
         .single()
       if (error) throw error
@@ -101,6 +102,8 @@ export default function GCProfileViewPage() {
           {user?.email && <p className="text-sm text-gray-500 mt-0.5">{user.email}</p>}
         </div>
       </div>
+
+      <OrientationComplianceCard companyId={(user as { new_company_id?: string | null } | undefined)?.new_company_id} />
 
       {!cp ? (
         <div className="card p-10 text-center text-gray-500">
