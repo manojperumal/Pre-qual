@@ -26,6 +26,7 @@ let server: any
 let db: pg.Client
 let signJwt: (p: any, s: string, e: number) => string
 let runReminders: (now?: Date) => Promise<{ reminders: number; expired: number }>
+let resetSchedulerCache: () => void
 
 const ids: Record<string, string> = {}
 const tok: Record<string, string> = {}
@@ -94,7 +95,7 @@ d('orientation MVP end to end', () => {
     process.env.ORIENTATION_LOCAL_MEDIA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'orient-media-'))
     process.env.ORIENTATION_EXPOSE_DEV_OTP = 'true'
     ;({ signJwt } = await import('../src/lib/tokens.js'))
-    ;({ runReminders } = await import('../src/lib/scheduler.js'))
+    ;({ runReminders, resetSchedulerCache } = await import('../src/lib/scheduler.js'))
     const { createApp } = await import('../src/app.js')
     server = createApp().listen(0)
     base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
@@ -411,6 +412,18 @@ d('orientation MVP end to end', () => {
     expect((await runReminders(new Date(expires.getTime() - 5 * 86400000))).reminders).toBe(0) // idempotent
     const notes = await db.query(`select user_id from notifications where type = 'orientation_expiry'`)
     expect(notes.rows.map((n) => n.user_id).sort()).toEqual([ids.u_gc, ids.u_trade].sort())
+    // Production may lack Pre-qual's notifications table: SMS reminders must still go out.
+    await db.query(`alter table notifications rename to notifications_off`)
+    resetSchedulerCache()
+    try {
+      const before = (await db.query(`select count(*)::int as n from orient_audit_log where event = 'expiry_reminder_sent'`)).rows[0].n
+      expect((await runReminders(new Date(expires.getTime() - 0.5 * 86400000))).reminders).toBe(1)
+      const after = (await db.query(`select count(*)::int as n from orient_audit_log where event = 'expiry_reminder_sent'`)).rows[0].n
+      expect(after).toBe(before + 1)
+    } finally {
+      await db.query(`alter table notifications_off rename to notifications`)
+      resetSchedulerCache()
+    }
     const r2 = await runReminders(new Date(expires.getTime() + 1000))
     expect(r2.expired).toBe(1)
     expect((await runReminders(new Date(expires.getTime() + 2000))).expired).toBe(0)

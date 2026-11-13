@@ -15,7 +15,20 @@ import { sendSms } from './sms.js'
 
 const DAY = 86400000
 
+let notificationsTable: boolean | null = null
+
+/** Pre-qual's notifications table (migration 022) may be absent; reminders still go out by SMS. */
+async function hasNotificationsTable(): Promise<boolean> {
+  if (notificationsTable === null) {
+    const r = await q(`select to_regclass('public.notifications') is not null as ok`)
+    notificationsTable = r[0]?.ok === true
+    if (!notificationsTable) console.warn('[orientation:scheduler] public.notifications not found — skipping in-app notifications (SMS still sent)')
+  }
+  return notificationsTable
+}
+
 async function notifyStaff(projectId: string, companyId: string | null, title: string, body: string, link: string) {
+  if (!(await hasNotificationsTable())) return 0
   const recipients = await q(
     `select distinct pr.id from profiles pr
       where (pr.new_company_id = $2 and pr.user_role = 'admin')
@@ -59,14 +72,26 @@ export async function runReminders(now = new Date()): Promise<{ reminders: numbe
     [now]
   )
   for (const r of rows) {
+    try {
+      const outcome = await remindOne(r, now)
+      if (outcome === 'expired') expired++
+      else if (outcome === 'reminded') reminders++
+    } catch (err) {
+      console.error(`[orientation:scheduler] reminder failed for enrollment ${r.id}`, err)
+    }
+  }
+  return { reminders, expired }
+}
+
+async function remindOne(r: any, now: Date): Promise<'expired' | 'reminded' | null> {
+  {
     const expiresAt = new Date(r.expires_at)
     const expKey = expiresAt.toISOString().slice(0, 10)
     const link = `${config.appUrl}/o/${r.join_code}`
     const es = r.preferred_language === 'es'
 
     if (expiresAt <= now) {
-      if (!(await claim(r.id, `expired:${expKey}`))) continue
-      expired++
+      if (!(await claim(r.id, `expired:${expKey}`))) return null
       await audit(pool, SYSTEM, 'clearance_expired', { projectId: r.project_id, enrollmentId: r.id, workerId: r.worker_id }, { expires_at: expiresAt })
       await sendSms(
         r.phone,
@@ -75,17 +100,16 @@ export async function runReminders(now = new Date()): Promise<{ reminders: numbe
           : `Safety Mojo: your orientation for ${r.project_name} has expired. Renew it before your next shift: ${link}`
       )
       await notifyStaff(r.project_id, r.company_id, 'Orientation expired', `${r.full_name}'s orientation for ${r.project_name} expired.`, `${config.appUrl}/staff/projects/${r.project_id}`)
-      continue
+      return 'expired'
     }
 
     const daysLeft = (expiresAt.getTime() - now.getTime()) / DAY
     const due = (r.reminder_days as number[]).filter((d) => daysLeft <= d).sort((a, b) => a - b)
-    if (due.length === 0) continue
+    if (due.length === 0) return null
     // Mark every threshold already passed, but message once — for the closest one.
     let fresh = false
     for (const d of due) if (await claim(r.id, `expiry:${expKey}:${d}`)) fresh = fresh || d === due[0]
-    if (!fresh) continue
-    reminders++
+    if (!fresh) return null
     const days = Math.max(1, Math.ceil(daysLeft))
     await audit(pool, SYSTEM, 'expiry_reminder_sent', { projectId: r.project_id, enrollmentId: r.id, workerId: r.worker_id }, { days_left: days })
     await sendSms(
@@ -101,8 +125,8 @@ export async function runReminders(now = new Date()): Promise<{ reminders: numbe
       `${r.full_name}'s orientation for ${r.project_name} expires in ${days} day(s).`,
       `${config.appUrl}/staff/projects/${r.project_id}`
     )
+    return 'reminded'
   }
-  return { reminders, expired }
 }
 
 export async function recomputeAll() {
@@ -128,4 +152,9 @@ export function startScheduler() {
 
 export function stopScheduler() {
   if (timer) clearInterval(timer)
+}
+
+/** Test hook: forget the cached notifications-table lookup. */
+export function resetSchedulerCache() {
+  notificationsTable = null
 }
